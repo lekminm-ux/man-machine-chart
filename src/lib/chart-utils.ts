@@ -25,10 +25,63 @@ export function getMachineTime(steps: ChartStep[]): number {
 
 /** For each operator, build a time-sorted list of timeline segments */
 export interface TimeSegment {
-  type: 'manual' | 'machine' | 'walk' | 'idle';
+  type: 'manual' | 'machine' | 'walk' | 'idle' | 'empty';
   start: number; // seconds from cycle start
   duration: number;
   label?: string;
+}
+
+/** Build segments for a single step (renders empty space before and after the active step) */
+export function buildSingleStepSegments(
+  step: ChartStep,
+  start: number,
+  cycleTime: number
+): TimeSegment[] {
+  const segments: TimeSegment[] = [];
+  const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
+
+  // 1. Empty segment before the step starts
+  if (start > 0) {
+    segments.push({ type: 'empty', start: 0, duration: start });
+  }
+
+  // 2. Active segments for this step
+  let currentStart = start;
+  const isMachine = step.operator === 'Auto M/C';
+
+  if (isMachine) {
+    if (step.machineTime > 0) {
+      segments.push({ type: 'machine', start: currentStart, duration: step.machineTime });
+      currentStart += step.machineTime;
+    }
+  } else {
+    if (step.manualTime > 0) {
+      segments.push({ type: 'manual', start: currentStart, duration: step.manualTime, label: step.description });
+      currentStart += step.manualTime;
+    }
+    if (step.walkingTime > 0) {
+      segments.push({ type: 'walk', start: currentStart, duration: step.walkingTime, label: 'Walk' });
+      currentStart += step.walkingTime;
+    }
+    if (step.idleTime > 0) {
+      segments.push({ type: 'idle', start: currentStart, duration: step.idleTime, label: 'Idle' });
+      currentStart += step.idleTime;
+    }
+    if (step.machineTime > 0) {
+      segments.push({ type: 'machine', start: currentStart, duration: step.machineTime });
+      currentStart += step.machineTime;
+    }
+  }
+
+  const stepEnd = currentStart;
+  const totalDur = Math.max(cycleTime, stepEnd);
+
+  // 3. Empty segment after the step ends
+  if (totalDur > stepEnd) {
+    segments.push({ type: 'empty', start: stepEnd, duration: totalDur - stepEnd });
+  }
+
+  return segments;
 }
 
 /**

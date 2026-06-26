@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { buildTimelineSegments, getActiveWorkers, computeTotalDuration } from '@/lib/chart-utils';
+import { buildSingleStepSegments, getActiveWorkers, computeTotalDuration } from '@/lib/chart-utils';
 import { TimelineRow, ROW_HEIGHT, LABEL_WIDTH, TICK_HEIGHT } from './TimelineRow';
 import type { OperatorType } from '@/types';
 
@@ -47,13 +47,24 @@ export default function ManMachineChart() {
     );
   }
 
-  const workers    = getActiveWorkers(steps);
-  const hasMachine = steps.some(s => s.operator === 'Auto M/C');
+  // 1. Pre-calculate start times for all steps sequentially per operator/machine
+  const stepStartTimes: Record<string, number> = {};
+  const actorEndTimes: Record<string, number> = {};
+  for (const step of steps) {
+    const actor = step.operator;
+    const lastEnd = actorEndTimes[actor] || 0;
+    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
+    stepStartTimes[step.id] = start;
+    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
+    actorEndTimes[actor] = start + stepDur;
+  }
 
-  const rows: Array<{ label: string; op: OperatorType | 'Machine' }> = [
-    ...(hasMachine ? [{ label: 'Machine', op: 'Machine' as const }] : []),
-    ...workers.map(w => ({ label: w, op: w as OperatorType })),
-  ];
+  // 2. Map one chart row to each step in the table
+  const rows = steps.map(step => ({
+    id: step.id,
+    label: `${step.no}. ${step.description || `Step ${step.no}`} (${step.operator === 'Auto M/C' ? 'M/C' : step.operator})`,
+    step,
+  }));
 
   const rawDur   = computeTotalDuration(steps);
   const totalDur = Math.max(rawDur, header.cycleTime, 10);
@@ -128,11 +139,12 @@ export default function ManMachineChart() {
         {/* ── Rows ─────────────────────────────────────────────── */}
         {rows.map((row, ri) => {
           const rowY       = chartTop + ri * ROW_HEIGHT;
-          const segs       = buildTimelineSegments(steps, row.op, header.cycleTime);
-          const isMachRow  = row.op === 'Machine';
+          const start      = stepStartTimes[row.step.id] || 0;
+          const segs       = buildSingleStepSegments(row.step, start, totalDur);
+          const isMachRow  = row.step.operator === 'Auto M/C';
 
           return (
-            <g key={row.label}>
+            <g key={row.id}>
               {/* Row background */}
               <rect
                 x={0} y={rowY} width={SVG_W} height={ROW_HEIGHT}
@@ -151,11 +163,11 @@ export default function ManMachineChart() {
               {/* Row label */}
               <text
                 x={LABEL_WIDTH - 10} y={rowY + ROW_HEIGHT / 2 + 4}
-                textAnchor="end" fontSize={11}
-                fontWeight={isMachRow ? '800' : '600'}
+                textAnchor="end" fontSize={9.5}
+                fontWeight={isMachRow ? '700' : '600'}
                 fill={isMachRow ? '#1d4ed8' : '#1f2937'}
               >
-                {row.label}
+                {row.label.length > 22 ? row.label.slice(0, 20) + '…' : row.label}
               </text>
 
               {/* Timeline symbols */}

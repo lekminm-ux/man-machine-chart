@@ -135,6 +135,9 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props
               </g>
             );
 
+          case 'empty':
+            return null;
+
           default:
             return null;
         }
