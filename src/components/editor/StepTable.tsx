@@ -54,6 +54,7 @@ export default function StepTable() {
               <th className="px-2 py-2 text-center w-8 text-gray-500">#</th>
               <th className="px-3 py-2 text-left min-w-[200px] text-gray-700 font-semibold">Process Description</th>
               <th className="px-2 py-2 text-center min-w-[120px] text-gray-700 font-semibold">Operator / Machine</th>
+              <th className="px-2 py-2 text-center w-16 text-gray-700 font-semibold">Start Time (s)</th>
               {TIME_COLS.map(c => (
                 <th key={c.key} className={`px-2 py-2 text-center w-20 font-semibold ${c.color}`}>
                   {c.label}
@@ -67,7 +68,7 @@ export default function StepTable() {
           <tbody>
             {steps.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-gray-400 italic">
+                <td colSpan={10} className="py-8 text-center text-gray-400 italic">
                   No steps yet — click "Add Step" to begin
                 </td>
               </tr>
@@ -110,6 +111,18 @@ export default function StepTable() {
                         <option key={op} value={op}>{op}</option>
                       ))}
                     </select>
+                  </td>
+
+                  {/* Start Time */}
+                  <td className="px-2 py-1.5 w-16">
+                    <input
+                      type="number"
+                      min={0}
+                      value={step.startTime === undefined || step.startTime === null || step.startTime === 0 ? '' : step.startTime}
+                      onChange={e => handleChange(step.id, 'startTime', parseFloat(e.target.value) || 0)}
+                      placeholder="Auto"
+                      className="w-full text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono text-gray-700 bg-white"
+                    />
                   </td>
 
                   {/* Time columns */}
@@ -161,7 +174,7 @@ export default function StepTable() {
           {steps.length > 0 && (
             <tfoot>
               <tr className="bg-slate-100 border-t border-gray-300">
-                <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-gray-600 text-right">TOTALS →</td>
+                <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-600 text-right">TOTALS →</td>
                 {TIME_COLS.map(col => (
                   <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
                     {steps.reduce((a, s) => a + s[col.key], 0)}

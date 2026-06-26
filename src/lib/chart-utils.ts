@@ -32,67 +32,92 @@ export interface TimeSegment {
 }
 
 /**
- * Build per-row segments. Steps are processed sequentially; each step
- * advances the time cursor by its total duration (for all operators together).
+ * Build per-row segments. Steps are processed sequentially per operator/machine;
+ * each operator has their own timeline based on start times and durations, allowing parallel execution.
  */
 export function buildTimelineSegments(
   steps: ChartStep[],
-  operatorOrMachine: OperatorType | 'Machine'
+  operatorOrMachine: OperatorType | 'Machine',
+  cycleTime: number
 ): TimeSegment[] {
-  let cursor = 0;
-  const segments: TimeSegment[] = [];
-
-  for (const step of steps) {
-    // Duration this step occupies on the shared time axis
-    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
-    if (stepDur === 0) continue;
-
+  // 1. Filter steps for this operator/machine
+  const actorSteps = steps.filter(s => {
     if (operatorOrMachine === 'Machine') {
-      // Machine row: show machine time if Auto M/C step, else idle
-      if (step.operator === 'Auto M/C' && step.machineTime > 0) {
-        segments.push({ type: 'machine', start: cursor, duration: step.machineTime });
-      } else {
-        segments.push({ type: 'idle', start: cursor, duration: stepDur });
+      return s.operator === 'Auto M/C';
+    }
+    return s.operator === operatorOrMachine;
+  });
+
+  const segments: TimeSegment[] = [];
+  let lastEnd = 0;
+
+  // 2. Process each step for this actor
+  for (let i = 0; i < actorSteps.length; i++) {
+    const step = actorSteps[i];
+    
+    // Determine start time for this step
+    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
+    
+    // If there is a gap between the last end and this start, fill it with idle time
+    if (start > lastEnd) {
+      segments.push({ type: 'idle', start: lastEnd, duration: start - lastEnd, label: 'Idle' });
+    }
+
+    const isMachine = operatorOrMachine === 'Machine' || step.operator === 'Auto M/C';
+    let currentStart = start;
+
+    if (isMachine) {
+      if (step.machineTime > 0) {
+        segments.push({ type: 'machine', start: currentStart, duration: step.machineTime });
+        currentStart += step.machineTime;
       }
-      cursor += stepDur;
-      continue;
+    } else {
+      if (step.manualTime > 0) {
+        segments.push({ type: 'manual', start: currentStart, duration: step.manualTime, label: step.description });
+        currentStart += step.manualTime;
+      }
+      if (step.walkingTime > 0) {
+        segments.push({ type: 'walk', start: currentStart, duration: step.walkingTime, label: 'Walk' });
+        currentStart += step.walkingTime;
+      }
+      if (step.idleTime > 0) {
+        segments.push({ type: 'idle', start: currentStart, duration: step.idleTime, label: 'Idle' });
+        currentStart += step.idleTime;
+      }
+      if (step.machineTime > 0) {
+        segments.push({ type: 'machine', start: currentStart, duration: step.machineTime });
+        currentStart += step.machineTime;
+      }
     }
 
-    // Worker row
-    if (step.operator !== operatorOrMachine) {
-      // Another actor's step — this worker waits
-      segments.push({ type: 'idle', start: cursor, duration: stepDur });
-      cursor += stepDur;
-      continue;
-    }
+    lastEnd = currentStart;
+  }
 
-    // This worker's own step — emit segments in order
-    if (step.manualTime > 0) {
-      segments.push({ type: 'manual', start: cursor, duration: step.manualTime, label: step.description });
-      cursor += step.manualTime;
-    }
-    if (step.walkingTime > 0) {
-      segments.push({ type: 'walk', start: cursor, duration: step.walkingTime, label: 'Walk' });
-      cursor += step.walkingTime;
-    }
-    if (step.idleTime > 0) {
-      segments.push({ type: 'idle', start: cursor, duration: step.idleTime, label: 'Idle' });
-      cursor += step.idleTime;
-    }
-    if (step.machineTime > 0) {
-      segments.push({ type: 'machine', start: cursor, duration: step.machineTime });
-      cursor += step.machineTime;
-    }
+  // 3. Fill the remaining time up to total cycle time with idle
+  const totalDur = Math.max(cycleTime, lastEnd);
+  if (totalDur > lastEnd) {
+    segments.push({ type: 'idle', start: lastEnd, duration: totalDur - lastEnd, label: 'Idle' });
   }
 
   return segments;
 }
 
-/** Compute total cycle duration = sum of ALL steps (shared timeline) */
+/** Compute total cycle duration = maximum end time across all operators/machines */
 export function computeTotalDuration(steps: ChartStep[]): number {
-  return steps.reduce((sum, s) => {
-    return sum + s.manualTime + s.machineTime + s.walkingTime + s.idleTime;
-  }, 0);
+  if (steps.length === 0) return 0;
+  
+  const actorEndTimes: Record<string, number> = {};
+  
+  for (const step of steps) {
+    const actor = step.operator;
+    const lastEnd = actorEndTimes[actor] || 0;
+    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
+    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
+    actorEndTimes[actor] = start + stepDur;
+  }
+  
+  const endTimes = Object.values(actorEndTimes);
+  return endTimes.length > 0 ? Math.max(...endTimes) : 0;
 }
 
 export function formatSeconds(s: number): string {

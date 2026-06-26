@@ -23,6 +23,7 @@ export interface ChartStep {
   machineTime: number;   // seconds (Auto M/C)
   walkingTime: number;   // seconds
   idleTime: number;      // seconds
+  startTime?: number;    // seconds (optional custom start time)
 }
 
 export interface ChartHeader {

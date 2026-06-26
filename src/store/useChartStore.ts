@@ -279,6 +279,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
         id: uuidv4(), no: file.steps.length + 1,
         description: '', operator: 'Worker A',
         manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 0,
+        startTime: 0,
       };
       const next = {
         ...s,

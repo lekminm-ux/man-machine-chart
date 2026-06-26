@@ -128,7 +128,7 @@ export default function ManMachineChart() {
         {/* ── Rows ─────────────────────────────────────────────── */}
         {rows.map((row, ri) => {
           const rowY       = chartTop + ri * ROW_HEIGHT;
-          const segs       = buildTimelineSegments(steps, row.op);
+          const segs       = buildTimelineSegments(steps, row.op, header.cycleTime);
           const isMachRow  = row.op === 'Machine';
 
           return (

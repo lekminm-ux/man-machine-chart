@@ -34,7 +34,7 @@ export default function SummaryTable() {
           </thead>
           <tbody>
             {summary.map((row, i) => {
-              const idleTime  = steps.filter(s => s.operator === row.operator).reduce((a, s) => a + s.idleTime, 0);
+              const idleTime  = Math.max(0, header.cycleTime - row.lineTotal);
               const util      = header.cycleTime > 0 ? Math.min(100, Math.round((row.lineTotal / header.cycleTime) * 100)) : 0;
               const barColor  = util >= 80 ? 'bg-green-500' : util >= 50 ? 'bg-amber-400' : 'bg-red-400';
 
@@ -99,7 +99,7 @@ export default function SummaryTable() {
                 {summary.reduce((a, s) => a + s.walkTime, 0)}
               </td>
               <td className="px-4 py-2 text-center font-mono text-red-300 font-bold">
-                {steps.reduce((a, s) => a + s.idleTime, 0)}
+                {summary.reduce((a, s) => a + Math.max(0, header.cycleTime - s.lineTotal), 0)}
               </td>
               <td className="px-4 py-2 text-center font-mono font-bold">{grandTotal}</td>
               <td className="px-4 py-2 text-center text-xs text-slate-300">
