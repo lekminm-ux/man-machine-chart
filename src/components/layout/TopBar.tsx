@@ -23,13 +23,17 @@ export default function TopBar() {
         alert('Export region not found. Please open a chart first.');
         return;
       }
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
+      
+      const canvas = await withPatchedStylesheets(async () => {
+        return html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+        });
       });
+
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = imgData;
@@ -58,12 +62,14 @@ export default function TopBar() {
         return;
       }
 
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
+      const canvas = await withPatchedStylesheets(async () => {
+        return html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+        });
       });
       const imgData = canvas.toDataURL('image/png');
 
@@ -94,6 +100,66 @@ export default function TopBar() {
       setExporting(null);
     }
   }, [activeFile]);
+
+// Helper to patch stylesheets (converts Tailwind OKLCH/LAB colors to HSL so html2canvas doesn't throw)
+function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof window === 'undefined') return fn();
+  const sheets = Array.from(document.styleSheets);
+  const originalStates: { sheet: CSSStyleSheet; disabled: boolean }[] = [];
+  const newStyleElements: HTMLStyleElement[] = [];
+
+  for (const sheet of sheets) {
+    try {
+      const rules = sheet.cssRules || sheet.rules;
+      if (!rules) continue;
+
+      let rulesText = '';
+      for (let i = 0; i < rules.length; i++) {
+        rulesText += rules[i].cssText + '\n';
+      }
+
+      if (rulesText.includes('oklch(') || rulesText.includes('lab(')) {
+        let patched = rulesText.replace(
+          /oklch\(\s*([0-9.]+%?)\s+([0-9.]+)\s+([0-9.]+)(?:\s*\/\s*([0-9.]+%?))?\s*\)/gi,
+          (_, l, c, h, a) => {
+            const lightness = l.endsWith('%') ? parseFloat(l) : parseFloat(l) * 100;
+            const chroma = parseFloat(c);
+            const hue = parseFloat(h);
+            const saturation = Math.min(100, Math.max(0, chroma * 250));
+            return a ? `hsla(${hue}, ${saturation}%, ${lightness}%, ${a})` : `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+          }
+        );
+
+        patched = patched.replace(
+          /lab\(\s*([0-9.]+%?)\s+([0-9.-]+)\s+([0-9.-]+)(?:\s*\/\s*([0-9.]+%?))?\s*\)/gi,
+          (_, l, __, ___, a) => {
+            const lightness = l.endsWith('%') ? parseFloat(l) : parseFloat(l);
+            return a ? `hsla(0, 0%, ${lightness}%, ${a})` : `hsl(0, 0%, ${lightness}%)`;
+          }
+        );
+
+        const styleEl = document.createElement('style');
+        styleEl.textContent = patched;
+        document.head.appendChild(styleEl);
+        newStyleElements.push(styleEl);
+
+        originalStates.push({ sheet, disabled: sheet.disabled });
+        sheet.disabled = true;
+      }
+    } catch (e) {
+      // Ignore CORS errors
+    }
+  }
+
+  return fn().finally(() => {
+    for (const state of originalStates) {
+      state.sheet.disabled = state.disabled;
+    }
+    for (const el of newStyleElements) {
+      el.remove();
+    }
+  });
+}
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center px-6 gap-4 shadow-sm flex-shrink-0">
