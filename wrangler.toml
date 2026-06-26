@@ -1,0 +1,6 @@
+# Wrangler Configuration for Cloudflare Pages & D1 Database
+
+[[d1_databases]]
+binding      = "DB"              # ตัวแปรอ้างอิงในโค้ด (context.env.DB)
+database_name = "mm-chart-db"   # ชื่อฐานข้อมูลที่สร้างบน Cloudflare D1
+database_id  = "c475f51c-3bcc-410a-8205-846b458c4efd"

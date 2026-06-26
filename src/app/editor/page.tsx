@@ -17,7 +17,7 @@ export default function EditorPage() {
 
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hydrated) {
     return (

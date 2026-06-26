@@ -22,11 +22,13 @@ function ElementShape({
   selected,
   onMouseDown,
   onDoubleClick,
+  onDelete,
 }: {
   el: LayoutElement;
   selected: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
+  onDelete: () => void;
 }) {
   const { x, y, width: w, height: h, label, type, color } = el;
   const isWorker  = type === 'worker';
@@ -37,6 +39,7 @@ function ElementShape({
       transform={`translate(${x}, ${y})`}
       style={{ cursor: 'grab' }}
       onMouseDown={onMouseDown}
+      onTouchStart={onMouseDown}
       onDoubleClick={onDoubleClick}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
@@ -79,6 +82,34 @@ function ElementShape({
       >
         {label.length > 16 ? label.slice(0, 16) + '…' : label}
       </text>
+
+      {/* Delete button (small red circle with 'x') on top-right of selected element */}
+      {selected && (
+        <g
+          transform={`translate(${w - 6}, 6)`}
+          style={{ cursor: 'pointer' }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <circle r="8" fill="#ef4444" stroke="#ffffff" strokeWidth="1.2" />
+          <path
+            d="M -2.5 -2.5 L 2.5 2.5 M -2.5 2.5 L 2.5 -2.5"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </g>
+      )}
     </g>
   );
 }
@@ -121,7 +152,7 @@ export default function LayoutDiagram() {
 
   // ── Drag ────────────────────────────────────────────────────────────────────
   const onMouseDownEl = useCallback(
-    (e: React.MouseEvent, el: LayoutElement) => {
+    (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
       e.stopPropagation();
       if (connectMode) {
         if (!connectFrom) {
@@ -134,29 +165,49 @@ export default function LayoutDiagram() {
         return;
       }
       setSelectedId(el.id);
+
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
       const svgRect = svgRef.current!.getBoundingClientRect();
       dragRef.current = {
         id: el.id,
         ox: el.x,
         oy: el.y,
-        startX: e.clientX - svgRect.left,
-        startY: e.clientY - svgRect.top,
+        startX: clientX - svgRect.left,
+        startY: clientY - svgRect.top,
       };
     },
     [connectMode, connectFrom, addConn]
   );
 
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+  const handleMove = useCallback(
+    (clientX: number, clientY: number) => {
       if (!dragRef.current) return;
       const svgRect = svgRef.current!.getBoundingClientRect();
-      const dx = (e.clientX - svgRect.left) - dragRef.current.startX;
-      const dy = (e.clientY - svgRect.top)  - dragRef.current.startY;
+      const dx = clientX - svgRect.left - dragRef.current.startX;
+      const dy = clientY - svgRect.top - dragRef.current.startY;
       const nx = Math.max(0, dragRef.current.ox + dx);
       const ny = Math.max(0, dragRef.current.oy + dy);
       updateEl(dragRef.current.id, { x: nx, y: ny });
     },
     [updateEl]
+  );
+
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      handleMove(e.clientX, e.clientY);
+    },
+    [handleMove]
+  );
+
+  const onTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    },
+    [handleMove]
   );
 
   const onMouseUp = useCallback(() => { dragRef.current = null; }, []);
@@ -232,12 +283,15 @@ export default function LayoutDiagram() {
           id="layout-diagram-svg"
           width={CANVAS_W}
           height={CANVAS_H}
-          style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: 'default' }}
+          style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
           onMouseMove={onMouseMove}
+          onTouchMove={onTouchMove}
           onMouseUp={onMouseUp}
+          onTouchEnd={onMouseUp}
           onMouseLeave={onMouseUp}
           onContextMenu={(e) => e.preventDefault()}
           onClick={() => { if (!connectMode) setSelectedId(null); }}
+          onTouchStart={() => { if (!connectMode) setSelectedId(null); }}
         >
           {/* Grid */}
           <defs>
@@ -279,6 +333,10 @@ export default function LayoutDiagram() {
               selected={selectedId === el.id}
               onMouseDown={e => onMouseDownEl(e, el)}
               onDoubleClick={e => onDblClick(e, el)}
+              onDelete={() => {
+                deleteEl(el.id);
+                setSelectedId(null);
+              }}
             />
           ))}
 

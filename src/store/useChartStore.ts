@@ -6,39 +6,49 @@ import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
 } from '@/types';
-import { loadDatabase, saveDatabase } from '@/lib/storage';
+import {
+  loadLocalDatabase, saveLocalDatabase,
+  loadDatabaseFromCloud, loadFileFromCloud,
+  createFolderCloud, updateFolderCloud, deleteFolderCloud,
+  createFileCloud, saveFileCloud, deleteFileCloud,
+} from '@/lib/storage';
+
+// ── Sync status ─────────────────────────────────────────────────────────────
+export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
 
 interface ChartState extends AppDatabase {
-  // ── Hydration ──────────────────────────────────────────
   hydrated: boolean;
-  hydrate: () => void;
+  syncStatus: SyncStatus;
 
-  // ── Active file helpers ─────────────────────────────────
+  // Hydration
+  hydrate: () => Promise<void>;
+
+  // Active file
   activeFile: () => ChartFile | null;
+  openFile: (id: string) => Promise<void>;
 
-  // ── Folder actions ──────────────────────────────────────
-  createFolder: (name: string, processType: ProcessType) => void;
-  renameFolder: (id: string, name: string) => void;
-  deleteFolder: (id: string) => void;
-  toggleFolder: (id: string) => void;
+  // Folder actions
+  createFolder: (name: string, processType: ProcessType) => Promise<void>;
+  renameFolder: (id: string, name: string) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
+  toggleFolder: (id: string) => Promise<void>;
 
-  // ── File actions ────────────────────────────────────────
-  createFile: (folderId: string, name: string) => void;
-  openFile: (id: string) => void;
-  renameFile: (id: string, name: string) => void;
-  deleteFile: (id: string) => void;
-  saveActiveFile: () => void;
+  // File actions
+  createFile: (folderId: string, name: string) => Promise<void>;
+  renameFile: (id: string, name: string) => Promise<void>;
+  deleteFile: (id: string) => Promise<void>;
+  saveActiveFile: () => Promise<void>;
 
-  // ── Header actions ──────────────────────────────────────
+  // Header actions
   updateHeader: (partial: Partial<ChartHeader>) => void;
 
-  // ── Step actions ────────────────────────────────────────
+  // Step actions
   addStep: () => void;
   updateStep: (id: string, partial: Partial<ChartStep>) => void;
   deleteStep: (id: string) => void;
   reorderSteps: (from: number, to: number) => void;
 
-  // ── Layout actions ──────────────────────────────────────
+  // Layout actions
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
   updateLayoutElement: (id: string, partial: Partial<LayoutElement>) => void;
   deleteLayoutElement: (id: string) => void;
@@ -46,83 +56,134 @@ interface ChartState extends AppDatabase {
   deleteLayoutConnection: (id: string) => void;
 }
 
-function persist(state: AppDatabase) {
-  saveDatabase({
-    folders: state.folders,
-    files: state.files,
-    activeFileId: state.activeFileId,
-  });
-}
-
 const defaultHeader: ChartHeader = {
-  processName: '',
-  partNumber: '',
-  model: '',
+  processName: '', partNumber: '', model: '',
   cycleTime: 60,
   issueDate: new Date().toISOString().split('T')[0],
-  revNo: 'A',
-  preparedBy: '',
-  approvedBy: '',
+  revNo: 'A', preparedBy: '', approvedBy: '',
 };
+
+// ── Helper: persist local state ──────────────────────────────────────────────
+function persistLocal(state: AppDatabase) {
+  saveLocalDatabase({ folders: state.folders, files: state.files, activeFileId: state.activeFileId });
+}
 
 export const useChartStore = create<ChartState>((set, get) => ({
   folders: [],
   files: [],
   activeFileId: null,
   hydrated: false,
+  syncStatus: 'idle',
 
-  hydrate() {
+  // ── Hydrate ─────────────────────────────────────────────────────────────────
+  async hydrate() {
     if (get().hydrated) return;
-    const db = loadDatabase();
-    set({ ...db, hydrated: true });
+    // Load local immediately for instant render
+    const local = loadLocalDatabase();
+    set({ ...local, hydrated: true, syncStatus: 'syncing' });
+    // Then fetch cloud data
+    try {
+      const db = await loadDatabaseFromCloud();
+      set({ ...db, hydrated: true, syncStatus: 'idle' });
+      persistLocal(db);
+    } catch {
+      set({ syncStatus: 'error' });
+    }
   },
 
+  // ── Active file ─────────────────────────────────────────────────────────────
   activeFile() {
     const { files, activeFileId } = get();
     return files.find(f => f.id === activeFileId) ?? null;
   },
 
-  // ── Folder ──────────────────────────────────────────────
-  createFolder(name, processType) {
+  // ── Open file (lazy load content from cloud) ────────────────────────────────
+  async openFile(id) {
+    set(s => ({ ...s, activeFileId: id }));
+    persistLocal({ ...get() });
+
+    // Check if content is already loaded
+    const existing = get().files.find(f => f.id === id);
+    if (!existing || (existing as ChartFile & { _loaded?: boolean })._loaded === false) {
+      set({ syncStatus: 'syncing' });
+      try {
+        const full = await loadFileFromCloud(id);
+        if (full) {
+          set(s => ({
+            files: s.files.map(f => f.id === id ? { ...full, _loaded: true } as ChartFile : f),
+            syncStatus: 'idle',
+          }));
+          persistLocal(get());
+        }
+      } catch {
+        set({ syncStatus: 'error' });
+      }
+    }
+  },
+
+  // ── Folders ─────────────────────────────────────────────────────────────────
+  async createFolder(name, processType) {
     const folder: ChartFolder = {
       id: uuidv4(), name, processType, expanded: true,
       createdAt: new Date().toISOString(),
     };
     set(s => {
       const next = { ...s, folders: [...s.folders, folder] };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await createFolderCloud(folder);
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  renameFolder(id, name) {
+  async renameFolder(id, name) {
     set(s => {
       const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, name } : f) };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await updateFolderCloud(id, { name });
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  deleteFolder(id) {
+  async deleteFolder(id) {
     set(s => {
       const files = s.files.filter(f => f.folderId !== id);
       const activeFileId = files.find(f => f.id === s.activeFileId) ? s.activeFileId : (files[0]?.id ?? null);
       const next = { ...s, folders: s.folders.filter(f => f.id !== id), files, activeFileId };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await deleteFolderCloud(id);
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  toggleFolder(id) {
+  async toggleFolder(id) {
     set(s => {
       const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, expanded: !f.expanded } : f) };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    try {
+      const folder = get().folders.find(f => f.id === id);
+      if (folder) await updateFolderCloud(id, { expanded: folder.expanded });
+    } catch { /* non-critical */ }
   },
 
-  // ── File ────────────────────────────────────────────────
-  createFile(folderId, name) {
+  // ── Files ────────────────────────────────────────────────────────────────────
+  async createFile(folderId, name) {
     const file: ChartFile = {
       id: uuidv4(), name, folderId,
       createdAt: new Date().toISOString(),
@@ -133,49 +194,66 @@ export const useChartStore = create<ChartState>((set, get) => ({
     };
     set(s => {
       const next = { ...s, files: [...s.files, file], activeFileId: file.id };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await createFileCloud(file);
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  openFile(id) {
-    set(s => {
-      const next = { ...s, activeFileId: id };
-      persist(next);
-      return next;
-    });
-  },
-
-  renameFile(id, name) {
+  async renameFile(id, name) {
     set(s => {
       const next = { ...s, files: s.files.map(f => f.id === id ? { ...f, name, updatedAt: new Date().toISOString() } : f) };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      const file = get().files.find(f => f.id === id);
+      if (file) await saveFileCloud({ ...file, name });
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  deleteFile(id) {
+  async deleteFile(id) {
     set(s => {
       const files = s.files.filter(f => f.id !== id);
       const activeFileId = id === s.activeFileId ? (files[0]?.id ?? null) : s.activeFileId;
       const next = { ...s, files, activeFileId };
-      persist(next);
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await deleteFileCloud(id);
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
-  saveActiveFile() {
+  async saveActiveFile() {
+    const file = get().activeFile();
+    if (!file) return;
+    const updated = { ...file, updatedAt: new Date().toISOString() };
     set(s => {
-      const next = {
-        ...s,
-        files: s.files.map(f => f.id === s.activeFileId ? { ...f, updatedAt: new Date().toISOString() } : f),
-      };
-      persist(next);
+      const next = { ...s, files: s.files.map(f => f.id === updated.id ? updated : f) };
+      persistLocal(next);
       return next;
     });
+    set({ syncStatus: 'syncing' });
+    try {
+      await saveFileCloud(updated);
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 3000);
   },
 
-  // ── Header ──────────────────────────────────────────────
+  // ── Header (local only — auto-saved on saveActiveFile) ───────────────────────
   updateHeader(partial) {
     set(s => {
       if (!s.activeFileId) return s;
@@ -187,34 +265,30 @@ export const useChartStore = create<ChartState>((set, get) => ({
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
 
-  // ── Steps ────────────────────────────────────────────────
+  // ── Steps (local only — auto-saved on saveActiveFile) ────────────────────────
   addStep() {
     set(s => {
       if (!s.activeFileId) return s;
       const file = s.files.find(f => f.id === s.activeFileId)!;
       const newStep: ChartStep = {
-        id: uuidv4(),
-        no: file.steps.length + 1,
-        description: '',
-        operator: 'Worker A',
-        manualTime: 0,
-        machineTime: 0,
-        walkingTime: 0,
-        idleTime: 0,
+        id: uuidv4(), no: file.steps.length + 1,
+        description: '', operator: 'Worker A',
+        manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 0,
       };
-      const steps = [...file.steps, newStep];
       const next = {
         ...s,
         files: s.files.map(f =>
-          f.id === s.activeFileId ? { ...f, steps, updatedAt: new Date().toISOString() } : f
+          f.id === s.activeFileId
+            ? { ...f, steps: [...f.steps, newStep], updatedAt: new Date().toISOString() }
+            : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -226,15 +300,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? {
-                ...f,
-                steps: f.steps.map(step => step.id === id ? { ...step, ...partial } : step),
-                updatedAt: new Date().toISOString(),
-              }
+            ? { ...f, steps: f.steps.map(step => step.id === id ? { ...step, ...partial } : step), updatedAt: new Date().toISOString() }
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -256,7 +326,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -275,12 +345,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
           f.id === s.activeFileId ? { ...f, steps: reindexed, updatedAt: new Date().toISOString() } : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
 
-  // ── Layout ──────────────────────────────────────────────
+  // ── Layout (local only — auto-saved on saveActiveFile) ────────────────────────
   addLayoutElement(el) {
     set(s => {
       if (!s.activeFileId) return s;
@@ -289,18 +359,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? {
-                ...f,
-                layoutDiagram: {
-                  ...f.layoutDiagram,
-                  elements: [...f.layoutDiagram.elements, newEl],
-                },
-                updatedAt: new Date().toISOString(),
-              }
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: [...f.layoutDiagram.elements, newEl] }, updatedAt: new Date().toISOString() }
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -312,18 +375,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? {
-                ...f,
-                layoutDiagram: {
-                  ...f.layoutDiagram,
-                  elements: f.layoutDiagram.elements.map(el => el.id === id ? { ...el, ...partial } : el),
-                },
-                updatedAt: new Date().toISOString(),
-              }
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(el => el.id === id ? { ...el, ...partial } : el) }, updatedAt: new Date().toISOString() }
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -346,7 +402,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -359,18 +415,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? {
-                ...f,
-                layoutDiagram: {
-                  ...f.layoutDiagram,
-                  connections: [...f.layoutDiagram.connections, newConn],
-                },
-                updatedAt: new Date().toISOString(),
-              }
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: [...f.layoutDiagram.connections, newConn] }, updatedAt: new Date().toISOString() }
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },
@@ -382,18 +431,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? {
-                ...f,
-                layoutDiagram: {
-                  ...f.layoutDiagram,
-                  connections: f.layoutDiagram.connections.filter(c => c.id !== id),
-                },
-                updatedAt: new Date().toISOString(),
-              }
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: f.layoutDiagram.connections.filter(c => c.id !== id) }, updatedAt: new Date().toISOString() }
             : f
         ),
       };
-      persist(next);
+      persistLocal(next);
       return next;
     });
   },

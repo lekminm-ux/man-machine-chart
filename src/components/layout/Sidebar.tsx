@@ -110,25 +110,25 @@ export default function Sidebar() {
                 )}
 
                 {/* Folder actions */}
-                <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
                   {/* Add file */}
                   <button
                     onClick={e => { e.stopPropagation(); setNewFileFolder(folder.id); setNewFileName(''); }}
-                    className="text-slate-400 hover:text-white text-xs px-1"
+                    className="text-slate-400 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
                     title="New chart"
-                  >+</button>
+                  >➕</button>
                   {/* Rename */}
                   <button
                     onClick={e => { e.stopPropagation(); setRenaming({ type: 'folder', id: folder.id }); setRenameValue(folder.name); }}
-                    className="text-slate-400 hover:text-white text-xs px-1"
+                    className="text-slate-400 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
                     title="Rename"
                   >✏️</button>
                   {/* Delete */}
                   <button
                     onClick={e => { e.stopPropagation(); if (confirm(`Delete folder "${folder.name}"?`)) deleteFolder(folder.id); }}
-                    className="text-slate-400 hover:text-red-400 text-xs px-1"
+                    className="text-slate-400 hover:text-red-400 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
                     title="Delete folder"
-                  >✕</button>
+                  >🗑️</button>
                 </div>
               </div>
 
@@ -177,17 +177,17 @@ export default function Sidebar() {
                   )}
 
                   {/* File actions */}
-                  <div className={`${activeFileId === file.id ? 'flex' : 'hidden group-hover:flex'} items-center gap-1 flex-shrink-0`}>
+                  <div className="flex items-center gap-1 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={e => { e.stopPropagation(); setRenaming({ type: 'file', id: file.id }); setRenameValue(file.name); }}
-                      className="text-white/60 hover:text-white text-xs"
+                      className="text-white/60 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
                       title="Rename"
                     >✏️</button>
                     <button
                       onClick={e => { e.stopPropagation(); if (confirm(`Delete "${file.name}"?`)) deleteFile(file.id); }}
-                      className="text-white/60 hover:text-red-300 text-xs"
+                      className="text-white/60 hover:text-red-300 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
                       title="Delete"
-                    >✕</button>
+                    >🗑️</button>
                   </div>
                 </div>
               ))}

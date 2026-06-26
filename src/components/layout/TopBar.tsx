@@ -4,15 +4,13 @@ import React, { useState, useCallback } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 
 export default function TopBar() {
-  const activeFile    = useChartStore(s => s.activeFile());
+  const activeFile     = useChartStore(s => s.activeFile());
   const saveActiveFile = useChartStore(s => s.saveActiveFile);
-  const [saving, setSaving]     = useState(false);
+  const syncStatus     = useChartStore(s => s.syncStatus);
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
 
   const handleSave = () => {
-    setSaving(true);
     saveActiveFile();
-    setTimeout(() => setSaving(false), 800);
   };
 
   const handleExportPNG = useCallback(async () => {
@@ -28,22 +26,17 @@ export default function TopBar() {
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
       });
-      // Use Blob + createObjectURL — most reliable method across all browsers
-      canvas.toBlob((blob) => {
-        if (!blob) { alert('Failed to create image. Please try again.'); return; }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${activeFile.name}_MM_Chart.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 200);
-      }, 'image/png');
+      const imgData = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = imgData;
+      link.download = `${activeFile.name}_MM_Chart.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error('PNG export failed:', err);
       alert(`PNG export failed: ${String(err)}`);
@@ -68,7 +61,7 @@ export default function TopBar() {
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
       });
@@ -132,17 +125,33 @@ export default function TopBar() {
 
       {/* Action buttons */}
       <div className="flex items-center gap-2">
+        {/* Sync status indicator */}
+        <div className="text-xs font-medium mr-1">
+          {syncStatus === 'syncing' && (
+            <span className="text-amber-500 flex items-center gap-1">
+              <span className="inline-block w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              Syncing…
+            </span>
+          )}
+          {syncStatus === 'saved' && (
+            <span className="text-emerald-500">✓ Saved to Cloud</span>
+          )}
+          {syncStatus === 'error' && (
+            <span className="text-red-500">⚠ Sync Error</span>
+          )}
+        </div>
+
         {/* Save */}
         <button
           onClick={handleSave}
-          disabled={!activeFile}
+          disabled={!activeFile || syncStatus === 'syncing'}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-            saving
-              ? 'bg-green-100 text-green-700 border border-green-300'
+            syncStatus === 'saved'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
               : 'bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-40'
           }`}
         >
-          {saving ? '✓ Saved' : '💾 Save'}
+          {syncStatus === 'saved' ? '✓ Saved' : '☁ Save'}
         </button>
 
         {/* Export PNG */}
