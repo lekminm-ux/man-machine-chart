@@ -48,18 +48,18 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props
         const w  = Math.max(x2 - x1, 1);
 
         switch (seg.type) {
-          /* ── Manual: thick solid black bar ─────────────────────────── */
+          /* ── Manual: thick solid light bar on dark background ──────── */
           case 'manual':
             return (
               <g key={i}>
                 <line
                   x1={x1} y1={cy} x2={x2} y2={cy}
-                  stroke="#111827" strokeWidth={MANUAL_W} strokeLinecap="butt"
+                  stroke="#e2e8f0" strokeWidth={MANUAL_W} strokeLinecap="butt"
                 />
                 {w > 22 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 11}
-                    textAnchor="middle" fontSize={8.5} fill="#374151"
+                    textAnchor="middle" fontSize={8.5} fill="#94a3b8"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >
@@ -71,17 +71,17 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props
               </g>
             );
 
-          /* ── Auto M/C: thin line + vertical end markers ─────────────── */
+          /* ── Auto M/C: thin blue line + vertical end markers ──────── */
           case 'machine':
             return (
               <g key={i}>
-                <line x1={x1} y1={cy} x2={x2} y2={cy} stroke="#1d4ed8" strokeWidth={AUTO_W} />
-                <line x1={x1} y1={cy - 10} x2={x1} y2={cy + 10} stroke="#1d4ed8" strokeWidth={2} />
-                <line x1={x2} y1={cy - 10} x2={x2} y2={cy + 10} stroke="#1d4ed8" strokeWidth={2} />
+                <line x1={x1} y1={cy} x2={x2} y2={cy} stroke="#60a5fa" strokeWidth={AUTO_W} />
+                <line x1={x1} y1={cy - 10} x2={x1} y2={cy + 10} stroke="#60a5fa" strokeWidth={2} />
+                <line x1={x2} y1={cy - 10} x2={x2} y2={cy + 10} stroke="#60a5fa" strokeWidth={2} />
                 {w > 42 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 14}
-                    textAnchor="middle" fontSize={8.5} fill="#1d4ed8"
+                    textAnchor="middle" fontSize={8.5} fill="#60a5fa"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >
@@ -91,19 +91,19 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props
               </g>
             );
 
-          /* ── Walk: zigzag ────────────────────────────────────────────── */
+          /* ── Walk: green zigzag ──────────────────────────────────── */
           case 'walk':
             return (
               <g key={i}>
                 <path
                   d={walkPath(x1, x2, cy)}
-                  stroke="#059669" strokeWidth={2.5}
+                  stroke="#34d399" strokeWidth={2.5}
                   fill="none" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {w > 26 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 11}
-                    textAnchor="middle" fontSize={8.5} fill="#059669"
+                    textAnchor="middle" fontSize={8.5} fill="#34d399"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >
@@ -113,19 +113,19 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props
               </g>
             );
 
-          /* ── Idle: dashed hollow box + red text ──────────────────────── */
+          /* ── Idle: red dashed hollow box ────────────────────────── */
           case 'idle':
             return (
               <g key={i}>
                 <rect
                   x={x1} y={cy - 13} width={Math.max(w, 2)} height={26}
-                  fill="none" stroke="#ef4444" strokeWidth={1.5}
+                  fill="rgba(239,68,68,0.08)" stroke="#f87171" strokeWidth={1.5}
                   strokeDasharray="4 2" rx={2}
                 />
                 {w > 24 && (
                   <text
                     x={(x1 + x2) / 2} y={cy + 4}
-                    textAnchor="middle" fontSize={8.5} fill="#ef4444" fontWeight="600"
+                    textAnchor="middle" fontSize={8.5} fill="#f87171" fontWeight="600"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >

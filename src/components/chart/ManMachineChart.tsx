@@ -8,10 +8,10 @@ import type { OperatorType } from '@/types';
 
 // ─── Legend ──────────────────────────────────────────────────────────────────
 const LEGEND = [
-  { label: 'Manual Time', color: '#111827', dash: false, thick: true  },
-  { label: 'Auto M/C',    color: '#1d4ed8', dash: false, thick: false },
-  { label: 'Walk',        color: '#059669', dash: false, thick: false },
-  { label: 'Idle',        color: '#ef4444', dash: true,  thick: false },
+  { label: 'Manual Time', color: '#e2e8f0', dash: false, thick: true  },
+  { label: 'Auto M/C',    color: '#60a5fa', dash: false, thick: false },
+  { label: 'Walk',        color: '#34d399', dash: false, thick: false },
+  { label: 'Idle',        color: '#f87171', dash: true,  thick: false },
 ];
 
 const HEADER_H = 30;
@@ -67,7 +67,7 @@ export default function ManMachineChart() {
   }));
 
   const rawDur   = computeTotalDuration(steps);
-  const totalDur = Math.max(rawDur, header.cycleTime, 10);
+  const totalDur = Math.max(rawDur, 10);
 
   const SVG_W   = 900;
   const AXIS_H  = TICK_HEIGHT;
@@ -85,6 +85,45 @@ export default function ManMachineChart() {
     return LABEL_WIDTH + (t / totalDur) * (SVG_W - LABEL_WIDTH - 8);
   }
 
+  // 3. Generate connection paths between consecutive steps of each operator
+  const connectionPaths: Array<{ id: string; d: string }> = [];
+  const operators = Array.from(new Set(steps.map(s => s.operator)));
+
+  for (const op of operators) {
+    const opRows = rows
+      .map((r, originalIdx) => ({ r, originalIdx }))
+      .filter(item => item.r.step.operator === op);
+
+    for (let k = 0; k < opRows.length - 1; k++) {
+      const stepA = opRows[k].r.step;
+      const idxA = opRows[k].originalIdx;
+
+      const stepB = opRows[k + 1].r.step;
+      const idxB = opRows[k + 1].originalIdx;
+
+      const startA = stepStartTimes[stepA.id] || 0;
+      const durA = stepA.manualTime + stepA.machineTime + stepA.walkingTime + stepA.idleTime;
+      const endA = startA + durA;
+
+      const startB = stepStartTimes[stepB.id] || 0;
+
+      const x1 = tX(endA);
+      const y1 = chartTop + idxA * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+      const x2 = tX(startB);
+      const y2 = chartTop + idxB * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+      // Draw orthogonal step line (horizontal then vertical)
+      const midY = (y1 + y2) / 2;
+      const d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+
+      connectionPaths.push({
+        id: `${stepA.id}-${stepB.id}`,
+        d,
+      });
+    }
+  }
+
   return (
     <div className="overflow-x-auto">
       {/* Legend */}
@@ -98,7 +137,7 @@ export default function ManMachineChart() {
             ) : (
               <div style={{ width: 28, height: 3, background: l.color, borderRadius: 1 }} />
             )}
-            <span className="text-gray-600 font-medium">{l.label}</span>
+            <span className="text-slate-300 font-medium">{l.label}</span>
           </div>
         ))}
       </div>
@@ -108,18 +147,18 @@ export default function ManMachineChart() {
         id="mm-chart-svg"
         width={SVG_W}
         height={SVG_H}
-        style={{ fontFamily: 'Inter, system-ui, sans-serif', background: '#fff', display: 'block' }}
+        style={{ fontFamily: 'Inter, system-ui, sans-serif', background: '#1e293b', display: 'block', borderRadius: '8px' }}
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
       >
         {/* ── Chart header ─────────────────────────────────────── */}
-        <rect x={0} y={0} width={SVG_W} height={HEADER_H} fill="#1e3a5f" rx={0} />
-        <text x={SVG_W / 2} y={HEADER_H - 9} textAnchor="middle" fill="white" fontSize={13} fontWeight="700">
+        <rect x={0} y={0} width={SVG_W} height={HEADER_H} fill="#0f172a" rx={0} />
+        <text x={SVG_W / 2} y={HEADER_H - 9} textAnchor="middle" fill="#f1f5f9" fontSize={13} fontWeight="700">
           MAN-MACHINE CHART — {header.processName.toUpperCase() || 'NEW PROCESS'} | {header.model || '—'}
         </text>
-        <text x={12} y={HEADER_H - 9} fill="#93c5fd" fontSize={10}>
-          Cycle: {header.cycleTime}s
+        <text x={12} y={HEADER_H - 9} fill="#60a5fa" fontSize={10}>
+          Cycle: {totalDur}s
         </text>
-        <text x={SVG_W - 12} y={HEADER_H - 9} textAnchor="end" fill="#93c5fd" fontSize={10}>
+        <text x={SVG_W - 12} y={HEADER_H - 9} textAnchor="end" fill="#60a5fa" fontSize={10}>
           Rev. {header.revNo}
         </text>
 
@@ -128,8 +167,8 @@ export default function ManMachineChart() {
           const x = tX(t);
           return (
             <g key={t}>
-              <line x1={x} y1={HEADER_H} x2={x} y2={chartTop + chartH} stroke="#e2e8f0" strokeWidth={1} />
-              <text x={x} y={HEADER_H + AXIS_H - 3} textAnchor="middle" fontSize={9} fill="#94a3b8">
+              <line x1={x} y1={HEADER_H} x2={x} y2={chartTop + chartH} stroke="#334155" strokeWidth={1} />
+              <text x={x} y={HEADER_H + AXIS_H - 3} textAnchor="middle" fontSize={9} fill="#64748b">
                 {t}s
               </text>
             </g>
@@ -148,24 +187,24 @@ export default function ManMachineChart() {
               {/* Row background */}
               <rect
                 x={0} y={rowY} width={SVG_W} height={ROW_HEIGHT}
-                fill={ri % 2 === 0 ? '#f8fafc' : '#f0f4f8'}
+                fill={ri % 2 === 0 ? '#1e293b' : '#162032'}
               />
               {/* Label area */}
               <rect
                 x={0} y={rowY} width={LABEL_WIDTH} height={ROW_HEIGHT}
-                fill={isMachRow ? '#dbeafe' : '#ecfdf5'}
+                fill={isMachRow ? '#1e3a5f' : '#1e2e22'}
               />
               {/* Top border */}
-              <line x1={0} y1={rowY} x2={SVG_W} y2={rowY} stroke="#e2e8f0" strokeWidth={1} />
+              <line x1={0} y1={rowY} x2={SVG_W} y2={rowY} stroke="#334155" strokeWidth={1} />
               {/* Vertical separator */}
-              <line x1={LABEL_WIDTH} y1={rowY} x2={LABEL_WIDTH} y2={rowY + ROW_HEIGHT} stroke="#94a3b8" strokeWidth={1} />
+              <line x1={LABEL_WIDTH} y1={rowY} x2={LABEL_WIDTH} y2={rowY + ROW_HEIGHT} stroke="#475569" strokeWidth={1} />
 
               {/* Row label */}
               <text
                 x={LABEL_WIDTH - 10} y={rowY + ROW_HEIGHT / 2 + 4}
                 textAnchor="end" fontSize={9.5}
                 fontWeight={isMachRow ? '700' : '600'}
-                fill={isMachRow ? '#1d4ed8' : '#1f2937'}
+                fill={isMachRow ? '#60a5fa' : '#e2e8f0'}
               >
                 {row.label.length > 22 ? row.label.slice(0, 20) + '…' : row.label}
               </text>
@@ -181,36 +220,49 @@ export default function ManMachineChart() {
           );
         })}
 
+        {/* Connection lines between operator steps */}
+        {connectionPaths.map(path => (
+          <path
+            key={path.id}
+            d={path.d}
+            stroke="#475569"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
         {/* Bottom border */}
-        <line x1={0} y1={chartTop + chartH} x2={SVG_W} y2={chartTop + chartH} stroke="#64748b" strokeWidth={1.5} />
+        <line x1={0} y1={chartTop + chartH} x2={SVG_W} y2={chartTop + chartH} stroke="#475569" strokeWidth={1.5} />
 
         {/* ── Cycle Time Arrow ──────────────────────────────────── */}
         <defs>
           <marker id="arr-s" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
-            <path d="M0 0 L8 4 L0 8 Z" fill="#dc2626" />
+            <path d="M0 0 L8 4 L0 8 Z" fill="#f87171" />
           </marker>
           <marker id="arr-e" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-            <path d="M0 0 L8 4 L0 8 Z" fill="#dc2626" />
+            <path d="M0 0 L8 4 L0 8 Z" fill="#f87171" />
           </marker>
         </defs>
 
         {/* Arrow line */}
         <line
           x1={tX(0)} y1={arrowY}
-          x2={tX(header.cycleTime)} y2={arrowY}
-          stroke="#dc2626" strokeWidth={2.5}
+          x2={tX(totalDur)} y2={arrowY}
+          stroke="#f87171" strokeWidth={2.5}
           markerStart="url(#arr-s)" markerEnd="url(#arr-e)"
         />
         {/* Arrow label */}
         <text
-          x={(tX(0) + tX(header.cycleTime)) / 2} y={arrowY - 6}
-          textAnchor="middle" fontSize={11} fill="#dc2626" fontWeight="700"
+          x={(tX(0) + tX(totalDur)) / 2} y={arrowY - 6}
+          textAnchor="middle" fontSize={11} fill="#f87171" fontWeight="700"
         >
-          Cycle Time: {header.cycleTime}s
+          Cycle Time: {totalDur}s
         </text>
         {/* End caps */}
-        <line x1={tX(0)} y1={arrowY - 7} x2={tX(0)} y2={arrowY + 7} stroke="#dc2626" strokeWidth={2} />
-        <line x1={tX(header.cycleTime)} y1={arrowY - 7} x2={tX(header.cycleTime)} y2={arrowY + 7} stroke="#dc2626" strokeWidth={2} />
+        <line x1={tX(0)} y1={arrowY - 7} x2={tX(0)} y2={arrowY + 7} stroke="#f87171" strokeWidth={2} />
+        <line x1={tX(totalDur)} y1={arrowY - 7} x2={tX(totalDur)} y2={arrowY + 7} stroke="#f87171" strokeWidth={2} />
       </svg>
     </div>
   );

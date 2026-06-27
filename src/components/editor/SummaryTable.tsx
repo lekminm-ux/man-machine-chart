@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { buildSummary, getMachineTime } from '@/lib/chart-utils';
+import { buildSummary, getMachineTime, computeTotalDuration } from '@/lib/chart-utils';
 
 export default function SummaryTable() {
   const activeFile = useChartStore(s => s.activeFile());
@@ -10,6 +10,7 @@ export default function SummaryTable() {
   if (!activeFile) return null;
 
   const { steps, header } = activeFile;
+  const cycleTime = computeTotalDuration(steps) || 60;
   const summary     = buildSummary(steps);
   const machineTime = getMachineTime(steps);
   const grandTotal  = summary.reduce((a, s) => a + s.lineTotal, 0);
@@ -34,8 +35,8 @@ export default function SummaryTable() {
           </thead>
           <tbody>
             {summary.map((row, i) => {
-              const idleTime  = Math.max(0, header.cycleTime - row.lineTotal);
-              const util      = header.cycleTime > 0 ? Math.min(100, Math.round((row.lineTotal / header.cycleTime) * 100)) : 0;
+              const idleTime  = Math.max(0, cycleTime - row.lineTotal);
+              const util      = cycleTime > 0 ? Math.min(100, Math.round((row.lineTotal / cycleTime) * 100)) : 0;
               const barColor  = util >= 80 ? 'bg-green-500' : util >= 50 ? 'bg-amber-400' : 'bg-red-400';
 
               return (
@@ -76,11 +77,11 @@ export default function SummaryTable() {
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
                       <div
                         className="h-2 rounded-full bg-blue-500 transition-all"
-                        style={{ width: `${Math.min(100, Math.round((machineTime / header.cycleTime) * 100))}%` }}
+                        style={{ width: `${Math.min(100, Math.round((machineTime / cycleTime) * 100))}%` }}
                       />
                     </div>
                     <span className="text-xs font-semibold text-blue-700 w-10 text-right">
-                      {header.cycleTime > 0 ? Math.min(100, Math.round((machineTime / header.cycleTime) * 100)) : 0}%
+                      {cycleTime > 0 ? Math.min(100, Math.round((machineTime / cycleTime) * 100)) : 0}%
                     </span>
                   </div>
                 </td>
@@ -99,11 +100,11 @@ export default function SummaryTable() {
                 {summary.reduce((a, s) => a + s.walkTime, 0)}
               </td>
               <td className="px-4 py-2 text-center font-mono text-red-300 font-bold">
-                {summary.reduce((a, s) => a + Math.max(0, header.cycleTime - s.lineTotal), 0)}
+                {summary.reduce((a, s) => a + Math.max(0, cycleTime - s.lineTotal), 0)}
               </td>
               <td className="px-4 py-2 text-center font-mono font-bold">{grandTotal}</td>
               <td className="px-4 py-2 text-center text-xs text-slate-300">
-                CT: {header.cycleTime}s
+                CT: {cycleTime}s
               </td>
             </tr>
           </tfoot>

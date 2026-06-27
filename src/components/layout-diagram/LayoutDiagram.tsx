@@ -233,10 +233,10 @@ export default function LayoutDiagram() {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+    <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 py-2.5 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
+        <h3 className="text-slate-100 font-semibold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
@@ -264,12 +264,12 @@ export default function LayoutDiagram() {
       </div>
 
       {/* Palette */}
-      <div className="bg-slate-50 border-b border-gray-200 px-4 py-2 flex flex-wrap gap-2">
+      <div className="bg-slate-900 border-b border-slate-700 px-4 py-2 flex flex-wrap gap-2" style={{ borderColor: '#334155' }}>
         {ELEMENT_PALETTE.map(p => (
           <button
             key={p.type}
             onClick={() => addEl({ type: p.type, label: p.label, x: 60, y: 60, width: p.w, height: p.h, color: p.color })}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded text-xs font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-medium text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition-colors shadow-sm cursor-pointer"
           >
             <span>{p.icon}</span> {p.label}
           </button>
@@ -277,13 +277,13 @@ export default function LayoutDiagram() {
       </div>
 
       {/* Canvas */}
-      <div className="overflow-auto bg-gray-50 p-2">
+      <div className="overflow-auto bg-slate-950 p-2">
         <svg
           ref={svgRef}
           id="layout-diagram-svg"
           width={CANVAS_W}
           height={CANVAS_H}
-          style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
+          style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
           onMouseMove={onMouseMove}
           onTouchMove={onTouchMove}
           onMouseUp={onMouseUp}
@@ -296,7 +296,7 @@ export default function LayoutDiagram() {
           {/* Grid */}
           <defs>
             <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f0f0f0" strokeWidth="0.5" />
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" strokeWidth="0.5" />
             </pattern>
           </defs>
           <rect width={CANVAS_W} height={CANVAS_H} fill="url(#grid)" />
@@ -304,7 +304,7 @@ export default function LayoutDiagram() {
           {/* Connections */}
           <defs>
             <marker id="conn-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M 0 0 L 6 3 L 0 6 Z" fill="#94a3b8" />
+              <path d="M 0 0 L 6 3 L 0 6 Z" fill="#64748b" />
             </marker>
           </defs>
           {connections.map(c => {
@@ -317,7 +317,7 @@ export default function LayoutDiagram() {
               <g key={c.id} onClick={e => { e.stopPropagation(); deleteConn(c.id); }}>
                 <line
                   x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke="#94a3b8" strokeWidth={2}
+                  stroke="#64748b" strokeWidth={2}
                   markerEnd="url(#conn-arrow)"
                   style={{ cursor: 'pointer' }}
                 />
@@ -342,7 +342,7 @@ export default function LayoutDiagram() {
 
           {/* Hint text */}
           {elements.length === 0 && (
-            <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" fill="#d1d5db" fontSize={14}>
+            <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" fill="#475569" fontSize={14}>
               Click palette items above to add equipment
             </text>
           )}
@@ -354,24 +354,24 @@ export default function LayoutDiagram() {
           if (!el) return null;
           return (
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-gray-500">Edit label:</span>
+              <span className="text-xs text-slate-400">Edit label:</span>
               <input
                 autoFocus
                 type="text"
                 value={editing.value}
                 onChange={e => setEditing({ ...editing, value: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null); }}
-                className="border border-blue-400 rounded px-2 py-1 text-sm focus:outline-none"
+                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
               />
-              <button onClick={commitEdit} className="px-2 py-1 text-xs bg-blue-500 text-white rounded">Save</button>
-              <button onClick={() => setEditing(null)} className="px-2 py-1 text-xs bg-gray-200 rounded">Cancel</button>
+              <button onClick={commitEdit} className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded cursor-pointer">Save</button>
+              <button onClick={() => setEditing(null)} className="px-2 py-1 text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 rounded cursor-pointer">Cancel</button>
             </div>
           );
         })()}
 
         {/* Tip */}
-        <p className="text-xs text-gray-400 mt-2 px-1">
-          Drag to move · Click to select then press <kbd className="bg-gray-100 border border-gray-300 rounded px-1">Del</kbd> or use ✕ Delete button · Double-click to rename · Use "↔ Connect" to draw arrows · Click an arrow to delete it
+        <p className="text-xs text-slate-500 mt-2 px-1">
+          Drag to move · Click to select then press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> or use ✕ Delete button · Double-click to rename · Use "↔ Connect" to draw arrows · Click an arrow to delete it
         </p>
       </div>
     </div>

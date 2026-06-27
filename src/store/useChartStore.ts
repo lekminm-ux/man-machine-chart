@@ -68,6 +68,21 @@ function persistLocal(state: AppDatabase) {
   saveLocalDatabase({ folders: state.folders, files: state.files, activeFileId: state.activeFileId });
 }
 
+// ── Helper: recalculate cycle time from steps ───────────────────────────────
+function recalcCycleTime(steps: ChartStep[]): number {
+  if (steps.length === 0) return 60;
+  const actorEndTimes: Record<string, number> = {};
+  for (const step of steps) {
+    const actor = step.operator;
+    const lastEnd = actorEndTimes[actor] || 0;
+    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
+    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
+    actorEndTimes[actor] = start + stepDur;
+  }
+  const endTimes = Object.values(actorEndTimes);
+  return endTimes.length > 0 ? Math.max(...endTimes) : 60;
+}
+
 export const useChartStore = create<ChartState>((set, get) => ({
   folders: [],
   files: [],
@@ -91,10 +106,18 @@ export const useChartStore = create<ChartState>((set, get) => ({
     }
   },
 
-  // ── Active file ─────────────────────────────────────────────────────────────
   activeFile() {
     const { files, activeFileId } = get();
-    return files.find(f => f.id === activeFileId) ?? null;
+    const file = files.find(f => f.id === activeFileId) ?? null;
+    if (!file) return null;
+    const computedCT = recalcCycleTime(file.steps);
+    if (file.header.cycleTime !== computedCT) {
+      return {
+        ...file,
+        header: { ...file.header, cycleTime: computedCT },
+      };
+    }
+    return file;
   },
 
   // ── Open file (lazy load content from cloud) ────────────────────────────────
@@ -281,11 +304,18 @@ export const useChartStore = create<ChartState>((set, get) => ({
         manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 0,
         startTime: 0,
       };
+      const updatedSteps = [...file.steps, newStep];
+      const cycleTime = recalcCycleTime(updatedSteps);
       const next = {
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? { ...f, steps: [...f.steps, newStep], updatedAt: new Date().toISOString() }
+            ? {
+                ...f,
+                steps: updatedSteps,
+                header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
+              }
             : f
         ),
       };
@@ -297,11 +327,19 @@ export const useChartStore = create<ChartState>((set, get) => ({
   updateStep(id, partial) {
     set(s => {
       if (!s.activeFileId) return s;
+      const file = s.files.find(f => f.id === s.activeFileId)!;
+      const updatedSteps = file.steps.map(step => step.id === id ? { ...step, ...partial } : step);
+      const cycleTime = recalcCycleTime(updatedSteps);
       const next = {
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
-            ? { ...f, steps: f.steps.map(step => step.id === id ? { ...step, ...partial } : step), updatedAt: new Date().toISOString() }
+            ? {
+                ...f,
+                steps: updatedSteps,
+                header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
+              }
             : f
         ),
       };
@@ -313,16 +351,18 @@ export const useChartStore = create<ChartState>((set, get) => ({
   deleteStep(id) {
     set(s => {
       if (!s.activeFileId) return s;
+      const file = s.files.find(f => f.id === s.activeFileId)!;
+      const updatedSteps = file.steps.filter(step => step.id !== id).map((step, i) => ({ ...step, no: i + 1 }));
+      const cycleTime = recalcCycleTime(updatedSteps);
       const next = {
         ...s,
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? {
                 ...f,
-                steps: f.steps
-                  .filter(step => step.id !== id)
-                  .map((step, i) => ({ ...step, no: i + 1 })),
-                updatedAt: new Date().toISOString(),
+                steps: updatedSteps,
+                header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
               }
             : f
         ),
@@ -340,10 +380,18 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const [moved] = steps.splice(from, 1);
       steps.splice(to, 0, moved);
       const reindexed = steps.map((step, i) => ({ ...step, no: i + 1 }));
+      const cycleTime = recalcCycleTime(reindexed);
       const next = {
         ...s,
         files: s.files.map(f =>
-          f.id === s.activeFileId ? { ...f, steps: reindexed, updatedAt: new Date().toISOString() } : f
+          f.id === s.activeFileId
+            ? {
+                ...f,
+                steps: reindexed,
+                header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
+              }
+            : f
         ),
       };
       persistLocal(next);

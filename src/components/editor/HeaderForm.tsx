@@ -59,13 +59,13 @@ export default function HeaderForm() {
 
           {/* Cycle Time */}
           <div>
-            <label className={LABEL_CLASS}>Cycle Time (s)</label>
+            <label className={LABEL_CLASS}>Cycle Time (s) [Auto]</label>
             <input
               type="number"
-              min={1}
+              readOnly
               value={h.cycleTime}
-              onChange={e => updateHeader({ cycleTime: parseFloat(e.target.value) || 60 })}
-              className={`${FIELD_CLASS} font-mono`}
+              className={`${FIELD_CLASS} font-mono bg-gray-50 text-gray-500 cursor-not-allowed`}
+              title="Calculated automatically from step timeline"
             />
           </div>
 

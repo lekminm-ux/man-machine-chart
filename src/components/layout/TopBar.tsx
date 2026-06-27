@@ -29,7 +29,7 @@ export default function TopBar() {
           scale: 2,
           useCORS: true,
           allowTaint: false,
-          backgroundColor: '#ffffff',
+          backgroundColor: '#0f172a',
           logging: false,
         });
       });
@@ -67,7 +67,7 @@ export default function TopBar() {
           scale: 2,
           useCORS: true,
           allowTaint: false,
-          backgroundColor: '#ffffff',
+          backgroundColor: '#0f172a',
           logging: false,
         });
       });
@@ -162,25 +162,25 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
 }
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center px-6 gap-4 shadow-sm flex-shrink-0">
+    <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-6 gap-4 shadow-md flex-shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2.5 mr-2">
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-xs font-black shadow">
           M
         </div>
-        <span className="font-bold text-gray-800 text-sm tracking-tight hidden sm:inline">
+        <span className="font-bold text-slate-100 text-sm tracking-tight hidden sm:inline">
           Man-Machine Chart
         </span>
-        <span className="text-xs text-gray-400 font-medium hidden md:inline">Standard Operation</span>
+        <span className="text-xs text-slate-400 font-medium hidden md:inline">Standard Operation</span>
       </div>
 
       {/* Active file breadcrumb */}
       {activeFile && (
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 border-l border-gray-200 pl-4">
-          <span className="font-medium text-gray-800">{activeFile.name}</span>
-          <span className="text-gray-300">·</span>
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 border-l border-slate-800 pl-4">
+          <span className="font-medium text-slate-200">{activeFile.name}</span>
+          <span className="text-slate-600">·</span>
           <span>{activeFile.header.processName || 'Unnamed Process'}</span>
-          <span className="bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 font-semibold ml-1">
+          <span className="bg-blue-950 text-blue-300 border border-blue-900 rounded px-1.5 py-0.5 font-semibold ml-1">
             Rev. {activeFile.header.revNo}
           </span>
         </div>

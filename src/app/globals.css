@@ -2,8 +2,8 @@
 
 :root {
   --font-inter: 'Inter', sans-serif;
-  --background: #f8fafc;
-  --foreground: #1f2937;
+  --background: #0f172a;
+  --foreground: #f8fafc;
 }
 
 /* ── Font ──────────────────────────────────────────────── */
@@ -24,25 +24,25 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #0f172a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  background: #334155;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #475569;
 }
 
 /* Sidebar dark scrollbars */
 aside ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: #090d16;
 }
 aside ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #1e293b;
 }
 aside ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #334155;
 }
 
 /* ── Print ──────────────────────────────────────────────── */
