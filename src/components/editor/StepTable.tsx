@@ -18,15 +18,16 @@ const TIME_COLS = [
 ] as const;
 
 export default function StepTable() {
-  const activeFile   = useChartStore(s => s.activeFile());
-  const addStep      = useChartStore(s => s.addStep);
-  const updateStep   = useChartStore(s => s.updateStep);
-  const deleteStep   = useChartStore(s => s.deleteStep);
-  const reorderSteps = useChartStore(s => s.reorderSteps);
-  const insertStep   = useChartStore(s => s.insertStep);
+  const activeFile             = useChartStore(s => s.activeFile());
+  const addStep                = useChartStore(s => s.addStep);
+  const updateStep             = useChartStore(s => s.updateStep);
+  const deleteStep             = useChartStore(s => s.deleteStep);
+  const reorderSteps           = useChartStore(s => s.reorderSteps);
+  const insertStep             = useChartStore(s => s.insertStep);
+  const updateOperatorPosition = useChartStore(s => s.updateOperatorPosition);
 
   if (!activeFile) return null;
-  const { steps } = activeFile;
+  const { steps, header } = activeFile;
 
   // Process calculated values on-the-fly
   const calcSteps = getCalculatedSteps(steps);
@@ -105,11 +106,12 @@ export default function StepTable() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs table-fixed min-w-[1360px]">
+        <table className="w-full text-xs table-fixed min-w-[1440px]">
           <colgroup>
             <col className="w-8" />
             <col className="min-w-[200px]" />
             <col className="w-28" />
+            <col className="w-20" /> {/* Position col */}
             <col className="w-16" />
             <col className="w-16" />
             <col className="w-16" />
@@ -126,6 +128,7 @@ export default function StepTable() {
               <th className="px-2 py-1 text-center text-slate-500">#</th>
               <th className="px-3 py-1 text-left text-slate-300 font-semibold">Process Description</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Operator / Machine</th>
+              <th className="px-2 py-1 text-center text-slate-300 font-semibold">Position</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Start Time (s)</th>
               {TIME_COLS.map(c => (
                 <th key={c.key} className={`px-2 py-1 text-center font-semibold ${c.color}`}>
@@ -161,7 +164,7 @@ export default function StepTable() {
           <tbody>
             {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={13} className="py-8 text-center text-slate-600 italic">
+                <td colSpan={14} className="py-8 text-center text-slate-600 italic">
                   No steps yet — click &quot;Add Step&quot; to begin
                 </td>
               </tr>
@@ -169,6 +172,7 @@ export default function StepTable() {
 
             {calcSteps.map((step, i) => {
               const isMachine = step.operator === 'Auto M/C';
+              const currentPos = isMachine ? 'M/C' : (header.operatorPositions?.[step.operator] || '');
 
               return (
                 <tr
@@ -206,6 +210,18 @@ export default function StepTable() {
                         <option key={op} value={op}>{op}</option>
                       ))}
                     </select>
+                  </td>
+
+                  {/* Operator Position */}
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      value={currentPos}
+                      disabled={isMachine}
+                      onChange={e => updateOperatorPosition(step.operator, e.target.value)}
+                      placeholder="e.g. OP-1"
+                      className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-650 disabled:opacity-55 disabled:bg-slate-950/40"
+                    />
                   </td>
 
                   {/* Start Time */}
@@ -304,12 +320,12 @@ export default function StepTable() {
                     <div className="flex gap-1 justify-center">
                       <button
                         onClick={() => insertStep(i, 'above')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
                         title="Insert blank step above"
                       >+▲</button>
                       <button
                         onClick={() => insertStep(i, 'below')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
                         title="Insert blank step below"
                       >+▼</button>
                     </div>
@@ -350,7 +366,7 @@ export default function StepTable() {
           {calcSteps.length > 0 && (
             <tfoot>
               <tr className="bg-slate-900 border-t border-slate-700 h-10">
-                <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
+                <td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
                 {TIME_COLS.map(col => (
                   <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
                     {/* Sum the calculated active durations instead of raw user-typed stop times */}

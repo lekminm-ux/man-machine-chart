@@ -37,6 +37,7 @@ export interface ChartHeader {
   revNo: string;
   preparedBy: string;
   approvedBy: string;
+  operatorPositions?: Record<string, string>;
 }
 
 export interface WorkerSummary {

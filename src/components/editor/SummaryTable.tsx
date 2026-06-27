@@ -5,11 +5,12 @@ import { useChartStore } from '@/store/useChartStore';
 import { getCalculatedSteps, buildSummary, getMachineTime, computeTotalDuration } from '@/lib/chart-utils';
 
 export default function SummaryTable() {
-  const activeFile = useChartStore(s => s.activeFile());
+  const activeFile             = useChartStore(s => s.activeFile());
+  const updateOperatorPosition = useChartStore(s => s.updateOperatorPosition);
 
   if (!activeFile) return null;
 
-  const { steps } = activeFile;
+  const { steps, header } = activeFile;
 
   // Cycle time and steps calculations
   const cycleTime   = computeTotalDuration(steps) || 1;
@@ -17,6 +18,8 @@ export default function SummaryTable() {
   const machineTime = getMachineTime(steps);
   const grandTotal  = summary.reduce((a, s) => a + s.lineTotal, 0);
   const calcSteps   = getCalculatedSteps(steps);
+
+  const positions = header.operatorPositions || {};
 
   return (
     <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
@@ -28,6 +31,7 @@ export default function SummaryTable() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-800 border-b border-slate-700">
+              <th className="px-4 py-2 text-left font-semibold text-slate-350">Position</th>
               <th className="px-4 py-2 text-left font-semibold text-slate-350">Operator</th>
               <th className="px-4 py-2 text-center font-semibold text-slate-350">Man Time (s)</th>
               <th className="px-4 py-2 text-center font-semibold text-slate-350">Walk Time (s)</th>
@@ -42,9 +46,20 @@ export default function SummaryTable() {
               const idleTime  = calcSteps.filter(s => s.operator === row.operator).reduce((a, s) => a + s.calcIdle, 0);
               const util      = cycleTime > 0 ? Math.min(100, Math.round((row.lineTotal / cycleTime) * 100)) : 0;
               const barColor  = util >= 80 ? 'bg-emerald-500' : util >= 50 ? 'bg-amber-500' : 'bg-red-500';
+              const currentPos = positions[row.operator] || '';
 
               return (
                 <tr key={row.operator} className="border-b border-slate-800" style={{ background: i % 2 === 0 ? '#1a2235' : '#1e293b' }}>
+                  {/* Operator Position Column (Editable in Summary Table too!) */}
+                  <td className="px-4 py-2">
+                    <input
+                      type="text"
+                      value={currentPos}
+                      onChange={e => updateOperatorPosition(row.operator, e.target.value)}
+                      placeholder="e.g. OP-1"
+                      className="w-24 bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-500 focus:outline-none py-0.5 text-slate-200 text-xs font-semibold placeholder:text-slate-700"
+                    />
+                  </td>
                   <td className="px-4 py-2 font-medium text-slate-200 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-450 inline-block" style={{ backgroundColor: '#60a5fa' }} />
                     {row.operator}
@@ -68,6 +83,7 @@ export default function SummaryTable() {
             {/* Machine row */}
             {machineTime > 0 && (
               <tr style={{ background: '#131e2f', borderBottom: '1px solid #1e293b' }}>
+                <td className="px-4 py-2 text-blue-300/60 font-semibold text-xs">—</td>
                 <td className="px-4 py-2 font-medium text-blue-300 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
                   Auto M/C
@@ -96,7 +112,7 @@ export default function SummaryTable() {
           {/* Grand total footer */}
           <tfoot>
             <tr className="bg-slate-900 border-t border-slate-700">
-              <td className="px-4 py-2 font-bold text-sm text-slate-200">TOTAL</td>
+              <td colSpan={2} className="px-4 py-2 font-bold text-sm text-slate-200">TOTAL</td>
               <td className="px-4 py-2 text-center font-mono font-bold text-slate-200">
                 {summary.reduce((a, s) => a + s.manTime, 0)}
               </td>

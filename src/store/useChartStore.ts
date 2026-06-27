@@ -49,6 +49,7 @@ interface ChartState extends AppDatabase {
   deleteStep: (id: string) => void;
   reorderSteps: (from: number, to: number) => void;
   insertStep: (targetIndex: number, position: 'above' | 'below') => void;
+  updateOperatorPosition: (operator: string, position: string) => void;
 
   // Layout actions
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
@@ -63,6 +64,18 @@ const defaultHeader: ChartHeader = {
   cycleTime: 60,
   issueDate: new Date().toISOString().split('T')[0],
   revNo: 'A', preparedBy: '', approvedBy: '',
+  operatorPositions: {
+    'Worker A': '',
+    'Worker B': '',
+    'Worker C': '',
+    'Worker D': '',
+    'Worker E': '',
+    'Worker F': '',
+    'Worker G': '',
+    'Worker H': '',
+    'Worker I': '',
+    'Worker J': '',
+  },
 };
 
 // ── Helper: persist local state ──────────────────────────────────────────────
@@ -479,6 +492,33 @@ export const useChartStore = create<ChartState>((set, get) => ({
                 ...f,
                 steps: reindexed,
                 header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
+              }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  updateOperatorPosition(operator, position) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const file = s.files.find(f => f.id === s.activeFileId)!;
+      const currentPositions = file.header.operatorPositions || {};
+      const updatedPositions = { ...currentPositions, [operator]: position };
+
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? {
+                ...f,
+                header: {
+                  ...f.header,
+                  operatorPositions: updatedPositions,
+                },
                 updatedAt: new Date().toISOString()
               }
             : f
