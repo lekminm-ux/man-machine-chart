@@ -108,24 +108,27 @@ export default function StepTable() {
       <div className="overflow-x-auto">
         <table className="w-full text-xs table-fixed min-w-[1440px]">
           <colgroup>
-            <col className="w-8" />
-            <col className="min-w-[200px]" />
-            <col className="w-28" />
-            <col className="w-20" /> {/* Position col */}
-            <col className="w-16" />
-            <col className="w-16" />
-            <col className="w-16" />
-            <col className="w-16" />
-            <col className="w-16" />
-            <col className="w-16" />
-            <col className="w-[500px]" />
-            <col className="w-16" /> {/* Insert Above/Below col */}
-            <col className="w-14" />
-            <col className="w-10" />
+            <col className="w-8" />   {/* # */}
+            <col className="w-16" />  {/* Insert */}
+            <col className="w-14" />  {/* Move */}
+            <col className="w-10" />  {/* Del */}
+            <col className="min-w-[200px]" /> {/* Process Description */}
+            <col className="w-28" />  {/* Operator / Machine */}
+            <col className="w-20" />  {/* Position */}
+            <col className="w-16" />  {/* Start Time */}
+            <col className="w-16" />  {/* Manual */}
+            <col className="w-16" />  {/* Machine */}
+            <col className="w-16" />  {/* Walk */}
+            <col className="w-16" />  {/* Idle */}
+            <col className="w-16" />  {/* Count */}
+            <col className="w-[500px]" /> {/* Timeline Visualization */}
           </colgroup>
           <thead>
             <tr className="bg-slate-800 border-b border-slate-700 h-10">
               <th className="px-2 py-1 text-center text-slate-500">#</th>
+              <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
+              <th className="px-2 py-1 text-center text-slate-500">Move</th>
+              <th className="px-2 py-1 text-center text-slate-500">Del</th>
               <th className="px-3 py-1 text-left text-slate-300 font-semibold">Process Description</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Operator / Machine</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Position</th>
@@ -155,9 +158,6 @@ export default function StepTable() {
                   </svg>
                 </div>
               </th>
-              <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
-              <th className="px-2 py-1 text-center text-slate-500">Move</th>
-              <th className="px-2 py-1 text-center text-slate-500">Del</th>
             </tr>
           </thead>
 
@@ -183,6 +183,49 @@ export default function StepTable() {
                   onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#1a2235' : '#1e293b')}
                 >
                   <td className="px-2 py-1.5 text-center text-slate-500 font-mono">{step.no}</td>
+
+                  {/* Insert Actions Above/Below */}
+                  <td className="px-1 py-1.5 text-center">
+                    <div className="flex gap-1 justify-center">
+                      <button
+                        onClick={() => insertStep(i, 'above')}
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        title="Insert blank step above"
+                      >+▲</button>
+                      <button
+                        onClick={() => insertStep(i, 'below')}
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        title="Insert blank step below"
+                      >+▼</button>
+                    </div>
+                  </td>
+
+                  {/* Move buttons */}
+                  <td className="px-1 py-1.5">
+                    <div className="flex gap-0.5 justify-center">
+                      <button
+                        onClick={() => moveUp(i)}
+                        disabled={i === 0}
+                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                        title="Move up"
+                      >▲</button>
+                      <button
+                        onClick={() => moveDown(i)}
+                        disabled={i === steps.length - 1}
+                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                        title="Move down"
+                      >▼</button>
+                    </div>
+                  </td>
+
+                  {/* Delete */}
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => deleteStep(step.id)}
+                      className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none"
+                      title="Delete step"
+                    >✕</button>
+                  </td>
 
                   {/* Description */}
                   <td className="px-3 py-1.5">
@@ -314,49 +357,6 @@ export default function StepTable() {
                       </svg>
                     </td>
                   )}
-
-                  {/* Insert Actions Above/Below */}
-                  <td className="px-1 py-1.5 text-center">
-                    <div className="flex gap-1 justify-center">
-                      <button
-                        onClick={() => insertStep(i, 'above')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
-                        title="Insert blank step above"
-                      >+▲</button>
-                      <button
-                        onClick={() => insertStep(i, 'below')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
-                        title="Insert blank step below"
-                      >+▼</button>
-                    </div>
-                  </td>
-
-                  {/* Move buttons */}
-                  <td className="px-1 py-1.5">
-                    <div className="flex gap-0.5 justify-center">
-                      <button
-                        onClick={() => moveUp(i)}
-                        disabled={i === 0}
-                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
-                        title="Move up"
-                      >▲</button>
-                      <button
-                        onClick={() => moveDown(i)}
-                        disabled={i === steps.length - 1}
-                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
-                        title="Move down"
-                      >▼</button>
-                    </div>
-                  </td>
-
-                  {/* Delete */}
-                  <td className="px-2 py-1.5 text-center">
-                    <button
-                      onClick={() => deleteStep(step.id)}
-                      className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none"
-                      title="Delete step"
-                    >✕</button>
-                  </td>
                 </tr>
               );
             })}
@@ -366,7 +366,7 @@ export default function StepTable() {
           {calcSteps.length > 0 && (
             <tfoot>
               <tr className="bg-slate-900 border-t border-slate-700 h-10">
-                <td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
+                <td colSpan={8} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
                 {TIME_COLS.map(col => (
                   <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
                     {/* Sum the calculated active durations instead of raw user-typed stop times */}
@@ -409,7 +409,6 @@ export default function StepTable() {
                     </svg>
                   </div>
                 </td>
-                <td colSpan={3} />
               </tr>
             </tfoot>
           )}
