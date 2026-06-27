@@ -61,7 +61,7 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
                 {w > 22 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 11}
-                    textAnchor="middle" fontSize={8.5} fill="#94a3b8"
+                    textAnchor="middle" fontSize={8.5} fill="#fbbf24"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >

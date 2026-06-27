@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration } from '@/lib/chart-utils';
 import { TimelineRow } from '../chart/TimelineRow';
@@ -26,6 +26,9 @@ export default function StepTable() {
   const insertStep             = useChartStore(s => s.insertStep);
   const updateOperatorPosition = useChartStore(s => s.updateOperatorPosition);
 
+  // Toggle state to hide/show yellow highlighted inputs
+  const [hideInputs, setHideInputs] = useState(false);
+
   if (!activeFile) return null;
   const { steps, header } = activeFile;
 
@@ -46,6 +49,9 @@ export default function StepTable() {
   const rawDur = computeTotalDuration(steps);
   const totalDur = Math.max(rawDur, 10);
 
+  // Timeline width expands to 850px when inputs are hidden (originally 500px)
+  const timelineWidth = hideInputs ? 850 : 500;
+
   // Time ticks calculation
   const tickInterval = totalDur > 100 ? 50 : totalDur > 50 ? 20 : totalDur > 20 ? 10 : 5;
   const ticks: number[] = [];
@@ -53,7 +59,7 @@ export default function StepTable() {
   if (ticks[ticks.length - 1] < totalDur) ticks.push(totalDur);
 
   function tX(t: number) {
-    return 4 + (t / totalDur) * 492;
+    return 4 + (t / totalDur) * (timelineWidth - 8);
   }
 
   // Generate connection paths between consecutive manual/walk/idle steps of each operator
@@ -97,53 +103,80 @@ export default function StepTable() {
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
         <h3 className="text-slate-100 font-semibold text-sm tracking-wide">OPERATION STEPS & TIMELINE</h3>
-        <button
-          onClick={addStep}
-          className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded transition-colors"
-        >
-          <span className="text-base leading-none">+</span> Add Step
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Hide/Show Inputs Toggle Button */}
+          <button
+            onClick={() => setHideInputs(!hideInputs)}
+            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold rounded transition-colors"
+          >
+            {hideInputs ? '👁️ Show Inputs' : '👁️ Hide Inputs'}
+          </button>
+          <button
+            onClick={addStep}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded transition-colors"
+          >
+            <span className="text-base leading-none">+</span> Add Step
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs table-fixed min-w-[1440px]">
-          <colgroup>
-            <col className="w-8" />   {/* # */}
-            <col className="w-16" />  {/* Insert */}
-            <col className="w-14" />  {/* Move */}
-            <col className="w-10" />  {/* Del */}
-            <col className="min-w-[200px]" /> {/* Process Description */}
-            <col className="w-28" />  {/* Operator / Machine */}
-            <col className="w-20" />  {/* Position */}
-            <col className="w-16" />  {/* Start Time */}
-            <col className="w-16" />  {/* Manual */}
-            <col className="w-16" />  {/* Machine */}
-            <col className="w-16" />  {/* Walk */}
-            <col className="w-16" />  {/* Idle */}
-            <col className="w-16" />  {/* Count */}
-            <col className="w-[500px]" /> {/* Timeline Visualization */}
-          </colgroup>
+        <table className={`w-full text-xs table-fixed ${hideInputs ? 'min-w-[1250px]' : 'min-w-[1440px]'}`}>
+          {hideInputs ? (
+            <colgroup>
+              <col className="min-w-[250px]" /> {/* Process Description */}
+              <col className="w-28" />  {/* Operator / Machine */}
+              <col className="w-20" />  {/* Position */}
+              <col className="w-16" />  {/* Count */}
+              <col style={{ width: timelineWidth }} /> {/* Timeline Visualization */}
+            </colgroup>
+          ) : (
+            <colgroup>
+              <col className="w-8" />   {/* # */}
+              <col className="w-16" />  {/* Insert */}
+              <col className="w-14" />  {/* Move */}
+              <col className="w-10" />  {/* Del */}
+              <col className="min-w-[200px]" /> {/* Process Description */}
+              <col className="w-28" />  {/* Operator / Machine */}
+              <col className="w-20" />  {/* Position */}
+              <col className="w-16" />  {/* Start Time */}
+              <col className="w-16" />  {/* Manual */}
+              <col className="w-16" />  {/* Machine */}
+              <col className="w-16" />  {/* Walk */}
+              <col className="w-16" />  {/* Idle */}
+              <col className="w-16" />  {/* Count */}
+              <col style={{ width: timelineWidth }} /> {/* Timeline Visualization */}
+            </colgroup>
+          )}
           <thead>
             <tr className="bg-slate-800 border-b border-slate-700 h-10">
-              <th className="px-2 py-1 text-center text-slate-500">#</th>
-              <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
-              <th className="px-2 py-1 text-center text-slate-500">Move</th>
-              <th className="px-2 py-1 text-center text-slate-500">Del</th>
+              {!hideInputs && (
+                <>
+                  <th className="px-2 py-1 text-center text-slate-500">#</th>
+                  <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
+                  <th className="px-2 py-1 text-center text-slate-500">Move</th>
+                  <th className="px-2 py-1 text-center text-slate-500">Del</th>
+                </>
+              )}
               <th className="px-3 py-1 text-left text-slate-300 font-semibold">Process Description</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Operator / Machine</th>
               <th className="px-2 py-1 text-center text-slate-300 font-semibold">Position</th>
-              <th className="px-2 py-1 text-center text-slate-300 font-semibold">Start Time (s)</th>
-              {TIME_COLS.map(c => (
-                <th key={c.key} className={`px-2 py-1 text-center font-semibold ${c.color}`}>
-                  {c.label}
-                </th>
-              ))}
+              {!hideInputs && (
+                <>
+                  <th className="px-2 py-1 text-center text-slate-300 font-semibold">Start Time (s)</th>
+                  {TIME_COLS.map(c => (
+                    <th key={c.key} className={`px-2 py-1 text-center font-semibold ${c.color}`}>
+                      {c.label}
+                    </th>
+                  ))}
+                </>
+              )}
               <th className="px-2 py-1 text-center text-amber-400 font-semibold">Count (s)</th>
               {/* Timeline Header (Axis Ticks) */}
-              <th className="p-0 text-center border-l border-slate-700 select-none">
+              <th className="p-0 text-center border-l border-slate-700 select-none" style={{ width: timelineWidth }}>
                 <div className="h-full flex flex-col justify-end py-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1 block">Timeline Visualization</span>
-                  <svg width={500} height={20} className="block mx-auto">
+                  <svg width={timelineWidth} height={20} className="block mx-auto">
                     {ticks.map(t => {
                       const x = tX(t);
                       return (
@@ -164,7 +197,7 @@ export default function StepTable() {
           <tbody>
             {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={14} className="py-8 text-center text-slate-600 italic">
+                <td colSpan={hideInputs ? 5 : 14} className="py-8 text-center text-slate-600 italic">
                   No steps yet — click &quot;Add Step&quot; to begin
                 </td>
               </tr>
@@ -182,50 +215,54 @@ export default function StepTable() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#273549')}
                   onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#1a2235' : '#1e293b')}
                 >
-                  <td className="px-2 py-1.5 text-center text-slate-500 font-mono">{step.no}</td>
+                  {!hideInputs && (
+                    <>
+                      <td className="px-2 py-1.5 text-center text-slate-500 font-mono">{step.no}</td>
 
-                  {/* Insert Actions Above/Below */}
-                  <td className="px-1 py-1.5 text-center">
-                    <div className="flex gap-1 justify-center">
-                      <button
-                        onClick={() => insertStep(i, 'above')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
-                        title="Insert blank step above"
-                      >+▲</button>
-                      <button
-                        onClick={() => insertStep(i, 'below')}
-                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
-                        title="Insert blank step below"
-                      >+▼</button>
-                    </div>
-                  </td>
+                      {/* Insert Actions Above/Below */}
+                      <td className="px-1 py-1.5 text-center">
+                        <div className="flex gap-1 justify-center">
+                          <button
+                            onClick={() => insertStep(i, 'above')}
+                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                            title="Insert blank step above"
+                          >+▲</button>
+                          <button
+                            onClick={() => insertStep(i, 'below')}
+                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                            title="Insert blank step below"
+                          >+▼</button>
+                        </div>
+                      </td>
 
-                  {/* Move buttons */}
-                  <td className="px-1 py-1.5">
-                    <div className="flex gap-0.5 justify-center">
-                      <button
-                        onClick={() => moveUp(i)}
-                        disabled={i === 0}
-                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
-                        title="Move up"
-                      >▲</button>
-                      <button
-                        onClick={() => moveDown(i)}
-                        disabled={i === steps.length - 1}
-                        className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
-                        title="Move down"
-                      >▼</button>
-                    </div>
-                  </td>
+                      {/* Move buttons */}
+                      <td className="px-1 py-1.5">
+                        <div className="flex gap-0.5 justify-center">
+                          <button
+                            onClick={() => moveUp(i)}
+                            disabled={i === 0}
+                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                            title="Move up"
+                          >▲</button>
+                          <button
+                            onClick={() => moveDown(i)}
+                            disabled={i === steps.length - 1}
+                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                            title="Move down"
+                          >▼</button>
+                        </div>
+                      </td>
 
-                  {/* Delete */}
-                  <td className="px-2 py-1.5 text-center">
-                    <button
-                      onClick={() => deleteStep(step.id)}
-                      className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none"
-                      title="Delete step"
-                    >✕</button>
-                  </td>
+                      {/* Delete */}
+                      <td className="px-2 py-1.5 text-center">
+                        <button
+                          onClick={() => deleteStep(step.id)}
+                          className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none"
+                          title="Delete step"
+                        >✕</button>
+                      </td>
+                    </>
+                  )}
 
                   {/* Description */}
                   <td className="px-3 py-1.5">
@@ -263,35 +300,39 @@ export default function StepTable() {
                       disabled={isMachine}
                       onChange={e => updateOperatorPosition(step.operator, e.target.value)}
                       placeholder="e.g. OP-1"
-                      className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-650 disabled:opacity-55 disabled:bg-slate-950/40"
+                      className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-655 disabled:opacity-55 disabled:bg-slate-950/40"
                     />
                   </td>
 
-                  {/* Start Time */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="number"
-                      min={0}
-                      value={step.startTime === undefined || step.startTime === null || step.startTime === 0 ? '' : step.startTime}
-                      onChange={e => handleChange(step.id, 'startTime', parseFloat(e.target.value) || 0)}
-                      placeholder="Auto"
-                      className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-600"
-                    />
-                  </td>
+                  {!hideInputs && (
+                    <>
+                      {/* Start Time */}
+                      <td className="px-2 py-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          value={step.startTime === undefined || step.startTime === null || step.startTime === 0 ? '' : step.startTime}
+                          onChange={e => handleChange(step.id, 'startTime', parseFloat(e.target.value) || 0)}
+                          placeholder="Auto"
+                          className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-600"
+                        />
+                      </td>
 
-                  {/* Time columns */}
-                  {TIME_COLS.map(col => (
-                    <td key={col.key} className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        value={step[col.key] === 0 ? '' : step[col.key]}
-                        onChange={e => handleChange(step.id, col.key, parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        className={`w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-slate-900`}
-                      />
-                    </td>
-                  ))}
+                      {/* Time columns */}
+                      {TIME_COLS.map(col => (
+                        <td key={col.key} className="px-2 py-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            value={step[col.key] === 0 ? '' : step[col.key]}
+                            onChange={e => handleChange(step.id, col.key, parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                            className={`w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-slate-900`}
+                          />
+                        </td>
+                      ))}
+                    </>
+                  )}
 
                   {/* Calculated Count (Duration) Column */}
                   <td className="px-2 py-1.5 text-center">
@@ -302,13 +343,13 @@ export default function StepTable() {
 
                   {/* Spanning cell: single timeline SVG for all rows (rendered on first row only) */}
                   {i === 0 && (
-                    <td rowSpan={calcSteps.length} className="p-0 border-l border-slate-700 bg-slate-900/60 align-top select-none" style={{ width: 500 }}>
-                      <svg width={500} height={calcSteps.length * ROW_HEIGHT} className="block">
+                    <td rowSpan={calcSteps.length} className="p-0 border-l border-slate-700 bg-slate-900/60 align-top select-none" style={{ width: timelineWidth }}>
+                      <svg width={timelineWidth} height={calcSteps.length * ROW_HEIGHT} className="block">
                         {/* alternate row backgrounds */}
                         {calcSteps.map((_, ri) => (
                           <rect
                             key={ri}
-                            x={0} y={ri * ROW_HEIGHT} width={500} height={ROW_HEIGHT}
+                            x={0} y={ri * ROW_HEIGHT} width={timelineWidth} height={ROW_HEIGHT}
                             fill={ri % 2 === 0 ? 'rgba(30, 41, 59, 0.2)' : 'rgba(15, 23, 42, 0.2)'}
                           />
                         ))}
@@ -334,7 +375,7 @@ export default function StepTable() {
                               key={s.id}
                               segments={segs}
                               totalDuration={totalDur}
-                              chartWidth={500}
+                              chartWidth={timelineWidth}
                               rowY={rowY}
                               noLabel
                             />
@@ -366,21 +407,34 @@ export default function StepTable() {
           {calcSteps.length > 0 && (
             <tfoot>
               <tr className="bg-slate-900 border-t border-slate-700 h-10">
-                <td colSpan={8} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
-                {TIME_COLS.map(col => (
-                  <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
-                    {/* Sum the calculated active durations instead of raw user-typed stop times */}
-                    {calcSteps.reduce((a, s) => a + (s[col.calcKey] as number), 0)}
-                  </td>
-                ))}
-                {/* Count Column Total */}
-                <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
-                  {totalCalcDuration}s
-                </td>
+                {hideInputs ? (
+                  <>
+                    <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
+                    {/* Count Column Total */}
+                    <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
+                      {totalCalcDuration}s
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td colSpan={8} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
+                    {TIME_COLS.map(col => (
+                      <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
+                        {/* Sum the calculated active durations instead of raw user-typed stop times */}
+                        {calcSteps.reduce((a, s) => a + (s[col.calcKey] as number), 0)}
+                      </td>
+                    ))}
+                    {/* Count Column Total */}
+                    <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
+                      {totalCalcDuration}s
+                    </td>
+                  </>
+                )}
+
                 {/* Timeline Footer (Red Cycle Time Arrow) */}
-                <td className="p-0 border-l border-slate-700 bg-slate-950/80 select-none" style={{ width: 500 }}>
+                <td className="p-0 border-l border-slate-700 bg-slate-950/80 select-none" style={{ width: timelineWidth }}>
                   <div className="h-full flex items-center py-1">
-                    <svg width={500} height={28} className="block mx-auto">
+                    <svg width={timelineWidth} height={28} className="block mx-auto">
                       <defs>
                         <marker id="arr-s" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
                           <path d="M0 0 L6 3 L0 6 Z" fill="#f87171" />
