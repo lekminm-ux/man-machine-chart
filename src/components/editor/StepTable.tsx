@@ -2,6 +2,7 @@
 
 import React, { useCallback } from 'react';
 import { useChartStore } from '@/store/useChartStore';
+import { getCalculatedSteps } from '@/lib/chart-utils';
 import type { ChartStep } from '@/types';
 import { ALL_WORKERS } from '@/types';
 
@@ -24,6 +25,9 @@ export default function StepTable() {
   if (!activeFile) return null;
   const { steps } = activeFile;
 
+  // Process calculated values on-the-fly
+  const calcSteps = getCalculatedSteps(steps);
+
   const handleChange = useCallback(
     (id: string, field: keyof ChartStep, value: string | number) => {
       updateStep(id, { [field]: value } as Partial<ChartStep>);
@@ -33,6 +37,8 @@ export default function StepTable() {
 
   const moveUp   = (i: number) => { if (i > 0) reorderSteps(i, i - 1); };
   const moveDown = (i: number) => { if (i < steps.length - 1) reorderSteps(i, i + 1); };
+
+  const totalCalcDuration = calcSteps.reduce((a, s) => a + s.calcDuration, 0);
 
   return (
     <div className="border border-slate-750 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
@@ -60,21 +66,22 @@ export default function StepTable() {
                   {c.label}
                 </th>
               ))}
+              <th className="px-2 py-2 text-center w-16 text-amber-400 font-semibold">Count (s)</th>
               <th className="px-2 py-2 text-center w-16 text-slate-500">Move</th>
               <th className="px-2 py-2 text-center w-12 text-slate-500">Del</th>
             </tr>
           </thead>
 
           <tbody>
-            {steps.length === 0 && (
+            {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-slate-600 italic">
+                <td colSpan={11} className="py-8 text-center text-slate-600 italic">
                   No steps yet — click &quot;Add Step&quot; to begin
                 </td>
               </tr>
             )}
 
-            {steps.map((step, i) => {
+            {calcSteps.map((step, i) => {
               const isMachine = step.operator === 'Auto M/C';
 
               return (
@@ -141,6 +148,13 @@ export default function StepTable() {
                     </td>
                   ))}
 
+                  {/* Calculated Count (Duration) Column */}
+                  <td className="px-2 py-1.5 w-16 text-center">
+                    <span className="font-mono text-amber-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                      {step.calcDuration > 0 ? `${step.calcDuration}s` : '—'}
+                    </span>
+                  </td>
+
                   {/* Move buttons */}
                   <td className="px-1 py-1.5">
                     <div className="flex gap-0.5 justify-center">
@@ -173,7 +187,7 @@ export default function StepTable() {
           </tbody>
 
           {/* Row total footer */}
-          {steps.length > 0 && (
+          {calcSteps.length > 0 && (
             <tfoot>
               <tr className="bg-slate-900 border-t border-slate-700">
                 <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
@@ -182,6 +196,10 @@ export default function StepTable() {
                     {steps.reduce((a, s) => a + s[col.key], 0)}
                   </td>
                 ))}
+                {/* Count Column Total */}
+                <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
+                  {totalCalcDuration}s
+                </td>
                 <td colSpan={2} />
               </tr>
             </tfoot>

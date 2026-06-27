@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { buildSingleStepSegments, getActiveWorkers, computeTotalDuration } from '@/lib/chart-utils';
+import { getCalculatedSteps, buildSingleStepSegments, getActiveWorkers, computeTotalDuration } from '@/lib/chart-utils';
 import { TimelineRow, ROW_HEIGHT, LABEL_WIDTH, TICK_HEIGHT } from './TimelineRow';
 import type { OperatorType } from '@/types';
 
@@ -31,7 +31,7 @@ export default function ManMachineChart() {
 
   if (!activeFile) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+      <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
         No file selected.
       </div>
     );
@@ -41,26 +41,17 @@ export default function ManMachineChart() {
 
   if (steps.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-400 text-sm italic">
+      <div className="flex items-center justify-center h-32 text-slate-450 text-sm italic">
         Add steps in the Operation Steps table to see the chart.
       </div>
     );
   }
 
-  // 1. Pre-calculate start times for all steps sequentially per operator/machine
-  const stepStartTimes: Record<string, number> = {};
-  const actorEndTimes: Record<string, number> = {};
-  for (const step of steps) {
-    const actor = step.operator;
-    const lastEnd = actorEndTimes[actor] || 0;
-    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
-    stepStartTimes[step.id] = start;
-    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
-    actorEndTimes[actor] = start + stepDur;
-  }
+  // 1. Get calculated step parameters (duration, calcStart, calcEnd)
+  const calcSteps = getCalculatedSteps(steps);
 
   // 2. Map one chart row to each step in the table
-  const rows = steps.map(step => ({
+  const rows = calcSteps.map(step => ({
     id: step.id,
     label: `${step.no}. ${step.description || `Step ${step.no}`} (${step.operator === 'Auto M/C' ? 'M/C' : step.operator})`,
     step,
@@ -85,14 +76,19 @@ export default function ManMachineChart() {
     return LABEL_WIDTH + (t / totalDur) * (SVG_W - LABEL_WIDTH - 8);
   }
 
-  // 3. Generate connection paths between consecutive steps of each operator
+  // 3. Generate connection paths between consecutive manual/walk/idle steps of each operator
   const connectionPaths: Array<{ id: string; d: string }> = [];
   const operators = Array.from(new Set(steps.map(s => s.operator)));
 
   for (const op of operators) {
+    // Only connect steps that represent manual work (not machine)
     const opRows = rows
       .map((r, originalIdx) => ({ r, originalIdx }))
-      .filter(item => item.r.step.operator === op);
+      .filter(item => {
+        const step = item.r.step;
+        const isMachStep = step.operator === 'Auto M/C' || step.calcMachine > 0;
+        return step.operator === op && !isMachStep;
+      });
 
     for (let k = 0; k < opRows.length - 1; k++) {
       const stepA = opRows[k].r.step;
@@ -101,16 +97,10 @@ export default function ManMachineChart() {
       const stepB = opRows[k + 1].r.step;
       const idxB = opRows[k + 1].originalIdx;
 
-      const startA = stepStartTimes[stepA.id] || 0;
-      const durA = stepA.manualTime + stepA.machineTime + stepA.walkingTime + stepA.idleTime;
-      const endA = startA + durA;
-
-      const startB = stepStartTimes[stepB.id] || 0;
-
-      const x1 = tX(endA);
+      const x1 = tX(stepA.calcEnd);
       const y1 = chartTop + idxA * ROW_HEIGHT + ROW_HEIGHT / 2;
 
-      const x2 = tX(startB);
+      const x2 = tX(stepB.calcStart);
       const y2 = chartTop + idxB * ROW_HEIGHT + ROW_HEIGHT / 2;
 
       // Draw orthogonal step line (horizontal then vertical)
@@ -178,8 +168,7 @@ export default function ManMachineChart() {
         {/* ── Rows ─────────────────────────────────────────────── */}
         {rows.map((row, ri) => {
           const rowY       = chartTop + ri * ROW_HEIGHT;
-          const start      = stepStartTimes[row.step.id] || 0;
-          const segs       = buildSingleStepSegments(row.step, start, totalDur);
+          const segs       = buildSingleStepSegments(row.step, totalDur);
           const isMachRow  = row.step.operator === 'Auto M/C';
 
           return (
@@ -225,7 +214,7 @@ export default function ManMachineChart() {
           <path
             key={path.id}
             d={path.d}
-            stroke="#475569"
+            stroke="#64748b"
             strokeWidth="1.5"
             fill="none"
             strokeLinejoin="round"
