@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { buildSummary, getMachineTime, computeTotalDuration } from '@/lib/chart-utils';
+import { getCalculatedSteps, buildSummary, getMachineTime, computeTotalDuration } from '@/lib/chart-utils';
 
 export default function SummaryTable() {
   const activeFile = useChartStore(s => s.activeFile());
@@ -11,11 +11,12 @@ export default function SummaryTable() {
 
   const { steps } = activeFile;
 
-  // Cycle time is auto-calculated from parallel operator timelines
+  // Cycle time and steps calculations
   const cycleTime   = computeTotalDuration(steps) || 1;
   const summary     = buildSummary(steps);
   const machineTime = getMachineTime(steps);
   const grandTotal  = summary.reduce((a, s) => a + s.lineTotal, 0);
+  const calcSteps   = getCalculatedSteps(steps);
 
   return (
     <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
@@ -37,7 +38,8 @@ export default function SummaryTable() {
           </thead>
           <tbody>
             {summary.map((row, i) => {
-              const idleTime  = steps.filter(s => s.operator === row.operator).reduce((a, s) => a + s.idleTime, 0);
+              // Sum the calculated active idle time for the operator (not the raw stop values entered by the user)
+              const idleTime  = calcSteps.filter(s => s.operator === row.operator).reduce((a, s) => a + s.calcIdle, 0);
               const util      = cycleTime > 0 ? Math.min(100, Math.round((row.lineTotal / cycleTime) * 100)) : 0;
               const barColor  = util >= 80 ? 'bg-emerald-500' : util >= 50 ? 'bg-amber-500' : 'bg-red-500';
 
@@ -101,8 +103,9 @@ export default function SummaryTable() {
               <td className="px-4 py-2 text-center font-mono font-bold text-slate-200">
                 {summary.reduce((a, s) => a + s.walkTime, 0)}
               </td>
+              {/* Grand total of calculated idle times */}
               <td className="px-4 py-2 text-center font-mono text-red-400 font-bold">
-                {steps.reduce((a, s) => a + s.idleTime, 0)}
+                {calcSteps.reduce((a, s) => a + s.calcIdle, 0)}
               </td>
               <td className="px-4 py-2 text-center font-mono font-bold text-slate-200">{grandTotal}</td>
               <td className="px-4 py-2 text-center text-xs text-amber-400 font-mono font-bold">

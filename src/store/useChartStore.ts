@@ -48,6 +48,7 @@ interface ChartState extends AppDatabase {
   updateStep: (id: string, partial: Partial<ChartStep>) => void;
   deleteStep: (id: string) => void;
   reorderSteps: (from: number, to: number) => void;
+  insertStep: (targetIndex: number, position: 'above' | 'below') => void;
 
   // Layout actions
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
@@ -434,6 +435,42 @@ export const useChartStore = create<ChartState>((set, get) => ({
       steps.splice(to, 0, moved);
       const reindexed = steps.map((step, i) => ({ ...step, no: i + 1 }));
       const cycleTime = recalcCycleTime(reindexed);
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? {
+                ...f,
+                steps: reindexed,
+                header: { ...f.header, cycleTime },
+                updatedAt: new Date().toISOString()
+              }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  insertStep(targetIndex, position) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const file = s.files.find(f => f.id === s.activeFileId)!;
+      const newStep: ChartStep = {
+        id: uuidv4(), no: 0,
+        description: '', operator: 'Worker A',
+        manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 0,
+        startTime: 0,
+      };
+
+      const updatedSteps = [...file.steps];
+      const insertAt = position === 'above' ? targetIndex : targetIndex + 1;
+      updatedSteps.splice(insertAt, 0, newStep);
+
+      const reindexed = updatedSteps.map((step, i) => ({ ...step, no: i + 1 }));
+      const cycleTime = recalcCycleTime(reindexed);
+
       const next = {
         ...s,
         files: s.files.map(f =>

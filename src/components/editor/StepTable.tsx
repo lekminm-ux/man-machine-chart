@@ -11,10 +11,10 @@ const OPERATORS: ChartStep['operator'][] = [...ALL_WORKERS, 'Auto M/C'];
 const ROW_HEIGHT = 48; // Fixed height in pixels for perfect alignment
 
 const TIME_COLS = [
-  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-200' },
-  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-400' },
-  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-400' },
-  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-400' },
+  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-200',  calcKey: 'calcManual' },
+  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-400',   calcKey: 'calcMachine' },
+  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-400', calcKey: 'calcWalk' },
+  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-400',    calcKey: 'calcIdle' },
 ] as const;
 
 export default function StepTable() {
@@ -23,6 +23,7 @@ export default function StepTable() {
   const updateStep   = useChartStore(s => s.updateStep);
   const deleteStep   = useChartStore(s => s.deleteStep);
   const reorderSteps = useChartStore(s => s.reorderSteps);
+  const insertStep   = useChartStore(s => s.insertStep);
 
   if (!activeFile) return null;
   const { steps } = activeFile;
@@ -104,7 +105,7 @@ export default function StepTable() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs table-fixed min-w-[1300px]">
+        <table className="w-full text-xs table-fixed min-w-[1360px]">
           <colgroup>
             <col className="w-8" />
             <col className="min-w-[200px]" />
@@ -116,6 +117,7 @@ export default function StepTable() {
             <col className="w-16" />
             <col className="w-16" />
             <col className="w-[500px]" />
+            <col className="w-16" /> {/* Insert Above/Below col */}
             <col className="w-14" />
             <col className="w-10" />
           </colgroup>
@@ -150,6 +152,7 @@ export default function StepTable() {
                   </svg>
                 </div>
               </th>
+              <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
               <th className="px-2 py-1 text-center text-slate-500">Move</th>
               <th className="px-2 py-1 text-center text-slate-500">Del</th>
             </tr>
@@ -158,7 +161,7 @@ export default function StepTable() {
           <tbody>
             {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={12} className="py-8 text-center text-slate-600 italic">
+                <td colSpan={13} className="py-8 text-center text-slate-600 italic">
                   No steps yet — click &quot;Add Step&quot; to begin
                 </td>
               </tr>
@@ -296,6 +299,22 @@ export default function StepTable() {
                     </td>
                   )}
 
+                  {/* Insert Actions Above/Below */}
+                  <td className="px-1 py-1.5 text-center">
+                    <div className="flex gap-1 justify-center">
+                      <button
+                        onClick={() => insertStep(i, 'above')}
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        title="Insert blank step above"
+                      >+▲</button>
+                      <button
+                        onClick={() => insertStep(i, 'below')}
+                        className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                        title="Insert blank step below"
+                      >+▼</button>
+                    </div>
+                  </td>
+
                   {/* Move buttons */}
                   <td className="px-1 py-1.5">
                     <div className="flex gap-0.5 justify-center">
@@ -334,7 +353,8 @@ export default function StepTable() {
                 <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
                 {TIME_COLS.map(col => (
                   <td key={col.key} className={`px-2 py-1.5 text-center font-mono font-semibold ${col.color}`}>
-                    {steps.reduce((a, s) => a + s[col.key], 0)}
+                    {/* Sum the calculated active durations instead of raw user-typed stop times */}
+                    {calcSteps.reduce((a, s) => a + (s[col.calcKey] as number), 0)}
                   </td>
                 ))}
                 {/* Count Column Total */}
@@ -373,7 +393,7 @@ export default function StepTable() {
                     </svg>
                   </div>
                 </td>
-                <td colSpan={2} />
+                <td colSpan={3} />
               </tr>
             </tfoot>
           )}
