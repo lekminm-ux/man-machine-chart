@@ -44,7 +44,7 @@ export async function loadDatabaseFromCloud(): Promise<AppDatabase> {
     // We have metadata for files; load full content lazily when file is opened
     const partialFiles = files.map(f => ({
       ...f,
-      header: { processName: '', partNumber: '', model: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' },
+      header: { processName: '', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' },
       steps: [],
       layoutDiagram: { elements: [], connections: [] },
       _loaded: false,

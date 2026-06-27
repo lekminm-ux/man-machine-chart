@@ -55,7 +55,9 @@ export const seedBlowMoldingFile: Omit<ChartFile, 'folderId'> = {
   header: {
     processName: 'Blow Molding',
     partNumber:  'BM-SS-001',
+    partName:    'Side Step LH, RH',
     model:       'Side Step LH, RH',
+    moldNo:      'Mold-001',
     cycleTime:   120,
     issueDate:   new Date().toISOString().split('T')[0],
     revNo:       'A',

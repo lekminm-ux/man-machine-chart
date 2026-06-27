@@ -30,10 +30,11 @@ export default function Sidebar() {
   const deleteFolder = useChartStore(s => s.deleteFolder);
   const toggleFolder = useChartStore(s => s.toggleFolder);
 
-  const createFile   = useChartStore(s => s.createFile);
-  const openFile     = useChartStore(s => s.openFile);
-  const renameFile   = useChartStore(s => s.renameFile);
-  const deleteFile   = useChartStore(s => s.deleteFile);
+  const createFile    = useChartStore(s => s.createFile);
+  const openFile      = useChartStore(s => s.openFile);
+  const renameFile    = useChartStore(s => s.renameFile);
+  const deleteFile    = useChartStore(s => s.deleteFile);
+  const duplicateFile = useChartStore(s => s.duplicateFile);
 
   const [newFolderName, setNewFolderName]       = useState('');
   const [newFolderProcess, setNewFolderProcess] = useState<ProcessType>('blow_molding');
@@ -178,6 +179,11 @@ export default function Sidebar() {
 
                   {/* File actions */}
                   <div className="flex items-center gap-1 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={e => { e.stopPropagation(); duplicateFile(file.id); }}
+                      className="text-white/60 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                      title="Duplicate Chart"
+                    >📋</button>
                     <button
                       onClick={e => { e.stopPropagation(); setRenaming({ type: 'file', id: file.id }); setRenameValue(file.name); }}
                       className="text-white/60 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"

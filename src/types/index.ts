@@ -29,7 +29,9 @@ export interface ChartStep {
 export interface ChartHeader {
   processName: string;
   partNumber: string;
+  partName: string;
   model: string;
+  moldNo: string;
   cycleTime: number; // seconds
   issueDate: string; // ISO date string
   revNo: string;

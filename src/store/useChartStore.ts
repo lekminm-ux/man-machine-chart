@@ -38,6 +38,7 @@ interface ChartState extends AppDatabase {
   renameFile: (id: string, name: string) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
   saveActiveFile: () => Promise<void>;
+  duplicateFile: (id: string) => Promise<void>;
 
   // Header actions
   updateHeader: (partial: Partial<ChartHeader>) => void;
@@ -57,7 +58,7 @@ interface ChartState extends AppDatabase {
 }
 
 const defaultHeader: ChartHeader = {
-  processName: '', partNumber: '', model: '',
+  processName: '', partNumber: '', partName: '', model: '', moldNo: '',
   cycleTime: 60,
   issueDate: new Date().toISOString().split('T')[0],
   revNo: 'A', preparedBy: '', approvedBy: '',
@@ -256,6 +257,58 @@ export const useChartStore = create<ChartState>((set, get) => ({
       await deleteFileCloud(id);
       set({ syncStatus: 'saved' });
     } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+  },
+
+  async duplicateFile(id) {
+    const file = get().files.find(f => f.id === id);
+    if (!file) return;
+
+    // Clone steps with new UUIDs
+    const newSteps = file.steps.map(step => ({
+      ...step,
+      id: uuidv4(),
+    }));
+
+    // Clone layout diagram elements and connections with new IDs to prevent collisions
+    const newElements = file.layoutDiagram.elements.map(el => ({ ...el, id: uuidv4() }));
+    const elIdMap: Record<string, string> = {};
+    file.layoutDiagram.elements.forEach((el, index) => {
+      elIdMap[el.id] = newElements[index].id;
+    });
+    const newConnections = file.layoutDiagram.connections.map(conn => ({
+      ...conn,
+      id: uuidv4(),
+      fromId: elIdMap[conn.fromId] || conn.fromId,
+      toId: elIdMap[conn.toId] || conn.toId,
+    }));
+
+    const duplicatedFile: ChartFile = {
+      ...file,
+      id: uuidv4(),
+      name: `${file.name} - Copy`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      steps: newSteps,
+      layoutDiagram: {
+        elements: newElements,
+        connections: newConnections,
+      },
+    };
+
+    set(s => {
+      const next = { ...s, files: [...s.files, duplicatedFile], activeFileId: duplicatedFile.id };
+      persistLocal(next);
+      return next;
+    });
+
+    set({ syncStatus: 'syncing' });
+    try {
+      await createFileCloud(duplicatedFile);
+      set({ syncStatus: 'saved' });
+    } catch {
+      set({ syncStatus: 'error' });
+    }
     setTimeout(() => set({ syncStatus: 'idle' }), 2000);
   },
 
