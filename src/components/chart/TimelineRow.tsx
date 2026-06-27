@@ -16,11 +16,13 @@ interface Props {
   totalDuration: number;
   chartWidth:    number; // full SVG width (including label)
   rowY:          number;
+  noLabel?:      boolean;
 }
 
-function tX(t: number, totalDur: number, chartW: number): number {
-  const plotW = chartW - LABEL_WIDTH;
-  return LABEL_WIDTH + (t / totalDur) * plotW;
+function tX(t: number, totalDur: number, chartW: number, noLabel?: boolean): number {
+  const lw = noLabel ? 0 : LABEL_WIDTH;
+  const plotW = chartW - lw;
+  return lw + (t / totalDur) * plotW;
 }
 
 function walkPath(x1: number, x2: number, cy: number): string {
@@ -37,14 +39,14 @@ function walkPath(x1: number, x2: number, cy: number): string {
   return d + ` L${x2} ${cy}`;
 }
 
-export function TimelineRow({ segments, totalDuration, chartWidth, rowY }: Props) {
+export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel }: Props) {
   const cy = rowY + ROW_HEIGHT / 2;
 
   return (
     <g>
       {segments.map((seg, i) => {
-        const x1 = tX(seg.start,              totalDuration, chartWidth);
-        const x2 = tX(seg.start + seg.duration, totalDuration, chartWidth);
+        const x1 = tX(seg.start,              totalDuration, chartWidth, noLabel);
+        const x2 = tX(seg.start + seg.duration, totalDuration, chartWidth, noLabel);
         const w  = Math.max(x2 - x1, 1);
 
         switch (seg.type) {
