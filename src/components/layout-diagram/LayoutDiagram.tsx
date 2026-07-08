@@ -5,7 +5,7 @@ import { useChartStore } from '@/store/useChartStore';
 import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting } from '@/types';
 import {
   ELEMENT_PALETTE, COLOR_PRESETS, shapeOf,
-  elCenter, straightPath, orthogonalPath, pointsToPath,
+  elCenter, edgePoint, straightPath, orthogonalPath, pointsToPath,
   arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
 } from '@/lib/layout-utils';
 
@@ -22,17 +22,25 @@ type Corner = 'nw' | 'ne' | 'sw' | 'se';
 function ElementShape({
   el,
   selected,
+  hovered,
+  linkTarget,
   onPointerDown,
   onDoubleClick,
   onResizeStart,
   onRotateStart,
+  onLinkStart,
+  onHoverChange,
 }: {
   el: LayoutElement;
   selected: boolean;
+  hovered: boolean;
+  linkTarget: boolean;
   onPointerDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
   onResizeStart: (e: React.MouseEvent | React.TouchEvent, corner: Corner) => void;
   onRotateStart: (e: React.MouseEvent | React.TouchEvent) => void;
+  onLinkStart: (e: React.MouseEvent | React.TouchEvent) => void;
+  onHoverChange: (hovering: boolean) => void;
 }) {
   const { width: w, height: h, label, color = '#64748b' } = el;
   const shape = shapeOf(el);
@@ -64,6 +72,14 @@ function ElementShape({
     { corner: 'se', cx: w, cy: h, cursor: 'nwse-resize' },
   ];
 
+  // Edge-midpoint connection points (Excel-style): hover to reveal, drag to link.
+  const linkDots = [
+    { cx: w / 2, cy: 0 },
+    { cx: w, cy: h / 2 },
+    { cx: w / 2, cy: h },
+    { cx: 0, cy: h / 2 },
+  ];
+
   return (
     <g
       transform={`translate(${el.x}, ${el.y})`}
@@ -72,6 +88,8 @@ function ElementShape({
       onDoubleClick={onDoubleClick}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
     >
       {/* Rotated visual content (shadow + body + label) */}
       <g transform={`rotate(${rotation}, ${w / 2}, ${h / 2})`} style={{ cursor: 'grab' }}>
@@ -118,6 +136,30 @@ function ElementShape({
               onMouseDown={(e) => onResizeStart(e, corner)}
               onTouchStart={(e) => onResizeStart(e, corner)}
             />
+          ))}
+        </>
+      )}
+
+      {/* Drop-target highlight while linking */}
+      {linkTarget && (
+        <rect
+          x={-4} y={-4} width={w + 8} height={h + 8} rx={8}
+          fill="#22c55e" fillOpacity={0.12} stroke="#22c55e" strokeWidth={2}
+          pointerEvents="none"
+        />
+      )}
+
+      {/* Excel-style connection points — appear on hover, drag to draw an arrow */}
+      {hovered && !selected && (
+        <>
+          <rect x={-3} y={-3} width={w + 6} height={h + 6} rx={7} fill="none" stroke="#38bdf8" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
+          {linkDots.map((d, i) => (
+            <g key={i} style={{ cursor: 'crosshair' }}
+               onMouseDown={onLinkStart} onTouchStart={onLinkStart}>
+              {/* larger invisible hit area for easy grabbing */}
+              <circle cx={d.cx} cy={d.cy} r={9} fill="transparent" />
+              <circle cx={d.cx} cy={d.cy} r={4.5} fill="#38bdf8" stroke="#fff" strokeWidth={1.3} />
+            </g>
           ))}
         </>
       )}
@@ -211,6 +253,9 @@ export default function LayoutDiagram() {
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [connectMode, setConnectMode]       = useState(false);
   const [connectFrom, setConnectFrom]       = useState<string | null>(null);
+  const [hoveredId, setHoveredId]           = useState<string | null>(null);
+  // Excel-style drag-to-connect: live rubber-band from a source element to the cursor.
+  const [linking, setLinking]               = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null);
 
   const dragRef   = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
   const resizeRef = useRef<{ id: string; corner: Corner; ox: number; oy: number; ow: number; oh: number; startX: number; startY: number } | null>(null);
@@ -273,9 +318,35 @@ export default function LayoutDiagram() {
     rotateRef.current = { id: el.id, cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
   };
 
+  // ── Start an Excel-style connection drag from an element ────────────────────
+  const onLinkStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    e.stopPropagation();
+    const c = 'touches' in e ? e.touches[0] : e;
+    const p = pointer(c.clientX, c.clientY);
+    setSelectedId(null);
+    setSelectedConnId(null);
+    setLinking({ sourceId: el.id, x: p.x, y: p.y, targetId: null });
+  };
+
+  // Topmost element (by draw order) whose box contains the point, excluding one id.
+  const elementAt = (p: Pt, excludeId: string): LayoutElement | undefined => {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el.id === excludeId) continue;
+      if (p.x >= el.x && p.x <= el.x + el.width && p.y >= el.y && p.y <= el.y + el.height) return el;
+    }
+    return undefined;
+  };
+
   // ── Unified move handler ───────────────────────────────────────────────────
   const handleMove = (clientX: number, clientY: number) => {
     const p = pointer(clientX, clientY);
+
+    if (linking) {
+      const target = elementAt(p, linking.sourceId);
+      setLinking({ ...linking, x: p.x, y: p.y, targetId: target ? target.id : null });
+      return;
+    }
 
     if (rotateRef.current) {
       const { id, cx, cy } = rotateRef.current;
@@ -307,7 +378,15 @@ export default function LayoutDiagram() {
 
   const onMouseMove = (e: React.MouseEvent) => handleMove(e.clientX, e.clientY);
   const onTouchMove = (e: React.TouchEvent) => { if (e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); };
-  const endPointer  = () => { dragRef.current = null; resizeRef.current = null; rotateRef.current = null; };
+  const endPointer  = () => {
+    if (linking) {
+      if (linking.targetId && linking.targetId !== linking.sourceId) {
+        addConn({ fromId: linking.sourceId, toId: linking.targetId, routing: 'straight', arrow: 'end', style: 'solid' });
+      }
+      setLinking(null);
+    }
+    dragRef.current = null; resizeRef.current = null; rotateRef.current = null;
+  };
 
   const clearSelection = () => {
     if (connectMode) return;
@@ -328,14 +407,18 @@ export default function LayoutDiagram() {
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
         <h3 className="text-slate-100 font-semibold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
-        <button
-          onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
-          className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer ${
-            connectMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-600 hover:bg-slate-500 text-white'
-          }`}
-        >
-          {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect'}
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-[10px] text-slate-400">Hover a box &amp; drag the blue dot to connect</span>
+          <button
+            onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
+            className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer ${
+              connectMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-600 hover:bg-slate-500 text-white'
+            }`}
+            title="Alternative: click this, then click two boxes"
+          >
+            {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect (click mode)'}
+          </button>
+        </div>
       </div>
 
       {/* Palette */}
@@ -414,14 +497,33 @@ export default function LayoutDiagram() {
               key={el.id}
               el={el}
               selected={selectedId === el.id}
+              hovered={hoveredId === el.id && !linking && !connectMode}
+              linkTarget={linking?.targetId === el.id}
               onPointerDown={e => onElementPointerDown(e, el)}
               onDoubleClick={() => { setSelectedId(el.id); setSelectedConnId(null); }}
               onResizeStart={(e, corner) => onResizeStart(e, el, corner)}
               onRotateStart={e => onRotateStart(e, el)}
+              onLinkStart={e => onLinkStart(e, el)}
+              onHoverChange={hovering => setHoveredId(hovering ? el.id : (cur => cur === el.id ? null : cur))}
             />
           ))}
 
-          {/* Connect-source highlight */}
+          {/* Live rubber-band while drawing a connection */}
+          {linking && getEl(linking.sourceId) && (() => {
+            const src = getEl(linking.sourceId)!;
+            const start = edgePoint(src, { x: linking.x, y: linking.y });
+            const end = linking.targetId && getEl(linking.targetId)
+              ? edgePoint(getEl(linking.targetId)!, elCenter(src))
+              : { x: linking.x, y: linking.y };
+            return (
+              <g pointerEvents="none">
+                <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#38bdf8" strokeWidth={2} strokeDasharray="5 3" />
+                <polygon points={arrowHeadPoints(start, end)} fill="#38bdf8" />
+              </g>
+            );
+          })()}
+
+          {/* Connect-source highlight (click-click fallback mode) */}
           {connectFrom && getEl(connectFrom) && (() => {
             const c = elCenter(getEl(connectFrom)!);
             return <circle cx={c.x} cy={c.y} r={8} fill="none" stroke="#f59e0b" strokeWidth={2} strokeDasharray="3 2" />;
@@ -453,10 +555,11 @@ export default function LayoutDiagram() {
         )}
 
         {!selectedEl && !selectedConn && (
-          <p className="text-xs text-slate-500 mt-2 px-1">
-            Drag to move · Drag a corner to resize · Drag the top dot to rotate · Click to select ·
-            Press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> to remove ·
-            Use &quot;↔ Connect&quot; to link two items · Click a line to edit it
+          <p className="text-xs text-slate-500 mt-2 px-1 leading-relaxed">
+            <b className="text-sky-400">Connect (Excel-style):</b> hover a box, then drag one of the blue dots onto another box.
+            <br />
+            Drag body to move · drag a corner to resize · drag the top dot to rotate · click to select ·
+            press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> to remove · click a line to edit it
           </p>
         )}
       </div>
