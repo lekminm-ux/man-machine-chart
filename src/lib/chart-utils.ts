@@ -160,17 +160,31 @@ export function computeTotalDuration(steps: ChartStep[]): number {
 }
 
 /**
- * Cycle Time = the busiest actor's total time (Worker A/B/C… or Auto M/C):
- * max over actors of Σ step durations (manual + machine + walk + idle).
- * Example: workers total 411 / 415 / 413 and the machine runs 450 → CT = 450.
+ * Cycle Time = the longest single track in the man-machine chart.
+ *
+ * Each operator has two PARALLEL tracks that must not be added together:
+ *   • a manual track   = Σ (manual + walk + idle)  — the time the person is
+ *     occupied or waiting;
+ *   • a machine track   = Σ (machine)              — the auto-run time of the
+ *     machine that person tends.
+ *
+ * The machine runs on its own while the worker waits (that wait shows up as
+ * idle on the manual track), so machine time is never summed into the worker's
+ * busy time. CT is the maximum of every track.
+ *
+ * Example (Rev.01): workers 411 / 415 / 413, Auto M/C machine 450 → CT = 450.
+ * Example (Rev.00): Worker D tends the crusher — manual+idle = 450 on one
+ * track, machine 388 on another → the worker still contributes 450, not 838.
  */
 export function computeCycleTime(steps: ChartStep[]): number {
   if (steps.length === 0) return 0;
-  const totals: Record<string, number> = {};
+  const manual: Record<string, number> = {};
+  const machine: Record<string, number> = {};
   for (const s of getCalculatedSteps(steps)) {
-    totals[s.operator] = (totals[s.operator] ?? 0) + s.calcDuration;
+    manual[s.operator] = (manual[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
+    machine[s.operator] = (machine[s.operator] ?? 0) + s.calcMachine;
   }
-  return Math.max(...Object.values(totals), 0);
+  return Math.max(0, ...Object.values(manual), ...Object.values(machine));
 }
 
 export function formatSeconds(s: number): string {

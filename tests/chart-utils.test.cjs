@@ -214,3 +214,26 @@ test('computeCycleTime sums multiple steps per actor and includes idle', () => {
   assert.equal(chartUtils.computeCycleTime(steps), 101);
   assert.equal(chartUtils.computeCycleTime([]), 0);
 });
+
+test('a worker who tends a machine keeps machine time on a separate track', () => {
+  // Reproduces the Rev.00 bug: the crusher runs under operator "Worker D".
+  // Manual+idle fills the 450s cycle; the 388s machine run is a parallel
+  // track, so Worker D contributes 450 — NOT 414+388+36 = 838.
+  const steps = [
+    // Worker D manual feeding until t=414
+    { id: 'd1', no: 1, description: 'feed', operator: 'Worker D',
+      manualTime: 414, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    // Worker D waits for the cycle to finish (idle stop reading 450)
+    { id: 'd2', no: 2, description: 'wait', operator: 'Worker D',
+      manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 450, startTime: 0 },
+    // The crusher auto-runs 388s, also logged under Worker D
+    { id: 'd3', no: 3, description: 'crush', operator: 'Worker D',
+      manualTime: 0, machineTime: 388, walkingTime: 0, idleTime: 0, startTime: 0 },
+    // Another worker on a 450s cycle
+    { id: 'a1', no: 4, description: 'work', operator: 'Worker A',
+      manualTime: 391, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'a2', no: 5, description: 'wait', operator: 'Worker A',
+      manualTime: 0, machineTime: 0, walkingTime: 0, idleTime: 450, startTime: 0 },
+  ];
+  assert.equal(chartUtils.computeCycleTime(steps), 450);
+});
