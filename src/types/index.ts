@@ -48,7 +48,16 @@ export interface WorkerSummary {
 }
 
 // Layout Diagram Types
-export type LayoutElementType = 'machine' | 'table' | 'rack' | 'worker' | 'label' | 'arrow_start' | 'conveyor';
+export type LayoutElementType =
+  // Original equipment
+  | 'machine' | 'table' | 'rack' | 'worker' | 'label' | 'arrow_start' | 'conveyor'
+  // Extended factory equipment
+  | 'robot' | 'jig' | 'inspection' | 'buffer' | 'pallet' | 'door'
+  // Basic geometric shapes
+  | 'shape_rect' | 'shape_circle' | 'shape_diamond' | 'shape_ellipse';
+
+/** How an element is drawn. Derived from its type unless overridden. */
+export type LayoutShape = 'rect' | 'circle' | 'ellipse' | 'diamond';
 
 export interface LayoutElement {
   id: string;
@@ -59,13 +68,25 @@ export interface LayoutElement {
   width: number;
   height: number;
   color?: string;
+  shape?: LayoutShape;   // overrides the default shape for the type
+  fontSize?: number;     // label size in px (default 11)
+  fontBold?: boolean;    // bold label (default true)
+  rotation?: number;     // clockwise degrees, default 0
 }
+
+export type ConnStyle = 'solid' | 'dashed' | 'dotted';
+export type ConnArrow = 'end' | 'both' | 'none';
+export type ConnRouting = 'straight' | 'orthogonal';
 
 export interface LayoutConnection {
   id: string;
   fromId: string;
   toId: string;
   label?: string;
+  color?: string;          // line + arrow colour (default slate)
+  style?: ConnStyle;       // solid / dashed / dotted (default solid)
+  arrow?: ConnArrow;       // arrowhead direction (default 'end')
+  routing?: ConnRouting;   // straight or right-angle path (default 'straight')
 }
 
 export interface LayoutDiagram {

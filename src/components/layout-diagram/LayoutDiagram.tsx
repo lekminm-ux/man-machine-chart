@@ -2,278 +2,370 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import type { LayoutElement, LayoutElementType } from '@/types';
-
-// ─── Palette ─────────────────────────────────────────────────────────────────
-const ELEMENT_PALETTE: { type: LayoutElementType; label: string; icon: string; color: string; w: number; h: number }[] = [
-  { type: 'machine',   label: 'Machine',       icon: '⚙️',  color: '#3b82f6', w: 140, h: 72 },
-  { type: 'table',     label: 'Table',         icon: '🗂️',  color: '#6b7280', w: 120, h: 56 },
-  { type: 'rack',      label: 'Rack / Shelf',  icon: '📦',  color: '#10b981', w: 100, h: 56 },
-  { type: 'worker',    label: 'Worker Pos.',   icon: '👷',  color: '#f59e0b', w: 64,  h: 64 },
-  { type: 'conveyor',  label: 'Conveyor',      icon: '➡️',  color: '#8b5cf6', w: 200, h: 32 },
-  { type: 'label',     label: 'Label',         icon: '🏷️',  color: '#374151', w: 100, h: 36 },
-];
+import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting } from '@/types';
+import {
+  ELEMENT_PALETTE, COLOR_PRESETS, shapeOf,
+  elCenter, straightPath, orthogonalPath, pointsToPath,
+  arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
+} from '@/lib/layout-utils';
 
 const CANVAS_W = 680;
 const CANVAS_H = 380;
+const MIN_SIZE = 24;
+const HANDLE = 7;
 
+type Corner = 'nw' | 'ne' | 'sw' | 'se';
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Element shape (body + label + selection UI)
+// ────────────────────────────────────────────────────────────────────────────
 function ElementShape({
   el,
   selected,
-  onMouseDown,
+  onPointerDown,
   onDoubleClick,
-  onDelete,
+  onResizeStart,
+  onRotateStart,
 }: {
   el: LayoutElement;
   selected: boolean;
-  onMouseDown: (e: React.MouseEvent | React.TouchEvent) => void;
+  onPointerDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
-  onDelete: () => void;
+  onResizeStart: (e: React.MouseEvent | React.TouchEvent, corner: Corner) => void;
+  onRotateStart: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
-  const { x, y, width: w, height: h, label, type, color } = el;
-  const isWorker  = type === 'worker';
-  const isConveyor = type === 'conveyor';
+  const { width: w, height: h, label, color = '#64748b' } = el;
+  const shape = shapeOf(el);
+  const rotation = el.rotation ?? 0;
+  const fontSize = el.fontSize ?? 11;
+  const fontWeight = el.fontBold === false ? '500' : '700';
+  const filled = el.type === 'worker'; // workers render as a solid disc
+
+  const body = (() => {
+    const common = filled
+      ? { fill: color, fillOpacity: 0.9, stroke: 'none' as const }
+      : { fill: color, fillOpacity: 0.15, stroke: color, strokeWidth: selected ? 2.5 : 1.5 };
+    switch (shape) {
+      case 'circle':
+        return <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} {...common} />;
+      case 'ellipse':
+        return <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} {...common} />;
+      case 'diamond':
+        return <polygon points={`${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`} {...common} />;
+      default:
+        return <rect width={w} height={h} rx={6} {...common} />;
+    }
+  })();
+
+  const corners: { corner: Corner; cx: number; cy: number; cursor: string }[] = [
+    { corner: 'nw', cx: 0, cy: 0, cursor: 'nwse-resize' },
+    { corner: 'ne', cx: w, cy: 0, cursor: 'nesw-resize' },
+    { corner: 'sw', cx: 0, cy: h, cursor: 'nesw-resize' },
+    { corner: 'se', cx: w, cy: h, cursor: 'nwse-resize' },
+  ];
 
   return (
     <g
-      transform={`translate(${x}, ${y})`}
-      style={{ cursor: 'grab' }}
-      onMouseDown={onMouseDown}
-      onTouchStart={onMouseDown}
+      transform={`translate(${el.x}, ${el.y})`}
+      onMouseDown={onPointerDown}
+      onTouchStart={onPointerDown}
       onDoubleClick={onDoubleClick}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Shadow */}
-      <rect x={3} y={3} width={w} height={h} rx={isWorker ? w / 2 : 6} fill="rgba(0,0,0,0.12)" />
-
-      {/* Body */}
-      {isWorker ? (
-        <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} fill={color} opacity={0.9} />
-      ) : (
-        <rect
-          width={w} height={h} rx={6}
-          fill={color}
-          fillOpacity={0.15}
-          stroke={color}
-          strokeWidth={selected ? 2.5 : 1.5}
-          strokeDasharray={selected ? undefined : undefined}
-        />
-      )}
-
-      {/* Selection ring */}
-      {selected && (
-        <rect
-          x={-3} y={-3} width={w + 6} height={h + 6} rx={8}
-          fill="none" stroke="#2563eb" strokeWidth={2} strokeDasharray="4 2"
-        />
-      )}
-
-      {/* Label */}
-      <text
-        x={w / 2} y={h / 2 + 4}
-        textAnchor="middle"
-        fontSize={isWorker ? 10 : isConveyor ? 10 : 11}
-        fontWeight="600"
-        fill={color}
-        fontFamily="Inter, sans-serif"
-        pointerEvents="none"
-        style={{ userSelect: 'none' }}
-      >
-        {label.length > 16 ? label.slice(0, 16) + '…' : label}
-      </text>
-
-      {/* Delete button (small red circle with 'x') on top-right of selected element */}
-      {selected && (
-        <g
-          transform={`translate(${w - 6}, 6)`}
-          style={{ cursor: 'pointer' }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
+      {/* Rotated visual content (shadow + body + label) */}
+      <g transform={`rotate(${rotation}, ${w / 2}, ${h / 2})`} style={{ cursor: 'grab' }}>
+        <rect x={3} y={3} width={w} height={h} rx={shape === 'circle' ? w / 2 : 6} fill="rgba(0,0,0,0.18)" />
+        {body}
+        <text
+          x={w / 2} y={h / 2 + fontSize / 3}
+          textAnchor="middle"
+          fontSize={fontSize}
+          fontWeight={fontWeight}
+          fill={filled ? '#1e293b' : color}
+          fontFamily="Inter, sans-serif"
+          pointerEvents="none"
+          style={{ userSelect: 'none' }}
         >
-          <circle r="8" fill="#ef4444" stroke="#ffffff" strokeWidth="1.2" />
-          <path
-            d="M -2.5 -2.5 L 2.5 2.5 M -2.5 2.5 L 2.5 -2.5"
-            stroke="#ffffff"
-            strokeWidth="1.2"
-            strokeLinecap="round"
+          {label.length > 20 ? label.slice(0, 20) + '…' : label}
+        </text>
+      </g>
+
+      {/* Axis-aligned selection UI (not rotated) */}
+      {selected && (
+        <>
+          <rect
+            x={-4} y={-4} width={w + 8} height={h + 8} rx={8}
+            fill="none" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="4 2"
           />
-        </g>
+          {/* Rotate handle */}
+          <line x1={w / 2} y1={-4} x2={w / 2} y2={-20} stroke="#2563eb" strokeWidth={1.5} />
+          <circle
+            cx={w / 2} cy={-24} r={6}
+            fill="#2563eb" stroke="#fff" strokeWidth={1.2}
+            style={{ cursor: 'grab' }}
+            onMouseDown={(e) => onRotateStart(e)}
+            onTouchStart={(e) => onRotateStart(e)}
+          />
+          {/* Resize handles */}
+          {corners.map(({ corner, cx, cy, cursor }) => (
+            <rect
+              key={corner}
+              x={cx - HANDLE / 2} y={cy - HANDLE / 2}
+              width={HANDLE} height={HANDLE} rx={1.5}
+              fill="#fff" stroke="#2563eb" strokeWidth={1.5}
+              style={{ cursor }}
+              onMouseDown={(e) => onResizeStart(e, corner)}
+              onTouchStart={(e) => onResizeStart(e, corner)}
+            />
+          ))}
+        </>
       )}
     </g>
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+//  Connection rendering
+// ────────────────────────────────────────────────────────────────────────────
+function ConnectionShape({
+  conn, from, to, selected, onSelect,
+}: {
+  conn: LayoutConnection;
+  from: LayoutElement;
+  to: LayoutElement;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const color = conn.color ?? '#64748b';
+  const routing: ConnRouting = conn.routing ?? 'straight';
+  const arrow: ConnArrow = conn.arrow ?? 'end';
+  const style: ConnStyle = conn.style ?? 'solid';
+
+  const { pts } = routing === 'orthogonal' ? orthogonalPath(from, to) : straightPath(from, to);
+  const d = pointsToPath(pts);
+  const mid = polylineMidpoint(pts);
+
+  const last = pts[pts.length - 1];
+  const prevLast = pts[pts.length - 2] ?? pts[0];
+  const first = pts[0];
+  const secondFirst = pts[1] ?? pts[pts.length - 1];
+
+  return (
+    <g
+      onMouseDown={(e) => { e.stopPropagation(); onSelect(); }}
+      onTouchStart={(e) => { e.stopPropagation(); onSelect(); }}
+      onClick={(e) => e.stopPropagation()}
+      style={{ cursor: 'pointer' }}
+    >
+      {/* Fat transparent hit area for easy clicking */}
+      <path d={d} stroke="transparent" strokeWidth={14} fill="none" />
+      {/* Visible line */}
+      <path
+        d={d}
+        stroke={color}
+        strokeWidth={selected ? 3 : 2}
+        strokeDasharray={DASH_ARRAY[style]}
+        fill="none"
+      />
+      {/* Arrowheads (manual polygons so colour + export are reliable) */}
+      {(arrow === 'end' || arrow === 'both') && (
+        <polygon points={arrowHeadPoints(prevLast, last)} fill={color} />
+      )}
+      {arrow === 'both' && (
+        <polygon points={arrowHeadPoints(secondFirst, first)} fill={color} />
+      )}
+      {/* Label */}
+      {conn.label && (
+        <g pointerEvents="none">
+          <rect
+            x={mid.x - conn.label.length * 3.3 - 4} y={mid.y - 8}
+            width={conn.label.length * 6.6 + 8} height={16} rx={3}
+            fill="#0f172a" stroke={color} strokeWidth={0.75} opacity={0.95}
+          />
+          <text x={mid.x} y={mid.y + 3.5} textAnchor="middle" fontSize={9} fill="#e2e8f0" fontFamily="Inter, sans-serif">
+            {conn.label}
+          </text>
+        </g>
+      )}
+      {selected && (
+        <circle cx={mid.x} cy={mid.y} r={4} fill="#2563eb" stroke="#fff" strokeWidth={1} pointerEvents="none" />
+      )}
+    </g>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Main component
+// ────────────────────────────────────────────────────────────────────────────
 export default function LayoutDiagram() {
-  const activeFile         = useChartStore(s => s.activeFile());
-  const addEl              = useChartStore(s => s.addLayoutElement);
-  const updateEl           = useChartStore(s => s.updateLayoutElement);
-  const deleteEl           = useChartStore(s => s.deleteLayoutElement);
-  const addConn            = useChartStore(s => s.addLayoutConnection);
-  const deleteConn         = useChartStore(s => s.deleteLayoutConnection);
+  const activeFile   = useChartStore(s => s.activeFile());
+  const addEl        = useChartStore(s => s.addLayoutElement);
+  const updateEl     = useChartStore(s => s.updateLayoutElement);
+  const deleteEl     = useChartStore(s => s.deleteLayoutElement);
+  const addConn      = useChartStore(s => s.addLayoutConnection);
+  const updateConn   = useChartStore(s => s.updateLayoutConnection);
+  const deleteConn   = useChartStore(s => s.deleteLayoutConnection);
 
   const [selectedId, setSelectedId]         = useState<string | null>(null);
-  const [editing, setEditing]               = useState<{ id: string; value: string } | null>(null);
+  const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [connectMode, setConnectMode]       = useState(false);
   const [connectFrom, setConnectFrom]       = useState<string | null>(null);
 
-  const dragRef    = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
-  const svgRef     = useRef<SVGSVGElement>(null);
-  // Keep a ref to the latest selectedId so keyboard/delete handlers always see current value
-  const selectedIdRef = useRef<string | null>(null);
-  selectedIdRef.current = selectedId;
+  const dragRef   = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
+  const resizeRef = useRef<{ id: string; corner: Corner; ox: number; oy: number; ow: number; oh: number; startX: number; startY: number } | null>(null);
+  const rotateRef = useRef<{ id: string; cx: number; cy: number } | null>(null);
+  const svgRef    = useRef<SVGSVGElement>(null);
 
-  // Keyboard delete support
+  // Keyboard delete for whichever item is selected
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdRef.current && !editing) {
-        deleteEl(selectedIdRef.current);
-        setSelectedId(null);
-      }
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (selectedId) { deleteEl(selectedId); setSelectedId(null); }
+      else if (selectedConnId) { deleteConn(selectedConnId); setSelectedConnId(null); }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteEl, editing]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [deleteEl, deleteConn, selectedId, selectedConnId]);
+
+  const pointer = useCallback((clientX: number, clientY: number): Pt => {
+    const r = svgRef.current!.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  }, []);
 
   if (!activeFile) return null;
   const { elements, connections } = activeFile.layoutDiagram;
-
   const getEl = (id: string) => elements.find(e => e.id === id);
+  const selectedEl = selectedId ? getEl(selectedId) : null;
+  const selectedConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
 
-  // ── Drag ────────────────────────────────────────────────────────────────────
-  const onMouseDownEl = useCallback(
-    (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
-      e.stopPropagation();
-      if (connectMode) {
-        if (!connectFrom) {
-          setConnectFrom(el.id);
-        } else if (connectFrom !== el.id) {
-          addConn({ fromId: connectFrom, toId: el.id });
-          setConnectFrom(null);
-          setConnectMode(false);
-        }
-        return;
+  // ── Element pointer down (move / connect) ──────────────────────────────────
+  const onElementPointerDown = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    e.stopPropagation();
+    if (connectMode) {
+      if (!connectFrom) {
+        setConnectFrom(el.id);
+      } else if (connectFrom !== el.id) {
+        addConn({ fromId: connectFrom, toId: el.id, routing: 'straight', arrow: 'end', style: 'solid' });
+        setConnectFrom(null);
+        setConnectMode(false);
       }
-      setSelectedId(el.id);
-
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-      const svgRect = svgRef.current!.getBoundingClientRect();
-      dragRef.current = {
-        id: el.id,
-        ox: el.x,
-        oy: el.y,
-        startX: clientX - svgRect.left,
-        startY: clientY - svgRect.top,
-      };
-    },
-    [connectMode, connectFrom, addConn]
-  );
-
-  const handleMove = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!dragRef.current) return;
-      const svgRect = svgRef.current!.getBoundingClientRect();
-      const dx = clientX - svgRect.left - dragRef.current.startX;
-      const dy = clientY - svgRect.top - dragRef.current.startY;
-      const nx = Math.max(0, dragRef.current.ox + dx);
-      const ny = Math.max(0, dragRef.current.oy + dy);
-      updateEl(dragRef.current.id, { x: nx, y: ny });
-    },
-    [updateEl]
-  );
-
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      handleMove(e.clientX, e.clientY);
-    },
-    [handleMove]
-  );
-
-  const onTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (e.touches.length > 0) {
-        handleMove(e.touches[0].clientX, e.touches[0].clientY);
-      }
-    },
-    [handleMove]
-  );
-
-  const onMouseUp = useCallback(() => { dragRef.current = null; }, []);
-
-  // ── Double-click to edit ────────────────────────────────────────────────────
-  const onDblClick = useCallback(
-    (e: React.MouseEvent, el: LayoutElement) => {
-      e.stopPropagation();
-      setEditing({ id: el.id, value: el.label });
-    },
-    []
-  );
-
-  const commitEdit = () => {
-    if (!editing) return;
-    updateEl(editing.id, { label: editing.value });
-    setEditing(null);
+      return;
+    }
+    setSelectedId(el.id);
+    setSelectedConnId(null);
+    const c = 'touches' in e ? e.touches[0] : e;
+    const p = pointer(c.clientX, c.clientY);
+    dragRef.current = { id: el.id, ox: el.x, oy: el.y, startX: p.x, startY: p.y };
   };
 
-  // ── Connection line midpoints ───────────────────────────────────────────────
-  function elCenter(el: LayoutElement) {
-    return { cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
-  }
+  const onResizeStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement, corner: Corner) => {
+    e.stopPropagation();
+    const c = 'touches' in e ? e.touches[0] : e;
+    const p = pointer(c.clientX, c.clientY);
+    resizeRef.current = { id: el.id, corner, ox: el.x, oy: el.y, ow: el.width, oh: el.height, startX: p.x, startY: p.y };
+  };
+
+  const onRotateStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    e.stopPropagation();
+    rotateRef.current = { id: el.id, cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
+  };
+
+  // ── Unified move handler ───────────────────────────────────────────────────
+  const handleMove = (clientX: number, clientY: number) => {
+    const p = pointer(clientX, clientY);
+
+    if (rotateRef.current) {
+      const { id, cx, cy } = rotateRef.current;
+      const deg = Math.atan2(p.y - cy, p.x - cx) * 180 / Math.PI + 90;
+      updateEl(id, { rotation: Math.round(deg / 5) * 5 });
+      return;
+    }
+
+    if (resizeRef.current) {
+      const r = resizeRef.current;
+      const dx = p.x - r.startX;
+      const dy = p.y - r.startY;
+      let nx = r.ox, ny = r.oy, nw = r.ow, nh = r.oh;
+      if (r.corner.includes('e')) nw = r.ow + dx;
+      if (r.corner.includes('s')) nh = r.oh + dy;
+      if (r.corner.includes('w')) { nw = r.ow - dx; nx = r.ox + dx; }
+      if (r.corner.includes('n')) { nh = r.oh - dy; ny = r.oy + dy; }
+      if (nw < MIN_SIZE) { if (r.corner.includes('w')) nx = r.ox + (r.ow - MIN_SIZE); nw = MIN_SIZE; }
+      if (nh < MIN_SIZE) { if (r.corner.includes('n')) ny = r.oy + (r.oh - MIN_SIZE); nh = MIN_SIZE; }
+      updateEl(r.id, { x: Math.max(0, nx), y: Math.max(0, ny), width: Math.round(nw), height: Math.round(nh) });
+      return;
+    }
+
+    if (dragRef.current) {
+      const d = dragRef.current;
+      updateEl(d.id, { x: Math.max(0, d.ox + (p.x - d.startX)), y: Math.max(0, d.oy + (p.y - d.startY)) });
+    }
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => handleMove(e.clientX, e.clientY);
+  const onTouchMove = (e: React.TouchEvent) => { if (e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); };
+  const endPointer  = () => { dragRef.current = null; resizeRef.current = null; rotateRef.current = null; };
+
+  const clearSelection = () => {
+    if (connectMode) return;
+    setSelectedId(null);
+    setSelectedConnId(null);
+  };
+
+  const addFromPalette = (type: string) => {
+    const p = ELEMENT_PALETTE.find(x => x.type === type)!;
+    addEl({ type: p.type, label: p.label, x: 70, y: 70, width: p.w, height: p.h, color: p.color, shape: p.shape });
+  };
+
+  const equipment = ELEMENT_PALETTE.filter(p => p.group === 'equipment');
+  const shapes    = ELEMENT_PALETTE.filter(p => p.group === 'shape');
 
   return (
     <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
         <h3 className="text-slate-100 font-semibold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
-            className={`px-2 py-1 text-xs font-semibold rounded transition-colors ${
-              connectMode ? 'bg-amber-400 text-white' : 'bg-slate-500 hover:bg-slate-400 text-white'
-            }`}
-          >
-            {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect'}
-          </button>
-          {selectedId && (
-            <button
-              // Use onMouseDown instead of onClick so it fires BEFORE the SVG's onClick
-              // that would clear the selection, allowing the delete to always work
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                deleteEl(selectedId);
-                setSelectedId(null);
-              }}
-              className="px-2 py-1 text-xs font-semibold rounded bg-red-500 hover:bg-red-400 text-white transition-colors"
-            >
-              ✕ Delete
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
+          className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer ${
+            connectMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-600 hover:bg-slate-500 text-white'
+          }`}
+        >
+          {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect'}
+        </button>
       </div>
 
       {/* Palette */}
-      <div className="bg-slate-900 border-b border-slate-700 px-4 py-2 flex flex-wrap gap-2" style={{ borderColor: '#334155' }}>
-        {ELEMENT_PALETTE.map(p => (
-          <button
-            key={p.type}
-            onClick={() => addEl({ type: p.type, label: p.label, x: 60, y: 60, width: p.w, height: p.h, color: p.color })}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-medium text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition-colors shadow-sm cursor-pointer"
-          >
-            <span>{p.icon}</span> {p.label}
-          </button>
-        ))}
+      <div className="bg-slate-900 border-b border-slate-700 px-3 py-2 space-y-1.5" style={{ borderColor: '#334155' }}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-14">Equip.</span>
+          {equipment.map(p => (
+            <button
+              key={p.type}
+              onClick={() => addFromPalette(p.type)}
+              className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-medium text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition-colors cursor-pointer"
+              title={`Add ${p.label}`}
+            >
+              <span>{p.icon}</span> {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-14">Shapes</span>
+          {shapes.map(p => (
+            <button
+              key={p.type}
+              onClick={() => addFromPalette(p.type)}
+              className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-medium text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition-colors cursor-pointer"
+              title={`Add ${p.label}`}
+            >
+              <span>{p.icon}</span> {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Canvas */}
@@ -286,14 +378,12 @@ export default function LayoutDiagram() {
           style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
           onMouseMove={onMouseMove}
           onTouchMove={onTouchMove}
-          onMouseUp={onMouseUp}
-          onTouchEnd={onMouseUp}
-          onMouseLeave={onMouseUp}
+          onMouseUp={endPointer}
+          onTouchEnd={endPointer}
+          onMouseLeave={endPointer}
           onContextMenu={(e) => e.preventDefault()}
-          onClick={() => { if (!connectMode) setSelectedId(null); }}
-          onTouchStart={() => { if (!connectMode) setSelectedId(null); }}
+          onClick={clearSelection}
         >
-          {/* Grid */}
           <defs>
             <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" strokeWidth="0.5" />
@@ -301,27 +391,20 @@ export default function LayoutDiagram() {
           </defs>
           <rect width={CANVAS_W} height={CANVAS_H} fill="url(#grid)" />
 
-          {/* Connections */}
-          <defs>
-            <marker id="conn-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M 0 0 L 6 3 L 0 6 Z" fill="#64748b" />
-            </marker>
-          </defs>
+          {/* Connections (under elements) */}
           {connections.map(c => {
             const from = getEl(c.fromId);
-            const to   = getEl(c.toId);
+            const to = getEl(c.toId);
             if (!from || !to) return null;
-            const { cx: x1, cy: y1 } = elCenter(from);
-            const { cx: x2, cy: y2 } = elCenter(to);
             return (
-              <g key={c.id} onClick={e => { e.stopPropagation(); deleteConn(c.id); }}>
-                <line
-                  x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke="#64748b" strokeWidth={2}
-                  markerEnd="url(#conn-arrow)"
-                  style={{ cursor: 'pointer' }}
-                />
-              </g>
+              <ConnectionShape
+                key={c.id}
+                conn={c}
+                from={from}
+                to={to}
+                selected={selectedConnId === c.id}
+                onSelect={() => { setSelectedConnId(c.id); setSelectedId(null); }}
+              />
             );
           })}
 
@@ -331,16 +414,19 @@ export default function LayoutDiagram() {
               key={el.id}
               el={el}
               selected={selectedId === el.id}
-              onMouseDown={e => onMouseDownEl(e, el)}
-              onDoubleClick={e => onDblClick(e, el)}
-              onDelete={() => {
-                deleteEl(el.id);
-                setSelectedId(null);
-              }}
+              onPointerDown={e => onElementPointerDown(e, el)}
+              onDoubleClick={() => { setSelectedId(el.id); setSelectedConnId(null); }}
+              onResizeStart={(e, corner) => onResizeStart(e, el, corner)}
+              onRotateStart={e => onRotateStart(e, el)}
             />
           ))}
 
-          {/* Hint text */}
+          {/* Connect-source highlight */}
+          {connectFrom && getEl(connectFrom) && (() => {
+            const c = elCenter(getEl(connectFrom)!);
+            return <circle cx={c.x} cy={c.y} r={8} fill="none" stroke="#f59e0b" strokeWidth={2} strokeDasharray="3 2" />;
+          })()}
+
           {elements.length === 0 && (
             <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" fill="#475569" fontSize={14}>
               Click palette items above to add equipment
@@ -348,31 +434,184 @@ export default function LayoutDiagram() {
           )}
         </svg>
 
-        {/* Inline edit overlay */}
-        {editing && (() => {
-          const el = getEl(editing.id);
-          if (!el) return null;
-          return (
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-slate-400">Edit label:</span>
-              <input
-                autoFocus
-                type="text"
-                value={editing.value}
-                onChange={e => setEditing({ ...editing, value: e.target.value })}
-                onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null); }}
-                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-              />
-              <button onClick={commitEdit} className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded cursor-pointer">Save</button>
-              <button onClick={() => setEditing(null)} className="px-2 py-1 text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 rounded cursor-pointer">Cancel</button>
-            </div>
-          );
-        })()}
+        {/* ── Element property panel ─────────────────────────────────────────── */}
+        {selectedEl && (
+          <ElementPanel
+            el={selectedEl}
+            onChange={(patch) => updateEl(selectedEl.id, patch)}
+            onDelete={() => { deleteEl(selectedEl.id); setSelectedId(null); }}
+          />
+        )}
 
-        {/* Tip */}
-        <p className="text-xs text-slate-500 mt-2 px-1">
-          Drag to move · Click to select then press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> or use ✕ Delete button · Double-click to rename · Use "↔ Connect" to draw arrows · Click an arrow to delete it
-        </p>
+        {/* ── Connection property panel ──────────────────────────────────────── */}
+        {selectedConn && (
+          <ConnectionPanel
+            conn={selectedConn}
+            onChange={(patch) => updateConn(selectedConn.id, patch)}
+            onDelete={() => { deleteConn(selectedConn.id); setSelectedConnId(null); }}
+          />
+        )}
+
+        {!selectedEl && !selectedConn && (
+          <p className="text-xs text-slate-500 mt-2 px-1">
+            Drag to move · Drag a corner to resize · Drag the top dot to rotate · Click to select ·
+            Press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> to remove ·
+            Use &quot;↔ Connect&quot; to link two items · Click a line to edit it
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Property panels
+// ────────────────────────────────────────────────────────────────────────────
+const PANEL = 'mt-2 rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2.5';
+const ROW = 'flex items-center gap-2 flex-wrap';
+const LBL = 'text-[10px] font-bold text-slate-500 uppercase tracking-wider w-16 shrink-0';
+const INPUT = 'bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:border-blue-500 focus:outline-none';
+
+function Swatches({ value, onPick }: { value?: string; onPick: (c: string) => void }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {COLOR_PRESETS.map(c => (
+        <button
+          key={c}
+          onClick={() => onPick(c)}
+          className="w-5 h-5 rounded border cursor-pointer"
+          style={{ background: c, borderColor: value === c ? '#fff' : 'rgba(255,255,255,0.2)', outline: value === c ? '2px solid #2563eb' : 'none' }}
+          title={c}
+        />
+      ))}
+      <input
+        type="color"
+        value={value ?? '#64748b'}
+        onChange={e => onPick(e.target.value)}
+        className="w-6 h-6 bg-transparent border border-slate-700 rounded cursor-pointer p-0"
+        title="Custom colour"
+      />
+    </div>
+  );
+}
+
+function ElementPanel({
+  el, onChange, onDelete,
+}: {
+  el: LayoutElement;
+  onChange: (patch: Partial<LayoutElement>) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-slate-200">Element</span>
+        <button onClick={onDelete} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer">✕ Delete</button>
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Label</span>
+        <input
+          type="text"
+          value={el.label}
+          onChange={e => onChange({ label: e.target.value })}
+          className={`${INPUT} flex-1 min-w-[140px]`}
+          placeholder="Name…"
+        />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Colour</span>
+        <Swatches value={el.color} onPick={c => onChange({ color: c })} />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Font</span>
+        <select value={el.fontSize ?? 11} onChange={e => onChange({ fontSize: Number(e.target.value) })} className={INPUT}>
+          {[9, 10, 11, 12, 14, 16, 18, 22].map(s => <option key={s} value={s}>{s}px</option>)}
+        </select>
+        <button
+          onClick={() => onChange({ fontBold: el.fontBold === false })}
+          className={`px-2 py-1 text-xs rounded border cursor-pointer ${el.fontBold === false ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-blue-600 border-blue-500 text-white'}`}
+        >
+          <b>B</b> Bold
+        </button>
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Size</span>
+        <input type="number" min={MIN_SIZE} value={Math.round(el.width)} onChange={e => onChange({ width: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} className={`${INPUT} w-16`} title="Width" />
+        <span className="text-slate-500 text-xs">×</span>
+        <input type="number" min={MIN_SIZE} value={Math.round(el.height)} onChange={e => onChange({ height: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} className={`${INPUT} w-16`} title="Height" />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Rotate</span>
+        <input
+          type="range" min={0} max={360} step={5}
+          value={el.rotation ?? 0}
+          onChange={e => onChange({ rotation: Number(e.target.value) })}
+          className="flex-1 min-w-[100px] accent-blue-500 cursor-pointer"
+        />
+        <span className="text-xs text-slate-300 font-mono w-10 text-right">{el.rotation ?? 0}°</span>
+        <button onClick={() => onChange({ rotation: 0 })} className="px-2 py-1 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 cursor-pointer">Reset</button>
+      </div>
+    </div>
+  );
+}
+
+function ConnectionPanel({
+  conn, onChange, onDelete,
+}: {
+  conn: LayoutConnection;
+  onChange: (patch: Partial<LayoutConnection>) => void;
+  onDelete: () => void;
+}) {
+  const seg = (active: boolean) =>
+    `px-2 py-1 text-xs rounded border cursor-pointer ${active ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`;
+
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-slate-200">Connection</span>
+        <button onClick={onDelete} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer">✕ Delete</button>
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Label</span>
+        <input
+          type="text"
+          value={conn.label ?? ''}
+          onChange={e => onChange({ label: e.target.value })}
+          className={`${INPUT} flex-1 min-w-[140px]`}
+          placeholder="e.g. Walk 5s"
+        />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Colour</span>
+        <Swatches value={conn.color} onPick={c => onChange({ color: c })} />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Line</span>
+        {(['solid', 'dashed', 'dotted'] as ConnStyle[]).map(s => (
+          <button key={s} onClick={() => onChange({ style: s })} className={seg((conn.style ?? 'solid') === s)}>{s}</button>
+        ))}
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Arrow</span>
+        {([['end', 'End →'], ['both', '↔ Both'], ['none', 'None']] as [ConnArrow, string][]).map(([v, t]) => (
+          <button key={v} onClick={() => onChange({ arrow: v })} className={seg((conn.arrow ?? 'end') === v)}>{t}</button>
+        ))}
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Path</span>
+        {([['straight', 'Straight'], ['orthogonal', 'Right-angle']] as [ConnRouting, string][]).map(([v, t]) => (
+          <button key={v} onClick={() => onChange({ routing: v })} className={seg((conn.routing ?? 'straight') === v)}>{t}</button>
+        ))}
       </div>
     </div>
   );

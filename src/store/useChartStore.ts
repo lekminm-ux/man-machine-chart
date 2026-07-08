@@ -57,6 +57,7 @@ interface ChartState extends AppDatabase {
   updateLayoutElement: (id: string, partial: Partial<LayoutElement>) => void;
   deleteLayoutElement: (id: string) => void;
   addLayoutConnection: (conn: Omit<LayoutConnection, 'id'>) => void;
+  updateLayoutConnection: (id: string, partial: Partial<LayoutConnection>) => void;
   deleteLayoutConnection: (id: string) => void;
 }
 
@@ -591,6 +592,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: [...f.layoutDiagram.connections, newConn] }, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  updateLayoutConnection(id, partial) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: f.layoutDiagram.connections.map(c => c.id === id ? { ...c, ...partial } : c) }, updatedAt: new Date().toISOString() }
             : f
         ),
       };
