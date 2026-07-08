@@ -3,9 +3,10 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ELEMENT_PALETTE, COLOR_PRESETS, shapeOf,
-  elCenter, edgePoint, straightPath, orthogonalPath, pointsToPath,
+  elCenter, edgePoint, connectionPath, pointsToPath,
   arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
 } from '@/lib/layout-utils';
 
@@ -171,20 +172,18 @@ function ElementShape({
 //  Connection rendering
 // ────────────────────────────────────────────────────────────────────────────
 function ConnectionShape({
-  conn, from, to, selected, onSelect,
+  conn, pts, selected, onSelect, onBodyDown,
 }: {
   conn: LayoutConnection;
-  from: LayoutElement;
-  to: LayoutElement;
+  pts: Pt[];
   selected: boolean;
   onSelect: () => void;
+  onBodyDown?: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const color = conn.color ?? '#64748b';
-  const routing: ConnRouting = conn.routing ?? 'straight';
   const arrow: ConnArrow = conn.arrow ?? 'end';
   const style: ConnStyle = conn.style ?? 'solid';
 
-  const { pts } = routing === 'orthogonal' ? orthogonalPath(from, to) : straightPath(from, to);
   const d = pointsToPath(pts);
   const mid = polylineMidpoint(pts);
 
@@ -192,13 +191,14 @@ function ConnectionShape({
   const prevLast = pts[pts.length - 2] ?? pts[0];
   const first = pts[0];
   const secondFirst = pts[1] ?? pts[pts.length - 1];
+  const isFree = !conn.fromId || !conn.toId; // draggable body only for free arrows
 
   return (
     <g
-      onMouseDown={(e) => { e.stopPropagation(); onSelect(); }}
-      onTouchStart={(e) => { e.stopPropagation(); onSelect(); }}
+      onMouseDown={(e) => { e.stopPropagation(); onSelect(); onBodyDown?.(e); }}
+      onTouchStart={(e) => { e.stopPropagation(); onSelect(); onBodyDown?.(e); }}
       onClick={(e) => e.stopPropagation()}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: isFree ? 'move' : 'pointer' }}
     >
       {/* Fat transparent hit area for easy clicking */}
       <path d={d} stroke="transparent" strokeWidth={14} fill="none" />
@@ -237,6 +237,37 @@ function ConnectionShape({
   );
 }
 
+// Draggable endpoint handles for a selected connector. Attached ends show a
+// static grey dot; free ends show a blue draggable dot.
+function ConnEndpoints({
+  pts, fromAttached, toAttached, onGrab,
+}: {
+  pts: Pt[];
+  fromAttached: boolean;
+  toAttached: boolean;
+  onGrab: (e: React.MouseEvent | React.TouchEvent, end: 'from' | 'to') => void;
+}) {
+  const ends: { pt: Pt; end: 'from' | 'to'; attached: boolean }[] = [
+    { pt: pts[0], end: 'from', attached: fromAttached },
+    { pt: pts[pts.length - 1], end: 'to', attached: toAttached },
+  ];
+  return (
+    <>
+      {ends.map(({ pt, end, attached }) => (
+        <g
+          key={end}
+          style={{ cursor: attached ? 'default' : 'grab' }}
+          onMouseDown={(e) => { if (!attached) onGrab(e, end); }}
+          onTouchStart={(e) => { if (!attached) onGrab(e, end); }}
+        >
+          <circle cx={pt.x} cy={pt.y} r={10} fill="transparent" />
+          <circle cx={pt.x} cy={pt.y} r={5} fill={attached ? '#94a3b8' : '#2563eb'} stroke="#fff" strokeWidth={1.5} />
+        </g>
+      ))}
+    </>
+  );
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 //  Main component
 // ────────────────────────────────────────────────────────────────────────────
@@ -260,6 +291,12 @@ export default function LayoutDiagram() {
   const dragRef   = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
   const resizeRef = useRef<{ id: string; corner: Corner; ox: number; oy: number; ow: number; oh: number; startX: number; startY: number } | null>(null);
   const rotateRef = useRef<{ id: string; cx: number; cy: number } | null>(null);
+  // Free-arrow endpoint / body dragging
+  const connDragRef = useRef<
+    | { id: string; end: 'from' | 'to'; }
+    | { id: string; end: 'body'; ofrom: Pt; oto: Pt; startX: number; startY: number }
+    | null
+  >(null);
   const svgRef    = useRef<SVGSVGElement>(null);
 
   // Keyboard delete for whichever item is selected
@@ -285,6 +322,7 @@ export default function LayoutDiagram() {
   const getEl = (id: string) => elements.find(e => e.id === id);
   const selectedEl = selectedId ? getEl(selectedId) : null;
   const selectedConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
+  const selectedConnPts = selectedConn ? (connectionPath(selectedConn, getEl)?.pts ?? null) : null;
 
   // ── Element pointer down (move / connect) ──────────────────────────────────
   const onElementPointerDown = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
@@ -338,6 +376,32 @@ export default function LayoutDiagram() {
     return undefined;
   };
 
+  // ── Free-floating arrow (belongs to no element) ─────────────────────────────
+  const addFreeArrow = () => {
+    const id = uuidv4();
+    addConn({
+      id,
+      fromPt: { x: 220, y: 150 },
+      toPt: { x: 400, y: 150 },
+      arrow: 'end', style: 'solid', routing: 'straight', color: '#e2e8f0',
+    });
+    setSelectedConnId(id);
+    setSelectedId(null);
+  };
+
+  const onConnEndpointDown = (e: React.MouseEvent | React.TouchEvent, id: string, end: 'from' | 'to') => {
+    e.stopPropagation();
+    connDragRef.current = { id, end };
+  };
+
+  const onConnBodyDown = (e: React.MouseEvent | React.TouchEvent, conn: LayoutConnection) => {
+    // Only free arrows (both ends floating) can be moved as a whole.
+    if (conn.fromId || conn.toId || !conn.fromPt || !conn.toPt) return;
+    const c = 'touches' in e ? e.touches[0] : e;
+    const p = pointer(c.clientX, c.clientY);
+    connDragRef.current = { id: conn.id, end: 'body', ofrom: conn.fromPt, oto: conn.toPt, startX: p.x, startY: p.y };
+  };
+
   // ── Unified move handler ───────────────────────────────────────────────────
   const handleMove = (clientX: number, clientY: number) => {
     const p = pointer(clientX, clientY);
@@ -345,6 +409,23 @@ export default function LayoutDiagram() {
     if (linking) {
       const target = elementAt(p, linking.sourceId);
       setLinking({ ...linking, x: p.x, y: p.y, targetId: target ? target.id : null });
+      return;
+    }
+
+    if (connDragRef.current) {
+      const cd = connDragRef.current;
+      const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+      if (cd.end === 'body') {
+        const dx = p.x - cd.startX;
+        const dy = p.y - cd.startY;
+        updateConn(cd.id, {
+          fromPt: { x: clamp(cd.ofrom.x + dx, CANVAS_W), y: clamp(cd.ofrom.y + dy, CANVAS_H) },
+          toPt: { x: clamp(cd.oto.x + dx, CANVAS_W), y: clamp(cd.oto.y + dy, CANVAS_H) },
+        });
+      } else {
+        const pt = { x: clamp(p.x, CANVAS_W), y: clamp(p.y, CANVAS_H) };
+        updateConn(cd.id, cd.end === 'from' ? { fromPt: pt } : { toPt: pt });
+      }
       return;
     }
 
@@ -385,7 +466,7 @@ export default function LayoutDiagram() {
       }
       setLinking(null);
     }
-    dragRef.current = null; resizeRef.current = null; rotateRef.current = null;
+    dragRef.current = null; resizeRef.current = null; rotateRef.current = null; connDragRef.current = null;
   };
 
   const clearSelection = () => {
@@ -408,7 +489,13 @@ export default function LayoutDiagram() {
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
         <h3 className="text-slate-100 font-semibold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
         <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-[10px] text-slate-400">Hover a box &amp; drag the blue dot to connect</span>
+          <button
+            onClick={addFreeArrow}
+            className="px-2 py-1 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition-colors cursor-pointer"
+            title="Add a free-floating arrow you can place anywhere"
+          >
+            ➘ Free Arrow
+          </button>
           <button
             onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
             className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer ${
@@ -416,7 +503,7 @@ export default function LayoutDiagram() {
             }`}
             title="Alternative: click this, then click two boxes"
           >
-            {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect (click mode)'}
+            {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect boxes'}
           </button>
         </div>
       </div>
@@ -476,17 +563,16 @@ export default function LayoutDiagram() {
 
           {/* Connections (under elements) */}
           {connections.map(c => {
-            const from = getEl(c.fromId);
-            const to = getEl(c.toId);
-            if (!from || !to) return null;
+            const path = connectionPath(c, getEl);
+            if (!path) return null;
             return (
               <ConnectionShape
                 key={c.id}
                 conn={c}
-                from={from}
-                to={to}
+                pts={path.pts}
                 selected={selectedConnId === c.id}
                 onSelect={() => { setSelectedConnId(c.id); setSelectedId(null); }}
+                onBodyDown={(e) => onConnBodyDown(e, c)}
               />
             );
           })}
@@ -523,6 +609,16 @@ export default function LayoutDiagram() {
             );
           })()}
 
+          {/* Endpoint handles for the selected connector (on top of elements) */}
+          {selectedConn && selectedConnPts && (
+            <ConnEndpoints
+              pts={selectedConnPts}
+              fromAttached={!!selectedConn.fromId}
+              toAttached={!!selectedConn.toId}
+              onGrab={(e, end) => onConnEndpointDown(e, selectedConn.id, end)}
+            />
+          )}
+
           {/* Connect-source highlight (click-click fallback mode) */}
           {connectFrom && getEl(connectFrom) && (() => {
             const c = elCenter(getEl(connectFrom)!);
@@ -556,10 +652,12 @@ export default function LayoutDiagram() {
 
         {!selectedEl && !selectedConn && (
           <p className="text-xs text-slate-500 mt-2 px-1 leading-relaxed">
-            <b className="text-sky-400">Connect (Excel-style):</b> hover a box, then drag one of the blue dots onto another box.
+            <b className="text-sky-400">Connect boxes (Excel-style):</b> hover a box, then drag a blue dot onto another box.
             <br />
-            Drag body to move · drag a corner to resize · drag the top dot to rotate · click to select ·
-            press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> to remove · click a line to edit it
+            <b className="text-sky-400">Free arrow:</b> click <b>➘ Free Arrow</b>, then drag its blue endpoints anywhere · edit colour, solid/dashed, and arrowheads in the panel.
+            <br />
+            Drag body to move · drag a corner to resize · drag the top dot to rotate ·
+            press <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-1 rounded">Del</kbd> to remove
           </p>
         )}
       </div>
@@ -672,11 +770,15 @@ function ConnectionPanel({
 }) {
   const seg = (active: boolean) =>
     `px-2 py-1 text-xs rounded border cursor-pointer ${active ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`;
+  const isFree = !conn.fromId || !conn.toId;
 
   return (
     <div className={PANEL}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-slate-200">Connection</span>
+        <span className="text-xs font-bold text-slate-200">
+          {isFree ? 'Free Arrow' : 'Connection'}
+          {isFree && <span className="ml-2 font-normal text-slate-500">drag the blue endpoints to reposition</span>}
+        </span>
         <button onClick={onDelete} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer">✕ Delete</button>
       </div>
 

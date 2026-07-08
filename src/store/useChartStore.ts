@@ -56,7 +56,7 @@ interface ChartState extends AppDatabase {
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
   updateLayoutElement: (id: string, partial: Partial<LayoutElement>) => void;
   deleteLayoutElement: (id: string) => void;
-  addLayoutConnection: (conn: Omit<LayoutConnection, 'id'>) => void;
+  addLayoutConnection: (conn: Omit<LayoutConnection, 'id'> & { id?: string }) => void;
   updateLayoutConnection: (id: string, partial: Partial<LayoutConnection>) => void;
   deleteLayoutConnection: (id: string) => void;
 }
@@ -290,8 +290,9 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const newConnections = file.layoutDiagram.connections.map(conn => ({
       ...conn,
       id: uuidv4(),
-      fromId: elIdMap[conn.fromId] || conn.fromId,
-      toId: elIdMap[conn.toId] || conn.toId,
+      // Free-arrow ends (fromPt/toPt) have no id and copy through untouched.
+      fromId: conn.fromId ? (elIdMap[conn.fromId] || conn.fromId) : undefined,
+      toId: conn.toId ? (elIdMap[conn.toId] || conn.toId) : undefined,
     }));
 
     const duplicatedFile: ChartFile = {
@@ -586,7 +587,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   addLayoutConnection(conn) {
     set(s => {
       if (!s.activeFileId) return s;
-      const newConn: LayoutConnection = { ...conn, id: uuidv4() };
+      const newConn: LayoutConnection = { ...conn, id: conn.id ?? uuidv4() };
       const next = {
         ...s,
         files: s.files.map(f =>

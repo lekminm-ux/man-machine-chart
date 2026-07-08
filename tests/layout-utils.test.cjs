@@ -80,3 +80,44 @@ test('polylineMidpoint is the halfway point along the path', () => {
   assert.equal(mid.x, 10);
   assert.equal(mid.y, 0);
 });
+
+// Normalize vm-realm arrays/objects so deepEqual doesn't fail on prototypes.
+const norm = (v) => JSON.parse(JSON.stringify(v));
+
+test('connectionPath: free arrow uses its floating endpoints verbatim', () => {
+  const conn = { fromPt: { x: 20, y: 30 }, toPt: { x: 120, y: 30 }, routing: 'straight' };
+  const res = L.connectionPath(conn, () => undefined);
+  assert.deepEqual(
+    norm(res.pts.map(p => ({ x: p.x, y: p.y }))),
+    [{ x: 20, y: 30 }, { x: 120, y: 30 }],
+  );
+});
+
+test('connectionPath: attached ends clip to element edges', () => {
+  const a = box(0, 0, 100, 100);   // centre (50,50), right edge x=100
+  const b = box(200, 0, 100, 100); // centre (250,50), left edge x=200
+  const els = { a, b };
+  const conn = { fromId: 'a', toId: 'b', routing: 'straight' };
+  const res = L.connectionPath(conn, (id) => els[id]);
+  assert.deepEqual(norm(res.pts.map(p => ({ x: p.x, y: p.y }))), [{ x: 100, y: 50 }, { x: 200, y: 50 }]);
+});
+
+test('connectionPath: mixed end (box → free point) clips only the attached side', () => {
+  const a = box(0, 0, 100, 100); // centre (50,50)
+  const conn = { fromId: 'a', toPt: { x: 300, y: 50 }, routing: 'straight' };
+  const res = L.connectionPath(conn, (id) => (id === 'a' ? a : undefined));
+  assert.deepEqual(norm(res.pts[0]), { x: 100, y: 50 }); // clipped to A's right edge
+  assert.deepEqual(norm(res.pts[1]), { x: 300, y: 50 }); // free point untouched
+});
+
+test('connectionPath: returns null when an attached element is missing', () => {
+  const conn = { fromId: 'gone', toPt: { x: 10, y: 10 } };
+  assert.equal(L.connectionPath(conn, () => undefined), null);
+});
+
+test('connectionPath: free arrow with orthogonal routing makes a right-angle jog', () => {
+  const conn = { fromPt: { x: 0, y: 0 }, toPt: { x: 100, y: 60 }, routing: 'orthogonal' };
+  const res = L.connectionPath(conn, () => undefined);
+  assert.equal(res.pts.length, 4);
+  assert.equal(res.pts[1].x, res.pts[2].x); // shared jog column
+});

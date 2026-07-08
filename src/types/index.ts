@@ -78,10 +78,19 @@ export type ConnStyle = 'solid' | 'dashed' | 'dotted';
 export type ConnArrow = 'end' | 'both' | 'none';
 export type ConnRouting = 'straight' | 'orthogonal';
 
+export interface LayoutPoint { x: number; y: number; }
+
+/**
+ * A connector. Each end is either attached to an element (fromId/toId) or a
+ * free floating point (fromPt/toPt). A "free arrow" has both ends floating and
+ * belongs to no element, so it can be drawn and moved anywhere on the canvas.
+ */
 export interface LayoutConnection {
   id: string;
-  fromId: string;
-  toId: string;
+  fromId?: string;
+  toId?: string;
+  fromPt?: LayoutPoint;    // used when fromId is absent
+  toPt?: LayoutPoint;      // used when toId is absent
   label?: string;
   color?: string;          // line + arrow colour (default slate)
   style?: ConnStyle;       // solid / dashed / dotted (default solid)

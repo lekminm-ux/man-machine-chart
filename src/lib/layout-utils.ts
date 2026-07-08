@@ -114,6 +114,42 @@ export function orthogonalPath(from: LayoutElement, to: LayoutElement): { pts: P
   ] };
 }
 
+/** Right-angle route between two arbitrary points (horizontal-first jog). */
+export function orthogonalPoints(a: Pt, b: Pt): Pt[] {
+  const midX = (a.x + b.x) / 2;
+  return [a, { x: midX, y: a.y }, { x: midX, y: b.y }, b];
+}
+
+/**
+ * Resolve a connector to a list of points for rendering, whichever ends are
+ * attached to elements (edge-clipped) or free floating points. Returns null if
+ * an attached element is missing or a free end has no point.
+ */
+export interface ConnLike {
+  fromId?: string; toId?: string;
+  fromPt?: Pt; toPt?: Pt;
+  routing?: 'straight' | 'orthogonal';
+}
+export function connectionPath(
+  conn: ConnLike,
+  getEl: (id: string) => LayoutElement | undefined,
+): { pts: Pt[] } | null {
+  const fromEl = conn.fromId ? getEl(conn.fromId) : undefined;
+  const toEl = conn.toId ? getEl(conn.toId) : undefined;
+  if (conn.fromId && !fromEl) return null;
+  if (conn.toId && !toEl) return null;
+
+  const fromRef: Pt | null = fromEl ? elCenter(fromEl) : conn.fromPt ?? null;
+  const toRef: Pt | null = toEl ? elCenter(toEl) : conn.toPt ?? null;
+  if (!fromRef || !toRef) return null;
+
+  const start = fromEl ? edgePoint(fromEl, toRef) : fromRef;
+  const end = toEl ? edgePoint(toEl, fromRef) : toRef;
+
+  const pts = conn.routing === 'orthogonal' ? orthogonalPoints(start, end) : [start, end];
+  return { pts };
+}
+
 /** Build an SVG polyline `d` from a list of points. */
 export function pointsToPath(pts: Pt[]): string {
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
