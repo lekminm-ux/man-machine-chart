@@ -58,12 +58,14 @@ export async function onRequestPut(context) {
     const file = await request.json();
     const { id, name, updatedAt, content } = file;
     if (!id) return badRequest('id required');
+    // COALESCE keeps the stored value when a field is omitted, so a
+    // rename-only request can't blank out the chart content (and vice versa).
     await env.DB.prepare(
-      'UPDATE chart_files SET name = ?, updatedAt = ?, content = ? WHERE id = ?'
+      'UPDATE chart_files SET name = COALESCE(?, name), updatedAt = ?, content = COALESCE(?, content) WHERE id = ?'
     ).bind(
-      name,
+      name ?? null,
       updatedAt ?? new Date().toISOString(),
-      JSON.stringify(content ?? {}),
+      content !== undefined ? JSON.stringify(content) : null,
       id
     ).run();
     return json({ success: true });

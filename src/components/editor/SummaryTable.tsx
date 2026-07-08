@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { getCalculatedSteps, buildSummary, getMachineTime, computeTotalDuration } from '@/lib/chart-utils';
+import { getCalculatedSteps, buildSummary, getMachineTime, computeCycleTime } from '@/lib/chart-utils';
 
 export default function SummaryTable() {
   const activeFile             = useChartStore(s => s.activeFile());
@@ -12,8 +12,8 @@ export default function SummaryTable() {
 
   const { steps, header } = activeFile;
 
-  // Cycle time and steps calculations
-  const cycleTime   = computeTotalDuration(steps) || 1;
+  // Cycle Time = busiest actor's total (max of Worker/Auto M/C sums)
+  const cycleTime   = computeCycleTime(steps) || 1;
   const summary     = buildSummary(steps);
   const machineTime = getMachineTime(steps);
   const grandTotal  = summary.reduce((a, s) => a + s.lineTotal, 0);

@@ -147,12 +147,30 @@ export function buildSingleStepSegments(
   return segments;
 }
 
-/** Compute total cycle duration = maximum end time across all operators/machines */
+/**
+ * Timeline extent = maximum end time across all operators/machines.
+ * Used for the chart's time axis only — NOT the cycle time (a step that
+ * starts late pushes the axis out, but does not lengthen anyone's cycle).
+ */
 export function computeTotalDuration(steps: ChartStep[]): number {
   if (steps.length === 0) return 0;
   const calcSteps = getCalculatedSteps(steps);
   const endTimes = calcSteps.map(s => s.calcEnd);
   return Math.max(...endTimes, 0);
+}
+
+/**
+ * Cycle Time = the busiest actor's total time (Worker A/B/C… or Auto M/C):
+ * max over actors of Σ step durations (manual + machine + walk + idle).
+ * Example: workers total 411 / 415 / 413 and the machine runs 450 → CT = 450.
+ */
+export function computeCycleTime(steps: ChartStep[]): number {
+  if (steps.length === 0) return 0;
+  const totals: Record<string, number> = {};
+  for (const s of getCalculatedSteps(steps)) {
+    totals[s.operator] = (totals[s.operator] ?? 0) + s.calcDuration;
+  }
+  return Math.max(...Object.values(totals), 0);
 }
 
 export function formatSeconds(s: number): string {

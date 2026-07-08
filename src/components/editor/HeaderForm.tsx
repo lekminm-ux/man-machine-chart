@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { computeTotalDuration } from '@/lib/chart-utils';
+import { computeCycleTime } from '@/lib/chart-utils';
 
 const FIELD_CLASS = 'w-full border border-slate-750 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-900 text-slate-200 placeholder-slate-600 transition-colors';
 const LABEL_CLASS = 'block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1';
@@ -14,8 +14,8 @@ export default function HeaderForm() {
   if (!activeFile) return null;
   const h = activeFile.header;
 
-  // Cycle time is computed automatically from step timelines (parallel per-operator)
-  const cycleTime = computeTotalDuration(activeFile.steps) || 0;
+  // Cycle Time = busiest actor's total time (max of Worker/Auto M/C sums)
+  const cycleTime = computeCycleTime(activeFile.steps) || 0;
 
   return (
     <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm">

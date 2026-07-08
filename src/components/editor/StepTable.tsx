@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration } from '@/lib/chart-utils';
+import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration, computeCycleTime } from '@/lib/chart-utils';
 import { TimelineRow } from '../chart/TimelineRow';
 import type { ChartStep } from '@/types';
 import { ALL_WORKERS } from '@/types';
@@ -48,6 +48,9 @@ export default function StepTable() {
   const totalCalcDuration = calcSteps.reduce((a, s) => a + s.calcDuration, 0);
   const rawDur = computeTotalDuration(steps);
   const totalDur = Math.max(rawDur, 10);
+  // Cycle Time = busiest actor's total (max of Worker/Auto M/C sums),
+  // not the timeline end — a late-starting step must not inflate it.
+  const cycleTime = computeCycleTime(steps);
 
   // Timeline width expands to 850px when inputs are hidden (originally 500px)
   const timelineWidth = hideInputs ? 850 : 500;
@@ -122,30 +125,32 @@ export default function StepTable() {
 
       <div className="overflow-x-auto">
         <table className={`w-full text-xs table-fixed ${hideInputs ? 'min-w-[1250px]' : 'min-w-[1440px]'}`}>
+          {/* No inline whitespace inside <colgroup> — a stray text node there
+              triggers a React hydration error. */}
           {hideInputs ? (
             <colgroup>
-              <col className="min-w-[250px]" /> {/* Process Description */}
-              <col className="w-28" />  {/* Operator / Machine */}
-              <col className="w-20" />  {/* Position */}
-              <col className="w-16" />  {/* Count */}
-              <col style={{ width: timelineWidth }} /> {/* Timeline Visualization */}
+              <col className="min-w-[250px]" />{/* Process Description */}
+              <col className="w-28" />{/* Operator / Machine */}
+              <col className="w-20" />{/* Position */}
+              <col className="w-16" />{/* Count */}
+              <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           ) : (
             <colgroup>
-              <col className="w-8" />   {/* # */}
-              <col className="w-16" />  {/* Insert */}
-              <col className="w-14" />  {/* Move */}
-              <col className="w-10" />  {/* Del */}
-              <col className="min-w-[200px]" /> {/* Process Description */}
-              <col className="w-28" />  {/* Operator / Machine */}
-              <col className="w-20" />  {/* Position */}
-              <col className="w-16" />  {/* Start Time */}
-              <col className="w-16" />  {/* Manual */}
-              <col className="w-16" />  {/* Machine */}
-              <col className="w-16" />  {/* Walk */}
-              <col className="w-16" />  {/* Idle */}
-              <col className="w-16" />  {/* Count */}
-              <col style={{ width: timelineWidth }} /> {/* Timeline Visualization */}
+              <col className="w-8" />{/* # */}
+              <col className="w-16" />{/* Insert */}
+              <col className="w-14" />{/* Move */}
+              <col className="w-10" />{/* Del */}
+              <col className="min-w-[200px]" />{/* Process Description */}
+              <col className="w-28" />{/* Operator / Machine */}
+              <col className="w-20" />{/* Position */}
+              <col className="w-16" />{/* Start Time */}
+              <col className="w-16" />{/* Manual */}
+              <col className="w-16" />{/* Machine */}
+              <col className="w-16" />{/* Walk */}
+              <col className="w-16" />{/* Idle */}
+              <col className="w-16" />{/* Count */}
+              <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           )}
           <thead>
@@ -443,23 +448,23 @@ export default function StepTable() {
                           <path d="M0 0 L6 3 L0 6 Z" fill="#f87171" />
                         </marker>
                       </defs>
-                      {/* Arrow line */}
+                      {/* Arrow line — spans the cycle time (max per-actor total), not the timeline end */}
                       <line
                         x1={tX(0)} y1={14}
-                        x2={tX(totalDur)} y2={14}
+                        x2={tX(Math.min(cycleTime, totalDur))} y2={14}
                         stroke="#f87171" strokeWidth={2}
                         markerStart="url(#arr-s)" markerEnd="url(#arr-e)"
                       />
                       {/* Arrow label */}
                       <text
-                        x={(tX(0) + tX(totalDur)) / 2} y={9}
+                        x={(tX(0) + tX(Math.min(cycleTime, totalDur))) / 2} y={9}
                         textAnchor="middle" fontSize={8} fill="#f87171" fontWeight="700"
                       >
-                        Cycle Time: {totalDur}s
+                        Cycle Time: {cycleTime}s
                       </text>
                       {/* End caps */}
                       <line x1={tX(0)} y1={8} x2={tX(0)} y2={20} stroke="#f87171" strokeWidth={1.5} />
-                      <line x1={tX(totalDur)} y1={8} x2={tX(totalDur)} y2={20} stroke="#f87171" strokeWidth={1.5} />
+                      <line x1={tX(Math.min(cycleTime, totalDur))} y1={8} x2={tX(Math.min(cycleTime, totalDur))} y2={20} stroke="#f87171" strokeWidth={1.5} />
                     </svg>
                   </div>
                 </td>

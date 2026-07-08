@@ -12,6 +12,7 @@ import {
   createFolderCloud, updateFolderCloud, deleteFolderCloud,
   createFileCloud, saveFileCloud, deleteFileCloud,
 } from '@/lib/storage';
+import { computeCycleTime } from '@/lib/chart-utils';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
 export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
@@ -84,18 +85,13 @@ function persistLocal(state: AppDatabase) {
 }
 
 // ── Helper: recalculate cycle time from steps ───────────────────────────────
+// Cycle Time = the busiest actor's total time (max of each Worker's and the
+// Auto M/C's summed durations) — not the timeline end, so a step that starts
+// late (explicit startTime) doesn't inflate the cycle.
 function recalcCycleTime(steps: ChartStep[]): number {
   if (steps.length === 0) return 60;
-  const actorEndTimes: Record<string, number> = {};
-  for (const step of steps) {
-    const actor = step.operator;
-    const lastEnd = actorEndTimes[actor] || 0;
-    const start = step.startTime !== undefined && step.startTime !== null ? step.startTime : lastEnd;
-    const stepDur = step.manualTime + step.machineTime + step.walkingTime + step.idleTime;
-    actorEndTimes[actor] = start + stepDur;
-  }
-  const endTimes = Object.values(actorEndTimes);
-  return endTimes.length > 0 ? Math.max(...endTimes) : 60;
+  const total = computeCycleTime(steps);
+  return total > 0 ? total : 60;
 }
 
 export const useChartStore = create<ChartState>((set, get) => ({
