@@ -68,7 +68,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 min-w-[200px] bg-slate-900 flex flex-col h-full overflow-hidden">
+    <aside className="w-[320px] min-w-[320px] bg-slate-900 flex flex-col h-full overflow-hidden flex-shrink-0 border-r border-slate-800">
       {/* Sidebar header */}
       <div className="px-4 py-4 border-b border-slate-700">
         <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Project Files</h2>
@@ -89,7 +89,7 @@ export default function Sidebar() {
                 >
                   {folder.expanded ? '▾' : '▸'}
                 </button>
-                <span className="text-sm flex-shrink-0">{PROCESS_ICONS[folder.processType]}</span>
+                <span className="text-lg flex-shrink-0 drop-shadow-sm mr-1">{PROCESS_ICONS[folder.processType]}</span>
 
                 {renaming?.type === 'folder' && renaming.id === folder.id ? (
                   <input
@@ -160,7 +160,7 @@ export default function Sidebar() {
                   }`}
                   onClick={() => openFile(file.id)}
                 >
-                  <span className="text-xs flex-shrink-0">📊</span>
+                  <span className="text-base flex-shrink-0 drop-shadow-sm mr-1">📊</span>
 
                   {renaming?.type === 'file' && renaming.id === file.id ? (
                     <input

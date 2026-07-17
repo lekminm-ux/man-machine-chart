@@ -62,7 +62,8 @@ export default function StepTable() {
   if (ticks[ticks.length - 1] < totalDur) ticks.push(totalDur);
 
   function tX(t: number) {
-    return 4 + (t / totalDur) * (timelineWidth - 8);
+    const padding = 24;
+    return padding + (t / totalDur) * (timelineWidth - (padding * 2));
   }
 
   // Generate connection paths between consecutive manual/walk/idle steps of each operator

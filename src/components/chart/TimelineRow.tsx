@@ -21,8 +21,9 @@ interface Props {
 
 function tX(t: number, totalDur: number, chartW: number, noLabel?: boolean): number {
   const lw = noLabel ? 0 : LABEL_WIDTH;
-  const plotW = chartW - lw;
-  return lw + (t / totalDur) * plotW;
+  const padding = 24; // 24px padding so the scale doesn't touch the borders
+  const plotW = chartW - lw - (padding * 2);
+  return lw + padding + (t / totalDur) * plotW;
 }
 
 function walkPath(x1: number, x2: number, cy: number): string {
