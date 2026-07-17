@@ -221,11 +221,11 @@ function ConnectionShape({
       {conn.label && (
         <g pointerEvents="none">
           <rect
-            x={mid.x - conn.label.length * 3.3 - 4} y={mid.y - 8}
-            width={conn.label.length * 6.6 + 8} height={16} rx={3}
-            fill="#0f172a" stroke={color} strokeWidth={0.75} opacity={0.95}
+            x={mid.x - conn.label.length * 4 - 6} y={mid.y - 10}
+            width={conn.label.length * 8 + 12} height={20} rx={4}
+            fill="#0f172a" stroke={color} strokeWidth={1} opacity={0.95}
           />
-          <text x={mid.x} y={mid.y + 3.5} textAnchor="middle" fontSize={9} fill="#e2e8f0" fontFamily="Inter, sans-serif">
+          <text x={mid.x} y={mid.y + 4.5} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#f8fafc" fontFamily="Inter, sans-serif">
             {conn.label}
           </text>
         </g>

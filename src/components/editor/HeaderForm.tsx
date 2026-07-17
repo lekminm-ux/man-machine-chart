@@ -4,8 +4,8 @@ import React from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { computeCycleTime } from '@/lib/chart-utils';
 
-const FIELD_CLASS = 'w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 placeholder-slate-400 transition-colors shadow-sm';
-const LABEL_CLASS = 'block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1';
+const FIELD_CLASS = 'w-full border border-slate-300 rounded px-2 py-1.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 placeholder-slate-400 transition-colors shadow-sm';
+const LABEL_CLASS = 'block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1';
 
 export default function HeaderForm() {
   const activeFile   = useChartStore(s => s.activeFile());

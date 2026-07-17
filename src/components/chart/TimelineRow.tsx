@@ -61,13 +61,14 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
                 />
                 {w > 22 && (
                   <text
-                    x={(x1 + x2) / 2} y={cy - 11}
-                    textAnchor="middle" fontSize={8.5} fill="#fbbf24"
+                    x={(x1 + x2) / 2} y={cy - 12}
+                    textAnchor="middle" fontSize={11} fill="#b45309"
+                    fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >
-                    {seg.label && seg.label.length > 16
-                      ? seg.label.slice(0, 16) + '…'
+                    {seg.label && seg.label.length > 20
+                      ? seg.label.slice(0, 20) + '…'
                       : (seg.label ?? '')}
                   </text>
                 )}
@@ -84,7 +85,8 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
                 {w > 42 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 14}
-                    textAnchor="middle" fontSize={8.5} fill="#60a5fa"
+                    textAnchor="middle" fontSize={11} fill="#3b82f6"
+                    fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >

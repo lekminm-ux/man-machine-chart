@@ -61,8 +61,8 @@ export default function StepTable() {
   // not the timeline end — a late-starting step must not inflate it.
   const cycleTime = computeCycleTime(steps);
 
-  // Timeline width expands to 850px when inputs are hidden (originally 500px)
-  const timelineWidth = hideInputs ? 850 : 500;
+  // Timeline width expands when inputs are hidden to use available space
+  const timelineWidth = hideInputs ? 1200 : 600;
 
   // Time ticks calculation
   const tickInterval = totalDur > 100 ? 50 : totalDur > 50 ? 20 : totalDur > 20 ? 10 : 5;
@@ -142,32 +142,33 @@ export default function StepTable() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className={`w-full text-xs table-fixed ${hideInputs ? 'min-w-[1250px]' : 'min-w-[1440px]'}`}>
+        <table className={`w-full text-sm table-fixed ${hideInputs ? 'min-w-[1550px]' : 'min-w-[1600px]'}`}>
           {/* No inline whitespace inside <colgroup> — a stray text node there
               triggers a React hydration error. */}
           {hideInputs ? (
             <colgroup>
-              <col className="min-w-[250px]" />{/* Process Description */}
-              <col className="w-28" />{/* Operator / Machine */}
-              <col className="w-20" />{/* Position */}
-              <col className="w-16" />{/* Count */}
+              <col className="min-w-[300px]" />{/* Process Description */}
+              <col className="w-32" />{/* Operator / Machine */}
+              <col className="w-24" />{/* Position */}
+              <col className="w-20" />{/* Count */}
               <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           ) : (
             <colgroup>
-              <col className="w-8" />{/* # */}
+            <colgroup>
+              <col className="w-10" />{/* # */}
               <col className="w-16" />{/* Insert */}
-              <col className="w-14" />{/* Move */}
-              <col className="w-10" />{/* Del */}
-              <col className="min-w-[200px]" />{/* Process Description */}
-              <col className="w-28" />{/* Operator / Machine */}
-              <col className="w-20" />{/* Position */}
-              <col className="w-16" />{/* Start Time */}
-              <col className="w-16" />{/* Manual */}
-              <col className="w-16" />{/* Machine */}
-              <col className="w-16" />{/* Walk */}
-              <col className="w-16" />{/* Idle */}
-              <col className="w-16" />{/* Count */}
+              <col className="w-16" />{/* Move */}
+              <col className="w-12" />{/* Del */}
+              <col className="min-w-[250px]" />{/* Process Description */}
+              <col className="w-32" />{/* Operator / Machine */}
+              <col className="w-24" />{/* Position */}
+              <col className="w-20" />{/* Start Time */}
+              <col className="w-20" />{/* Manual */}
+              <col className="w-20" />{/* Machine */}
+              <col className="w-20" />{/* Walk */}
+              <col className="w-20" />{/* Idle */}
+              <col className="w-20" />{/* Count */}
               <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           )}

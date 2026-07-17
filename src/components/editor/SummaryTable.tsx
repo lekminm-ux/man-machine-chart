@@ -57,7 +57,7 @@ export default function SummaryTable() {
                       value={currentPos}
                       onChange={e => updateOperatorPosition(row.operator, e.target.value)}
                       placeholder="e.g. OP-1"
-                      className="w-24 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 text-xs font-bold placeholder:text-slate-400"
+                      className="w-24 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 text-sm font-bold placeholder:text-slate-400"
                     />
                   </td>
                   <td className="px-4 py-2 font-bold text-slate-800 flex items-center gap-2">
@@ -73,7 +73,7 @@ export default function SummaryTable() {
                       <div className="flex-1 bg-slate-200 rounded-full h-2">
                         <div className={`h-2 rounded-full ${barColor} transition-all`} style={{ width: `${util}%` }} />
                       </div>
-                      <span className="text-xs font-bold text-slate-600 w-10 text-right">{util}%</span>
+                      <span className="text-sm font-bold text-slate-700 w-10 text-right">{util}%</span>
                     </div>
                   </td>
                 </tr>
@@ -83,7 +83,7 @@ export default function SummaryTable() {
             {/* Machine row */}
             {machineTime > 0 && (
               <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-                <td className="px-4 py-2 text-blue-400 font-semibold text-xs">—</td>
+                <td className="px-4 py-2 text-blue-400 font-semibold text-sm">—</td>
                 <td className="px-4 py-2 font-bold text-blue-600 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
                   Auto M/C
@@ -100,7 +100,7 @@ export default function SummaryTable() {
                         style={{ width: `${Math.min(100, Math.round((machineTime / cycleTime) * 100))}%` }}
                       />
                     </div>
-                    <span className="text-xs font-bold text-blue-600 w-10 text-right">
+                    <span className="text-sm font-bold text-blue-700 w-10 text-right">
                       {cycleTime > 0 ? Math.min(100, Math.round((machineTime / cycleTime) * 100)) : 0}%
                     </span>
                   </div>
