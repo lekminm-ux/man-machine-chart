@@ -10,8 +10,8 @@ import {
   arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
 } from '@/lib/layout-utils';
 
-const CANVAS_W = 680;
-const CANVAS_H = 380;
+const CANVAS_W = 2000; // logical maximum boundary
+const CANVAS_H = 1000;
 const MIN_SIZE = 24;
 const HANDLE = 7;
 
@@ -543,8 +543,8 @@ export default function LayoutDiagram() {
         <svg
           ref={svgRef}
           id="layout-diagram-svg"
-          width={CANVAS_W}
-          height={CANVAS_H}
+          width="100%"
+          height={600}
           style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
           onMouseMove={onMouseMove}
           onTouchMove={onTouchMove}
@@ -559,7 +559,7 @@ export default function LayoutDiagram() {
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" strokeWidth="0.5" />
             </pattern>
           </defs>
-          <rect width={CANVAS_W} height={CANVAS_H} fill="url(#grid)" />
+          <rect width="100%" height="100%" fill="url(#grid)" />
 
           {/* Connections (under elements) */}
           {connections.map(c => {
@@ -625,9 +625,9 @@ export default function LayoutDiagram() {
             return <circle cx={c.x} cy={c.y} r={8} fill="none" stroke="#f59e0b" strokeWidth={2} strokeDasharray="3 2" />;
           })()}
 
-          {elements.length === 0 && (
-            <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" fill="#475569" fontSize={14}>
-              Click palette items above to add equipment
+          {elements.length === 0 && !connectMode && (
+            <text x="50%" y="50%" textAnchor="middle" fill="#475569" fontSize={14}>
+              Drag items from the palette above to build layout
             </text>
           )}
         </svg>
