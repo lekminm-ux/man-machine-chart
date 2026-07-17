@@ -17,6 +17,15 @@ const TIME_COLS = [
   { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-400',    calcKey: 'calcIdle' },
 ] as const;
 
+function getWorkerBorder(operator: string) {
+  if (operator === 'Worker A') return 'border-l-4 border-orange-500';
+  if (operator === 'Worker B') return 'border-l-4 border-blue-500';
+  if (operator === 'Worker C') return 'border-l-4 border-green-500';
+  if (operator === 'Worker D') return 'border-l-4 border-purple-500';
+  if (operator === 'Auto M/C') return 'border-l-4 border-slate-500';
+  return 'border-l-4 border-transparent';
+}
+
 export default function StepTable() {
   const activeFile             = useChartStore(s => s.activeFile());
   const addStep                = useChartStore(s => s.addStep);
@@ -223,7 +232,7 @@ export default function StepTable() {
                 >
                   {!hideInputs && (
                     <>
-                      <td className="px-2 py-1.5 text-center text-slate-500 font-mono">{step.no}</td>
+                      <td className={`px-2 py-1.5 text-center text-slate-500 font-mono ${getWorkerBorder(step.operator)}`}>{step.no}</td>
 
                       {/* Insert Actions Above/Below */}
                       <td className="px-1 py-1.5 text-center">
@@ -271,7 +280,7 @@ export default function StepTable() {
                   )}
 
                   {/* Description */}
-                  <td className="px-3 py-1.5">
+                  <td className={`px-3 py-1.5 ${hideInputs ? getWorkerBorder(step.operator) : ''}`}>
                     <input
                       type="text"
                       value={step.description}

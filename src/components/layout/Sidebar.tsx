@@ -4,19 +4,15 @@ import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import type { ChartFolder, ProcessType } from '@/types';
 
-const PROCESS_ICONS: Record<ProcessType, string> = {
-  blow_molding:     '💨',
-  injection_molding:'💉',
-  assembly:         '🔧',
-  custom:           '⚙️',
-};
+const LEVEL_ICONS = ['🏭', '⚙️', '📦', '🗃️'];
+const LEVEL_COLORS = ['text-yellow-500', 'text-green-400', 'text-blue-300', 'text-slate-400'];
 
-const PROCESS_COLORS: Record<ProcessType, string> = {
-  blow_molding:      'text-blue-600',
-  injection_molding: 'text-purple-600',
-  assembly:          'text-green-600',
-  custom:            'text-gray-600',
-};
+function getLevelIcon(level: number) {
+  return LEVEL_ICONS[Math.min(level, LEVEL_ICONS.length - 1)];
+}
+function getLevelColor(level: number) {
+  return LEVEL_COLORS[Math.min(level, LEVEL_COLORS.length - 1)];
+}
 
 type ContextTarget = { type: 'folder'; id: string } | { type: 'file'; id: string } | null;
 
@@ -130,7 +126,7 @@ export default function Sidebar() {
             {folder.expanded ? '▾' : '▸'}
           </button>
           
-          <span className="text-lg flex-shrink-0 drop-shadow-sm mr-1">{PROCESS_ICONS[folder.processType]}</span>
+          <span className="text-lg flex-shrink-0 drop-shadow-sm mr-1">{getLevelIcon(level)}</span>
 
           {renaming?.type === 'folder' && renaming.id === folder.id ? (
             <input
@@ -144,7 +140,7 @@ export default function Sidebar() {
             />
           ) : (
             <span
-              className={`flex-1 text-sm font-semibold truncate ${PROCESS_COLORS[folder.processType]} ${movingTarget?.id === folder.id ? 'opacity-30' : ''}`}
+              className={`flex-1 text-sm font-semibold truncate ${getLevelColor(level)} ${movingTarget?.id === folder.id ? 'opacity-30' : ''}`}
               onClick={() => toggleFolder(folder.id)}
             >
               {folder.name}
@@ -229,7 +225,7 @@ export default function Sidebar() {
                 style={{ marginLeft: `${indent + 24}px` }}
                 onClick={() => openFile(file.id)}
               >
-                <span className="text-base flex-shrink-0 drop-shadow-sm mr-1">📊</span>
+                <span className="text-base flex-shrink-0 drop-shadow-sm mr-1">📋</span>
 
                 {renaming?.type === 'file' && renaming.id === file.id ? (
                   <input

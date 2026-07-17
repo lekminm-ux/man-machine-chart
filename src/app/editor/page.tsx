@@ -85,10 +85,14 @@ export default function EditorPage() {
               {/* ── Step Table & Integrated Timeline ────────────────── */}
               <StepTable />
 
-              {/* ── Summary + Layout (2 column on large screens) ──── */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <SummaryTable />
+              {/* ── Layout Diagram (Full Width) ──── */}
+              <div className="w-full">
                 <LayoutDiagram />
+              </div>
+
+              {/* ── Line Total Summary ──── */}
+              <div className="w-full">
+                <SummaryTable />
               </div>
 
               {/* ── Approval section ───────────────────────────────── */}
