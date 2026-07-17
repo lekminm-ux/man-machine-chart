@@ -20,6 +20,9 @@ export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
 interface ChartState extends AppDatabase {
   hydrated: boolean;
   syncStatus: SyncStatus;
+  activeModule: 1 | 2 | 3 | 4 | 5;
+
+  setActiveModule: (m: 1 | 2 | 3 | 4 | 5) => void;
 
   // Hydration
   hydrate: () => Promise<void>;
@@ -45,6 +48,7 @@ interface ChartState extends AppDatabase {
 
   // Header actions
   updateHeader: (partial: Partial<ChartHeader>) => void;
+  updateTimeMeasurement: (partial: Partial<import('@/types').TimeMeasurement>) => void;
 
   // Step actions
   addStep: () => void;
@@ -103,8 +107,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
   activeFileId: null,
   hydrated: false,
   syncStatus: 'idle',
+  activeModule: 4,
 
-  // ── Hydrate ─────────────────────────────────────────────────────────────────
+  setActiveModule: (m) => set({ activeModule: m }),
+
+  // ── Hydration ─────────────────────────────────────────────────────────────────
   async hydrate() {
     if (get().hydrated) return;
     // Load local immediately for instant render
@@ -381,6 +388,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? { ...f, header: { ...f.header, ...partial }, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  updateTimeMeasurement(partial) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, timeMeasurement: { ...(f.timeMeasurement || { laps: [], minTime: 0, maxTime: 0, avgTime: 0, fluctuation: 0, taktTime: 0 }), ...partial }, updatedAt: new Date().toISOString() }
             : f
         ),
       };

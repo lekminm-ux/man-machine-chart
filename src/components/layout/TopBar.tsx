@@ -7,6 +7,8 @@ export default function TopBar() {
   const activeFile     = useChartStore(s => s.activeFile());
   const saveActiveFile = useChartStore(s => s.saveActiveFile);
   const syncStatus     = useChartStore(s => s.syncStatus);
+  const activeModule   = useChartStore(s => s.activeModule);
+  const setActiveModule= useChartStore(s => s.setActiveModule);
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
 
   const handleSave = () => {
@@ -162,29 +164,57 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
 }
 
   return (
-    <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-6 gap-4 shadow-md flex-shrink-0">
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 shadow-sm flex-shrink-0 z-10 relative">
       {/* Logo */}
       <div className="flex items-center gap-2.5 mr-2">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-xs font-black shadow">
-          M
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow">
+          A
         </div>
-        <span className="font-bold text-slate-100 text-sm tracking-tight hidden sm:inline">
-          Man-Machine Chart
+        <span className="font-bold text-slate-800 text-sm tracking-tight hidden sm:inline">
+          Antigravity
         </span>
-        <span className="text-xs text-slate-400 font-medium hidden md:inline">Standard Operation</span>
+        <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded hidden md:inline border border-blue-100">Full System</span>
       </div>
 
       {/* Active file breadcrumb */}
       {activeFile && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 border-l border-slate-800 pl-4">
-          <span className="font-medium text-slate-200">{activeFile.name}</span>
-          <span className="text-slate-600">·</span>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 border-l border-slate-200 pl-4">
+          <span className="font-medium text-slate-700">{activeFile.name}</span>
+          <span className="text-slate-400">·</span>
           <span>{activeFile.header.processName || 'Unnamed Process'}</span>
-          <span className="bg-blue-950 text-blue-300 border border-blue-900 rounded px-1.5 py-0.5 font-semibold ml-1">
+          <span className="bg-slate-100 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 font-semibold ml-1">
             Rev. {activeFile.header.revNo}
           </span>
         </div>
       )}
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Module Navigator */}
+      <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        {([
+          { id: 1, name: '1: Lapping' },
+          { id: 2, name: '2: Capacity' },
+          { id: 3, name: '3: Gantt' },
+          { id: 4, name: '4: Layout' },
+          { id: 5, name: '5: Yamazumi' }
+        ] as const).map(m => (
+          <button
+            key={m.id}
+            onClick={() => setActiveModule(m.id)}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+              activeModule === m.id
+                ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+            }`}
+          >
+            {m.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1" />
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -214,7 +244,7 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
             syncStatus === 'saved'
               ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-              : 'bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-40'
+              : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 shadow-sm'
           }`}
         >
           {syncStatus === 'saved' ? '✓ Saved' : '☁ Save'}

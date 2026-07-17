@@ -104,6 +104,21 @@ export interface LayoutDiagram {
 }
 
 // File & Folder
+export interface LapTime {
+  id: string;
+  lapNumber: number;
+  timeSeconds: number;
+}
+
+export interface TimeMeasurement {
+  laps: LapTime[];
+  minTime: number;
+  maxTime: number;
+  avgTime: number;
+  fluctuation: number;
+  taktTime: number;
+}
+
 export interface ChartFile {
   id: string;
   name: string;
@@ -113,6 +128,7 @@ export interface ChartFile {
   header: ChartHeader;
   steps: ChartStep[];
   layoutDiagram: LayoutDiagram;
+  timeMeasurement?: TimeMeasurement;
 }
 
 export interface ChartFolder {

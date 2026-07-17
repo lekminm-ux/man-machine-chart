@@ -4,8 +4,8 @@ import React from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { computeCycleTime } from '@/lib/chart-utils';
 
-const FIELD_CLASS = 'w-full border border-slate-750 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-900 text-slate-200 placeholder-slate-600 transition-colors';
-const LABEL_CLASS = 'block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1';
+const FIELD_CLASS = 'w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 placeholder-slate-400 transition-colors shadow-sm';
+const LABEL_CLASS = 'block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1';
 
 export default function HeaderForm() {
   const activeFile   = useChartStore(s => s.activeFile());
@@ -18,12 +18,12 @@ export default function HeaderForm() {
   const cycleTime = computeCycleTime(activeFile.steps) || 0;
 
   return (
-    <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5">
-        <h3 className="text-slate-100 font-semibold text-sm tracking-wide">PROCESS INFORMATION</h3>
+    <div className="border border-slate-300 rounded-lg overflow-hidden shadow-sm bg-white">
+      <div className="bg-slate-50 border-b border-slate-300 px-4 py-2.5">
+        <h3 className="text-slate-800 font-bold text-sm tracking-wide">PROCESS INFORMATION</h3>
       </div>
 
-      <div className="p-4 bg-slate-850" style={{ background: '#1a2235' }}>
+      <div className="p-4 bg-white">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
           {/* Process Name */}
           <div className="col-span-2">
@@ -89,14 +89,13 @@ export default function HeaderForm() {
           <div>
             <label className={LABEL_CLASS}>
               Cycle Time (s)
-              <span className="ml-1 text-amber-400 normal-case font-normal">[Auto]</span>
+              <span className="ml-1 text-amber-600 normal-case font-normal">[Auto]</span>
             </label>
             <input
               type="number"
               readOnly
               value={cycleTime}
-              className={`${FIELD_CLASS} font-mono bg-slate-900 text-amber-400 cursor-not-allowed`}
-              style={{ borderColor: '#334155' }}
+              className={`${FIELD_CLASS} font-mono bg-amber-50 text-amber-700 border-amber-200 cursor-not-allowed`}
               title="Auto-calculated from step timelines (parallel operators)"
             />
           </div>
@@ -156,8 +155,8 @@ export default function HeaderForm() {
             { label: 'Created', value: new Date(activeFile.createdAt).toLocaleDateString() },
             { label: 'Updated', value: new Date(activeFile.updatedAt).toLocaleDateString() },
           ].map(item => (
-            <span key={item.label} className="text-xs bg-slate-900 text-slate-400 rounded px-2 py-1 border border-slate-700">
-              <strong className="text-slate-350">{item.label}:</strong> {item.value}
+            <span key={item.label} className="text-xs bg-slate-50 text-slate-600 rounded px-2 py-1 border border-slate-200">
+              <strong className="text-slate-800">{item.label}:</strong> {item.value}
             </span>
           ))}
         </div>

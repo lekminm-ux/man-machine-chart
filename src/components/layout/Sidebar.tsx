@@ -42,6 +42,8 @@ export default function Sidebar() {
   const deleteFile    = useChartStore(s => s.deleteFile);
   const duplicateFile = useChartStore(s => s.duplicateFile);
   const moveFile      = useChartStore(s => s.moveFile);
+  const setActiveModule = useChartStore(s => s.setActiveModule);
+  const activeModule = useChartStore(s => s.activeModule);
 
   const [showNewFolder, setShowNewFolder]       = useState(false);
   const [newFolderName, setNewFolderName]       = useState('');
@@ -119,10 +121,10 @@ export default function Sidebar() {
     return (
       <div key={folder.id} className="mb-0.5">
         <div 
-          className="group flex items-center gap-1 px-3 py-1.5 hover:bg-slate-800 cursor-pointer rounded mx-1 transition-colors"
+          className="group flex items-center gap-1 px-3 py-1.5 hover:bg-slate-200 cursor-pointer rounded mx-1 transition-colors"
           style={{ marginLeft: `${indent + 4}px` }}
         >
-          <button onClick={() => toggleFolder(folder.id)} className="text-slate-400 text-xs w-4 text-center flex-shrink-0">
+          <button onClick={() => toggleFolder(folder.id)} className="text-slate-500 hover:text-slate-700 text-xs w-4 text-center flex-shrink-0">
             {folder.expanded ? '▾' : '▸'}
           </button>
           
@@ -136,7 +138,7 @@ export default function Sidebar() {
               onChange={e => setRenameValue(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(null); }}
               onBlur={submitRename}
-              className="flex-1 bg-slate-700 text-white text-xs rounded px-1 py-0.5 focus:outline-none min-w-0"
+              className="flex-1 bg-white border border-slate-300 text-slate-800 text-xs rounded px-1 py-0.5 focus:outline-none min-w-0"
             />
           ) : (
             <span
@@ -159,22 +161,22 @@ export default function Sidebar() {
             <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={e => { e.stopPropagation(); setNewFolderParent(folder.id); setShowNewFolder(true); }}
-                className="text-slate-400 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                className="text-slate-500 hover:text-slate-800 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                 title="New sub-folder"
               >📁➕</button>
               <button
                 onClick={e => { e.stopPropagation(); setNewFileFolder(folder.id); setNewFileName(''); }}
-                className="text-slate-400 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                className="text-slate-500 hover:text-slate-800 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                 title="New chart"
               >📄➕</button>
               <button
                 onClick={e => { e.stopPropagation(); setMovingTarget({ type: 'folder', id: folder.id }); }}
-                className="text-slate-400 hover:text-blue-400 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                className="text-slate-500 hover:text-blue-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                 title="Move folder"
               >🔄</button>
               <button
                 onClick={e => { e.stopPropagation(); setRenaming({ type: 'folder', id: folder.id }); setRenameValue(folder.name); }}
-                className="text-slate-400 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                className="text-slate-500 hover:text-slate-800 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                 title="Rename"
               >✏️</button>
               <button
@@ -184,7 +186,7 @@ export default function Sidebar() {
                     if (confirm(`Delete folder "${folder.name}"? This will delete all sub-folders and charts.`)) deleteFolder(folder.id); 
                   }
                 }}
-                className="text-slate-400 hover:text-red-400 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                className="text-slate-500 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                 title="Delete folder"
               >🗑️</button>
             </div>
@@ -201,7 +203,7 @@ export default function Sidebar() {
               onChange={e => setNewFileName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submitNewFile(); if (e.key === 'Escape') setNewFileFolder(null); }}
               placeholder="Chart name…"
-              className="flex-1 bg-slate-700 text-white text-xs rounded px-2 py-1 focus:outline-none min-w-0"
+              className="flex-1 bg-white border border-slate-300 text-slate-800 text-xs rounded px-2 py-1 focus:outline-none min-w-0"
             />
             <button onClick={submitNewFile} className="text-xs text-blue-400 hover:text-blue-300">✓</button>
           </div>
@@ -219,8 +221,8 @@ export default function Sidebar() {
                 key={file.id}
                 className={`group flex items-center gap-1.5 px-3 py-1.5 rounded cursor-pointer transition-colors mx-1 ${
                   activeFileId === file.id
-                    ? 'bg-blue-600 text-white'
-                    : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                    ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200'
+                    : 'hover:bg-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
                 style={{ marginLeft: `${indent + 24}px` }}
                 onClick={() => openFile(file.id)}
@@ -247,17 +249,17 @@ export default function Sidebar() {
                 <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={e => { e.stopPropagation(); duplicateFile(file.id); }}
-                    className="text-white/60 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                    className="text-slate-400 hover:text-slate-700 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                     title="Duplicate Chart"
                   >📋</button>
                   <button
                     onClick={e => { e.stopPropagation(); setMovingTarget({ type: 'file', id: file.id }); }}
-                    className="text-white/60 hover:text-blue-300 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                    className="text-slate-400 hover:text-blue-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                     title="Move"
                   >🔄</button>
                   <button
                     onClick={e => { e.stopPropagation(); setRenaming({ type: 'file', id: file.id }); setRenameValue(file.name); }}
-                    className="text-white/60 hover:text-white text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                    className="text-slate-400 hover:text-slate-700 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                     title="Rename"
                   >✏️</button>
                   <button
@@ -267,7 +269,7 @@ export default function Sidebar() {
                         if (confirm(`Delete "${file.name}"?`)) deleteFile(file.id); 
                       }
                     }}
-                    className="text-white/60 hover:text-red-300 text-[10px] p-1 hover:bg-slate-850 rounded transition-colors"
+                    className="text-slate-400 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                     title="Delete"
                   >🗑️</button>
                 </div>
@@ -289,10 +291,10 @@ export default function Sidebar() {
   const rootFolders = folders.filter(f => !f.parentId);
 
   return (
-    <aside className="w-[320px] min-w-[320px] bg-slate-900 flex flex-col h-full overflow-hidden flex-shrink-0 border-r border-slate-800">
+    <aside className="w-[320px] min-w-[320px] bg-slate-50 flex flex-col h-full overflow-hidden flex-shrink-0 border-r border-slate-200">
       {/* Sidebar header */}
-      <div className="px-4 py-4 border-b border-slate-700 flex justify-between items-center">
-        <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Project Files</h2>
+      <div className="px-4 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
+        <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Project Files</h2>
         {movingTarget?.type === 'folder' && (
           <button 
             onClick={() => submitMove(null)} 
@@ -304,7 +306,7 @@ export default function Sidebar() {
         {movingTarget && (
           <button 
             onClick={() => setMovingTarget(null)} 
-            className="text-[10px] text-red-400 hover:text-red-300"
+            className="text-[10px] text-red-600 hover:text-red-500 font-semibold"
           >
             Cancel Move
           </button>
@@ -317,10 +319,10 @@ export default function Sidebar() {
       </div>
 
       {/* New folder panel */}
-      <div className="border-t border-slate-700 p-3">
+      <div className="border-t border-slate-200 p-3 bg-white">
         {showNewFolder ? (
           <div className="space-y-2">
-            <div className="text-xs text-blue-400 mb-1 font-semibold">
+            <div className="text-xs text-blue-600 mb-1 font-semibold">
               {newFolderParent 
                 ? `Creating sub-folder in "${folders.find(f => f.id === newFolderParent)?.name}"` 
                 : 'Creating root folder (e.g. PD level)'}
@@ -332,12 +334,12 @@ export default function Sidebar() {
               onChange={e => setNewFolderName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submitNewFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderParent(null); } }}
               placeholder="Folder name…"
-              className="w-full bg-slate-700 text-white text-xs rounded px-2 py-1.5 focus:outline-none"
+              className="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded px-2 py-1.5 focus:outline-none"
             />
             <select
               value={newFolderProcess}
               onChange={e => setNewFolderProcess(e.target.value as ProcessType)}
-              className="w-full bg-slate-700 text-white text-xs rounded px-2 py-1.5 focus:outline-none"
+              className="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded px-2 py-1.5 focus:outline-none"
             >
               <option value="blow_molding">💨 Blow Molding</option>
               <option value="injection_molding">💉 Injection Molding</option>
@@ -345,18 +347,39 @@ export default function Sidebar() {
               <option value="custom">⚙️ Custom</option>
             </select>
             <div className="flex gap-2">
-              <button onClick={submitNewFolder} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded py-1 font-semibold">Create</button>
-              <button onClick={() => { setShowNewFolder(false); setNewFolderParent(null); }} className="flex-1 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded py-1">Cancel</button>
+              <button onClick={submitNewFolder} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded py-1.5 font-semibold shadow-sm">Create</button>
+              <button onClick={() => { setShowNewFolder(false); setNewFolderParent(null); }} className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs rounded py-1.5 font-semibold">Cancel</button>
             </div>
           </div>
         ) : (
           <button
             onClick={() => { setNewFolderParent(null); setShowNewFolder(true); }}
-            className="w-full flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-xs font-semibold rounded py-2 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 text-xs font-bold rounded py-2 transition-all shadow-sm"
           >
-            <span className="text-base leading-none">+</span> New Root Folder
+            <span className="text-base leading-none text-blue-600">+</span> New Root Folder
           </button>
         )}
+      </div>
+
+      {/* Module Switcher */}
+      <div className="border-t border-slate-200 bg-slate-50 p-2 flex flex-col gap-1">
+        <div className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1">Ecosystem Modules</div>
+        <div className="grid grid-cols-5 gap-1">
+          {[1, 2, 3, 4, 5].map(m => (
+            <button
+              key={m}
+              onClick={() => setActiveModule(m as any)}
+              className={`py-1.5 rounded text-xs font-bold transition-colors shadow-sm border ${
+                activeModule === m
+                  ? 'bg-blue-600 text-white border-blue-700'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              title={`Module ${m}`}
+            >
+              M{m}
+            </button>
+          ))}
+        </div>
       </div>
     </aside>
   );

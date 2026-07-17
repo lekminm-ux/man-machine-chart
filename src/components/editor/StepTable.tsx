@@ -11,10 +11,10 @@ const OPERATORS: ChartStep['operator'][] = [...ALL_WORKERS, 'Auto M/C'];
 const ROW_HEIGHT = 48; // Fixed height in pixels for perfect alignment
 
 const TIME_COLS = [
-  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-200',  calcKey: 'calcManual' },
-  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-400',   calcKey: 'calcMachine' },
-  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-400', calcKey: 'calcWalk' },
-  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-400',    calcKey: 'calcIdle' },
+  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-700',  calcKey: 'calcManual' },
+  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-600',   calcKey: 'calcMachine' },
+  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-600', calcKey: 'calcWalk' },
+  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-600',    calcKey: 'calcIdle' },
 ] as const;
 
 function getWorkerBorder(operator: string) {
@@ -112,21 +112,29 @@ export default function StepTable() {
   }
 
   return (
-    <div className="border border-slate-750 rounded-lg overflow-hidden shadow-sm" style={{ borderColor: '#334155' }}>
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between">
-        <h3 className="text-slate-100 font-semibold text-sm tracking-wide">OPERATION STEPS & TIMELINE</h3>
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+      {/* ── Table Toolbar ─────────────────────────────── */}
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h3 className="text-slate-700 font-bold text-sm tracking-wide">STANDARD WORK SHEET (STEP-BY-STEP)</h3>
+          <button
+            onClick={addStep}
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer"
+          >
+            + Add Step
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           {/* Hide/Show Inputs Toggle Button */}
           <button
             onClick={() => setHideInputs(!hideInputs)}
-            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold rounded transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold rounded shadow-sm transition-colors"
           >
             {hideInputs ? '👁️ Show Inputs' : '👁️ Hide Inputs'}
           </button>
           <button
             onClick={addStep}
-            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer"
           >
             <span className="text-base leading-none">+</span> Add Step
           </button>
@@ -164,21 +172,21 @@ export default function StepTable() {
             </colgroup>
           )}
           <thead>
-            <tr className="bg-slate-800 border-b border-slate-700 h-10">
+            <tr className="bg-slate-50 border-b border-slate-200 h-10">
               {!hideInputs && (
                 <>
                   <th className="px-2 py-1 text-center text-slate-500">#</th>
-                  <th className="px-2 py-1 text-center text-slate-400 font-semibold">Insert</th>
+                  <th className="px-2 py-1 text-center text-slate-600 font-bold">Insert</th>
                   <th className="px-2 py-1 text-center text-slate-500">Move</th>
                   <th className="px-2 py-1 text-center text-slate-500">Del</th>
                 </>
               )}
-              <th className="px-3 py-1 text-left text-slate-300 font-semibold">Process Description</th>
-              <th className="px-2 py-1 text-center text-slate-300 font-semibold">Operator / Machine</th>
-              <th className="px-2 py-1 text-center text-slate-300 font-semibold">Position</th>
+              <th className="px-3 py-1 text-left text-slate-700 font-bold">Process Description</th>
+              <th className="px-2 py-1 text-center text-slate-700 font-bold">Operator / Machine</th>
+              <th className="px-2 py-1 text-center text-slate-700 font-bold">Position</th>
               {!hideInputs && (
                 <>
-                  <th className="px-2 py-1 text-center text-slate-300 font-semibold">Start Time (s)</th>
+                  <th className="px-2 py-1 text-center text-slate-700 font-bold">Start Time (s)</th>
                   {TIME_COLS.map(c => (
                     <th key={c.key} className={`px-2 py-1 text-center font-semibold ${c.color}`}>
                       {c.label}
@@ -188,15 +196,15 @@ export default function StepTable() {
               )}
               <th className="px-2 py-1 text-center text-amber-400 font-semibold">Count (s)</th>
               {/* Timeline Header (Axis Ticks) */}
-              <th className="p-0 text-center border-l border-slate-700 select-none" style={{ width: timelineWidth }}>
+              <th className="p-0 text-center border-l border-slate-200 select-none" style={{ width: timelineWidth }}>
                 <div className="h-full flex flex-col justify-end py-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1 block">Timeline Visualization</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1 block">Timeline Visualization</span>
                   <svg width={timelineWidth} height={20} className="block mx-auto">
                     {ticks.map(t => {
                       const x = tX(t);
                       return (
                         <g key={t}>
-                          <line x1={x} y1={0} x2={x} y2={6} stroke="#475569" strokeWidth={1} />
+                          <line x1={x} y1={0} x2={x} y2={6} stroke="#cbd5e1" strokeWidth={1} />
                           <text x={x} y={16} textAnchor="middle" fontSize={8} fill="#64748b" fontFamily="monospace">
                             {t}
                           </text>
@@ -212,8 +220,8 @@ export default function StepTable() {
           <tbody>
             {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={hideInputs ? 5 : 14} className="py-8 text-center text-slate-600 italic">
-                  No steps yet — click &quot;Add Step&quot; to begin
+                <td colSpan={hideInputs ? 5 : 14} className="py-8 text-center text-slate-500 italic font-semibold">
+                  No steps yet — click "Add Step" to begin
                 </td>
               </tr>
             )}
@@ -225,10 +233,10 @@ export default function StepTable() {
               return (
                 <tr
                   key={step.id}
-                  className="border-b border-slate-800 transition-colors"
-                  style={{ background: i % 2 === 0 ? '#1a2235' : '#1e293b', height: ROW_HEIGHT }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#273549')}
-                  onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#1a2235' : '#1e293b')}
+                  className="border-b border-slate-200 transition-colors"
+                  style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc', height: ROW_HEIGHT }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                  onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#ffffff' : '#f8fafc')}
                 >
                   {!hideInputs && (
                     <>
@@ -286,7 +294,7 @@ export default function StepTable() {
                       value={step.description}
                       onChange={e => handleChange(step.id, 'description', e.target.value)}
                       placeholder="Enter process description…"
-                      className="w-full bg-transparent border-b border-transparent hover:border-slate-650 focus:border-blue-500 focus:outline-none py-0.5 text-slate-200 transition-colors placeholder:text-slate-700 truncate"
+                      className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 font-medium transition-colors placeholder:text-slate-400 truncate"
                     />
                   </td>
 
@@ -297,8 +305,8 @@ export default function StepTable() {
                       onChange={e => handleChange(step.id, 'operator', e.target.value as ChartStep['operator'])}
                       className={`w-full text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                         isMachine
-                          ? 'bg-blue-950 text-blue-300 border-blue-800'
-                          : 'bg-slate-800 text-slate-200 border-slate-700'
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
+                          : 'bg-white text-slate-800 border-slate-300'
                       }`}
                     >
                       {OPERATORS.map(op => (
@@ -315,7 +323,7 @@ export default function StepTable() {
                       disabled={isMachine}
                       onChange={e => updateOperatorPosition(step.operator, e.target.value)}
                       placeholder="e.g. OP-1"
-                      className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-655 disabled:opacity-55 disabled:bg-slate-950/40"
+                      className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400 disabled:opacity-55 disabled:bg-slate-100"
                     />
                   </td>
 
@@ -329,7 +337,7 @@ export default function StepTable() {
                           value={step.startTime === undefined || step.startTime === null || step.startTime === 0 ? '' : step.startTime}
                           onChange={e => handleChange(step.id, 'startTime', parseFloat(e.target.value) || 0)}
                           placeholder="Auto"
-                          className="w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-200 bg-slate-900 placeholder:text-slate-600"
+                          className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400"
                         />
                       </td>
 
@@ -342,7 +350,7 @@ export default function StepTable() {
                             value={step[col.key] === 0 ? '' : step[col.key]}
                             onChange={e => handleChange(step.id, col.key, parseFloat(e.target.value) || 0)}
                             placeholder="0"
-                            className={`w-full text-center border border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-slate-900`}
+                            className={`w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-white`}
                           />
                         </td>
                       ))}
@@ -351,21 +359,21 @@ export default function StepTable() {
 
                   {/* Calculated Count (Duration) Column */}
                   <td className="px-2 py-1.5 text-center">
-                    <span className="font-mono text-amber-400 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                    <span className="font-mono text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                       {step.calcDuration > 0 ? `${step.calcDuration}s` : '—'}
                     </span>
                   </td>
 
                   {/* Spanning cell: single timeline SVG for all rows (rendered on first row only) */}
                   {i === 0 && (
-                    <td rowSpan={calcSteps.length} className="p-0 border-l border-slate-700 bg-slate-900/60 align-top select-none" style={{ width: timelineWidth }}>
+                    <td rowSpan={calcSteps.length} className="p-0 border-l border-slate-200 bg-slate-50 align-top select-none" style={{ width: timelineWidth }}>
                       <svg width={timelineWidth} height={calcSteps.length * ROW_HEIGHT} className="block">
                         {/* alternate row backgrounds */}
                         {calcSteps.map((_, ri) => (
                           <rect
                             key={ri}
                             x={0} y={ri * ROW_HEIGHT} width={timelineWidth} height={ROW_HEIGHT}
-                            fill={ri % 2 === 0 ? 'rgba(30, 41, 59, 0.2)' : 'rgba(15, 23, 42, 0.2)'}
+                            fill={ri % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.5)'}
                           />
                         ))}
 
@@ -376,7 +384,7 @@ export default function StepTable() {
                             <line
                               key={t}
                               x1={x} y1={0} x2={x} y2={calcSteps.length * ROW_HEIGHT}
-                              stroke="#334155" strokeWidth={0.5} strokeDasharray="2 2"
+                              stroke="#cbd5e1" strokeWidth={0.5} strokeDasharray="2 2"
                             />
                           );
                         })}
@@ -421,12 +429,12 @@ export default function StepTable() {
           {/* Row total footer */}
           {calcSteps.length > 0 && (
             <tfoot>
-              <tr className="bg-slate-900 border-t border-slate-700 h-10">
+              <tr className="bg-slate-50 border-t border-slate-200 h-10">
                 {hideInputs ? (
                   <>
                     <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-slate-500 text-right">TOTALS →</td>
                     {/* Count Column Total */}
-                    <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
+                    <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-700">
                       {totalCalcDuration}s
                     </td>
                   </>
