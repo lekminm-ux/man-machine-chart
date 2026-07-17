@@ -11,10 +11,10 @@ const OPERATORS: ChartStep['operator'][] = [...ALL_WORKERS, 'Auto M/C'];
 const ROW_HEIGHT = 48; // Fixed height in pixels for perfect alignment
 
 const TIME_COLS = [
-  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-700',  calcKey: 'calcManual' },
-  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-600',   calcKey: 'calcMachine' },
-  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-600', calcKey: 'calcWalk' },
-  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-600',    calcKey: 'calcIdle' },
+  { key: 'manualTime',  label: 'Manual (s)',  color: 'text-slate-900',  calcKey: 'calcManual' },
+  { key: 'machineTime', label: 'Machine (s)', color: 'text-blue-800',   calcKey: 'calcMachine' },
+  { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-800', calcKey: 'calcWalk' },
+  { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-800',    calcKey: 'calcIdle' },
 ] as const;
 
 function getWorkerBorder(operator: string) {
@@ -24,6 +24,15 @@ function getWorkerBorder(operator: string) {
   if (operator === 'Worker D') return 'border-l-4 border-purple-500';
   if (operator === 'Auto M/C') return 'border-l-4 border-slate-500';
   return 'border-l-4 border-transparent';
+}
+
+function getWorkerBgClass(operator: string) {
+  if (operator === 'Worker A') return 'bg-orange-100 text-orange-900 border-orange-300 font-bold';
+  if (operator === 'Worker B') return 'bg-blue-100 text-blue-900 border-blue-300 font-bold';
+  if (operator === 'Worker C') return 'bg-green-100 text-green-900 border-green-300 font-bold';
+  if (operator === 'Worker D') return 'bg-purple-100 text-purple-900 border-purple-300 font-bold';
+  if (operator === 'Auto M/C') return 'bg-blue-50 text-blue-700 border-blue-300 font-bold';
+  return 'bg-white text-slate-800 border-slate-300';
 }
 
 export default function StepTable() {
@@ -194,7 +203,7 @@ export default function StepTable() {
                   ))}
                 </>
               )}
-              <th className="px-2 py-1 text-center text-amber-400 font-semibold">Count (s)</th>
+              <th className="px-2 py-1 text-center text-slate-900 font-bold">Count (s)</th>
               {/* Timeline Header (Axis Ticks) */}
               <th className="p-0 text-center border-l border-slate-200 select-none" style={{ width: timelineWidth }}>
                 <div className="h-full flex flex-col justify-end py-1">
@@ -303,11 +312,7 @@ export default function StepTable() {
                     <select
                       value={step.operator}
                       onChange={e => handleChange(step.id, 'operator', e.target.value as ChartStep['operator'])}
-                      className={`w-full text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                        isMachine
-                          ? 'bg-blue-50 text-blue-700 border-blue-300'
-                          : 'bg-white text-slate-800 border-slate-300'
-                      }`}
+                      className={`w-full text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${getWorkerBgClass(step.operator)}`}
                     >
                       {OPERATORS.map(op => (
                         <option key={op} value={op}>{op}</option>

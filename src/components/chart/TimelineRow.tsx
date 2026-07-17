@@ -19,13 +19,6 @@ interface Props {
   noLabel?:      boolean;
 }
 
-function getWorkerColor(operator?: string) {
-  if (operator === 'Worker A') return '#f97316'; // orange-500
-  if (operator === 'Worker B') return '#3b82f6'; // blue-500
-  if (operator === 'Worker C') return '#22c55e'; // green-500
-  if (operator === 'Worker D') return '#a855f7'; // purple-500
-  return '#e2e8f0'; // slate-200 (fallback)
-}
 
 function tX(t: number, totalDur: number, chartW: number, noLabel?: boolean): number {
   const lw = noLabel ? 0 : LABEL_WIDTH;
@@ -59,22 +52,19 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
         const w  = Math.max(x2 - x1, 1);
 
         switch (seg.type) {
-          /* ── Manual: thick solid colored bar ──────── */
-          case 'manual': {
-            const barColor = getWorkerColor(seg.operator);
-            const isDefault = barColor === '#e2e8f0';
-            const textColor = isDefault ? '#b45309' : '#ffffff';
-
+          /* ── Manual: solid blue bar (STD activity color) ──────── */
+          case 'manual':
             return (
               <g key={i}>
                 <line
                   x1={x1} y1={cy} x2={x2} y2={cy}
-                  stroke={barColor} strokeWidth={MANUAL_W} strokeLinecap="butt"
+                  stroke="#3b82f6" strokeWidth={MANUAL_W} strokeLinecap="butt"
+                  opacity={0.85}
                 />
                 {w > 22 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 12}
-                    textAnchor="middle" fontSize={11} fill={textColor}
+                    textAnchor="middle" fontSize={11} fill="#1e3a5f"
                     fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -86,7 +76,6 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
                 )}
               </g>
             );
-          }
 
           /* ── Auto M/C: thin blue line + vertical end markers ──────── */
           case 'machine':
@@ -115,13 +104,14 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
               <g key={i}>
                 <path
                   d={walkPath(x1, x2, cy)}
-                  stroke="#34d399" strokeWidth={2.5}
+                  stroke="#059669" strokeWidth={2.5}
                   fill="none" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {w > 26 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 11}
-                    textAnchor="middle" fontSize={8.5} fill="#34d399"
+                    textAnchor="middle" fontSize={10} fill="#065f46"
+                    fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >
@@ -137,13 +127,13 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
               <g key={i}>
                 <rect
                   x={x1} y={cy - 13} width={Math.max(w, 2)} height={26}
-                  fill="rgba(239,68,68,0.08)" stroke="#f87171" strokeWidth={1.5}
+                  fill="rgba(220,38,38,0.1)" stroke="#dc2626" strokeWidth={1.5}
                   strokeDasharray="4 2" rx={2}
                 />
                 {w > 24 && (
                   <text
                     x={(x1 + x2) / 2} y={cy + 4}
-                    textAnchor="middle" fontSize={8.5} fill="#f87171" fontWeight="600"
+                    textAnchor="middle" fontSize={10} fill="#991b1b" fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >
