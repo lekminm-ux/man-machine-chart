@@ -155,7 +155,6 @@ export default function StepTable() {
             </colgroup>
           ) : (
             <colgroup>
-            <colgroup>
               <col className="w-10" />{/* # */}
               <col className="w-16" />{/* Insert */}
               <col className="w-16" />{/* Move */}
