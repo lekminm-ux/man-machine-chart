@@ -102,6 +102,7 @@ export interface TimeSegment {
   start: number; // seconds from cycle start
   duration: number;
   label?: string;
+  operator?: string;
 }
 
 /** Build segments for a single step (renders empty space before and after the active step) */
@@ -115,24 +116,24 @@ export function buildSingleStepSegments(
 
   // 1. Empty segment before the step starts
   if (start > 0) {
-    segments.push({ type: 'empty', start: 0, duration: start });
+    segments.push({ type: 'empty', start: 0, duration: start, operator: step.operator });
   }
 
   // 2. Active segments for this step
   const isMachine = step.operator === 'Auto M/C' || step.calcMachine > 0;
   if (isMachine) {
     if (duration > 0) {
-      segments.push({ type: 'machine', start, duration });
+      segments.push({ type: 'machine', start, duration, operator: step.operator });
     }
   } else {
     if (step.calcManual > 0) {
-      segments.push({ type: 'manual', start, duration, label: step.description });
+      segments.push({ type: 'manual', start, duration, label: step.description, operator: step.operator });
     }
     if (step.calcWalk > 0) {
-      segments.push({ type: 'walk', start, duration, label: 'Walk' });
+      segments.push({ type: 'walk', start, duration, label: 'Walk', operator: step.operator });
     }
     if (step.calcIdle > 0) {
-      segments.push({ type: 'idle', start, duration, label: 'Idle' });
+      segments.push({ type: 'idle', start, duration, label: 'Idle', operator: step.operator });
     }
   }
 
@@ -141,7 +142,7 @@ export function buildSingleStepSegments(
 
   // 3. Empty segment after the step ends
   if (totalDur > stepEnd) {
-    segments.push({ type: 'empty', start: stepEnd, duration: totalDur - stepEnd });
+    segments.push({ type: 'empty', start: stepEnd, duration: totalDur - stepEnd, operator: step.operator });
   }
 
   return segments;

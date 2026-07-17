@@ -19,6 +19,14 @@ interface Props {
   noLabel?:      boolean;
 }
 
+function getWorkerColor(operator?: string) {
+  if (operator === 'Worker A') return '#f97316'; // orange-500
+  if (operator === 'Worker B') return '#3b82f6'; // blue-500
+  if (operator === 'Worker C') return '#22c55e'; // green-500
+  if (operator === 'Worker D') return '#a855f7'; // purple-500
+  return '#e2e8f0'; // slate-200 (fallback)
+}
+
 function tX(t: number, totalDur: number, chartW: number, noLabel?: boolean): number {
   const lw = noLabel ? 0 : LABEL_WIDTH;
   const padding = 24; // 24px padding so the scale doesn't touch the borders
@@ -51,18 +59,22 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
         const w  = Math.max(x2 - x1, 1);
 
         switch (seg.type) {
-          /* ── Manual: thick solid light bar on dark background ──────── */
-          case 'manual':
+          /* ── Manual: thick solid colored bar ──────── */
+          case 'manual': {
+            const barColor = getWorkerColor(seg.operator);
+            const isDefault = barColor === '#e2e8f0';
+            const textColor = isDefault ? '#b45309' : '#ffffff';
+
             return (
               <g key={i}>
                 <line
                   x1={x1} y1={cy} x2={x2} y2={cy}
-                  stroke="#e2e8f0" strokeWidth={MANUAL_W} strokeLinecap="butt"
+                  stroke={barColor} strokeWidth={MANUAL_W} strokeLinecap="butt"
                 />
                 {w > 22 && (
                   <text
                     x={(x1 + x2) / 2} y={cy - 12}
-                    textAnchor="middle" fontSize={11} fill="#b45309"
+                    textAnchor="middle" fontSize={11} fill={textColor}
                     fontWeight="bold"
                     fontFamily="Inter,sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -74,6 +86,7 @@ export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel
                 )}
               </g>
             );
+          }
 
           /* ── Auto M/C: thin blue line + vertical end markers ──────── */
           case 'machine':
