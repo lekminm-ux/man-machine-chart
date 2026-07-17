@@ -117,6 +117,7 @@ export interface ChartFile {
 
 export interface ChartFolder {
   id: string;
+  parentId?: string | null;
   name: string;
   processType: ProcessType;
   expanded: boolean;

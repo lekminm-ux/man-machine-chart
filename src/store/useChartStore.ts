@@ -29,13 +29,15 @@ interface ChartState extends AppDatabase {
   openFile: (id: string) => Promise<void>;
 
   // Folder actions
-  createFolder: (name: string, processType: ProcessType) => Promise<void>;
+  createFolder: (name: string, processType: ProcessType, parentId?: string | null) => Promise<void>;
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
   toggleFolder: (id: string) => Promise<void>;
+  moveFolder: (id: string, newParentId: string | null) => Promise<void>;
 
   // File actions
   createFile: (folderId: string, name: string) => Promise<void>;
+  moveFile: (id: string, newFolderId: string) => Promise<void>;
   renameFile: (id: string, name: string) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
   saveActiveFile: () => Promise<void>;
@@ -157,9 +159,9 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   // ── Folders ─────────────────────────────────────────────────────────────────
-  async createFolder(name, processType) {
+  async createFolder(name, processType, parentId = null) {
     const folder: ChartFolder = {
-      id: uuidv4(), name, processType, expanded: true,
+      id: uuidv4(), parentId, name, processType, expanded: true,
       createdAt: new Date().toISOString(),
     };
     set(s => {
@@ -184,6 +186,20 @@ export const useChartStore = create<ChartState>((set, get) => ({
     set({ syncStatus: 'syncing' });
     try {
       await updateFolderCloud(id, { name });
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+  },
+
+  async moveFolder(id, newParentId) {
+    set(s => {
+      const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, parentId: newParentId } : f) };
+      persistLocal(next);
+      return next;
+    });
+    set({ syncStatus: 'syncing' });
+    try {
+      await updateFolderCloud(id, { parentId: newParentId });
       set({ syncStatus: 'saved' });
     } catch { set({ syncStatus: 'error' }); }
     setTimeout(() => set({ syncStatus: 'idle' }), 2000);
@@ -250,6 +266,21 @@ export const useChartStore = create<ChartState>((set, get) => ({
     try {
       const file = get().files.find(f => f.id === id);
       if (file) await saveFileCloud({ ...file, name });
+      set({ syncStatus: 'saved' });
+    } catch { set({ syncStatus: 'error' }); }
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+  },
+
+  async moveFile(id, newFolderId) {
+    set(s => {
+      const next = { ...s, files: s.files.map(f => f.id === id ? { ...f, folderId: newFolderId, updatedAt: new Date().toISOString() } : f) };
+      persistLocal(next);
+      return next;
+    });
+    set({ syncStatus: 'syncing' });
+    try {
+      const file = get().files.find(f => f.id === id);
+      if (file) await saveFileCloud({ ...file, folderId: newFolderId });
       set({ syncStatus: 'saved' });
     } catch { set({ syncStatus: 'error' }); }
     setTimeout(() => set({ syncStatus: 'idle' }), 2000);

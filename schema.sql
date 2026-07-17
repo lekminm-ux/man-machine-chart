@@ -5,10 +5,12 @@
 -- Folders (Process Groups)
 CREATE TABLE IF NOT EXISTS folders (
   id          TEXT PRIMARY KEY,
+  parentId    TEXT DEFAULT NULL,
   name        TEXT NOT NULL,
   processType TEXT NOT NULL DEFAULT 'custom',
   expanded    INTEGER NOT NULL DEFAULT 1,
-  createdAt   TEXT NOT NULL
+  createdAt   TEXT NOT NULL,
+  FOREIGN KEY (parentId) REFERENCES folders(id) ON DELETE CASCADE
 );
 
 -- Chart Files (each file = one Man-Machine Chart)

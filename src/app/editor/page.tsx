@@ -48,7 +48,7 @@ export default function EditorPage() {
               <p className="text-sm text-slate-600">Open an existing chart or create a new one from the sidebar.</p>
             </div>
           ) : (
-            <div id="chart-export-region" className="p-6 space-y-6 max-w-[1500px] mx-auto">
+            <div id="chart-export-region" className="p-6 space-y-6 w-full mx-auto">
 
               {/* ── Document header ────────────────────────────────── */}
               <div className="rounded-xl shadow-sm border border-slate-700 overflow-hidden" style={{ background: '#1e293b' }}>

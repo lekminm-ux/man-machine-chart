@@ -21,11 +21,11 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { env, request } = context;
   try {
-    const { id, name, processType, expanded, createdAt } = await request.json();
+    const { id, parentId, name, processType, expanded, createdAt } = await request.json();
     if (!id || !name) return badRequest('id and name are required');
     await env.DB.prepare(
-      'INSERT INTO folders (id, name, processType, expanded, createdAt) VALUES (?, ?, ?, ?, ?)'
-    ).bind(id, name, processType ?? 'custom', expanded ? 1 : 0, createdAt ?? new Date().toISOString()).run();
+      'INSERT INTO folders (id, parentId, name, processType, expanded, createdAt) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(id, parentId ?? null, name, processType ?? 'custom', expanded ? 1 : 0, createdAt ?? new Date().toISOString()).run();
     return json({ success: true });
   } catch (err) {
     return error(err);
@@ -35,10 +35,11 @@ export async function onRequestPost(context) {
 export async function onRequestPut(context) {
   const { env, request } = context;
   try {
-    const { id, name, expanded } = await request.json();
+    const { id, parentId, name, expanded } = await request.json();
     if (!id) return badRequest('id is required');
     const updates = [];
     const binds = [];
+    if (parentId !== undefined) { updates.push('parentId = ?'); binds.push(parentId); }
     if (name !== undefined)     { updates.push('name = ?');     binds.push(name); }
     if (expanded !== undefined) { updates.push('expanded = ?'); binds.push(expanded ? 1 : 0); }
     if (updates.length === 0)   return badRequest('nothing to update');
