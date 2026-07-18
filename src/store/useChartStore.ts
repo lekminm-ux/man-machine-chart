@@ -365,6 +365,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
   async saveActiveFile() {
     const file = get().activeFile();
     if (!file) return;
+    // Prevent saving if the file content has not loaded yet (prevents empty steps overwrite)
+    if ((file as any)._loaded === false) {
+      console.warn('Save blocked: File content has not finished loading from the cloud.');
+      return;
+    }
     const updated = { ...file, updatedAt: new Date().toISOString() };
     set(s => {
       const next = { ...s, files: s.files.map(f => f.id === updated.id ? updated : f) };

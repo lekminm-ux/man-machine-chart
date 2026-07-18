@@ -9,6 +9,15 @@
 export async function onRequestGet(context) {
   const { env } = context;
   try {
+    // Run schema migration to add parentId column if it doesn't exist
+    try {
+      await env.DB.prepare(
+        'ALTER TABLE folders ADD COLUMN parentId TEXT DEFAULT NULL'
+      ).run();
+    } catch (migErr) {
+      // Ignore error if column already exists
+    }
+
     const { results } = await env.DB.prepare(
       'SELECT * FROM folders ORDER BY createdAt ASC'
     ).all();
