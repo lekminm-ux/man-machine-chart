@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คู่มือการใช้งานแอปพลิเคชัน Man-Machine Chart (Standard Operation)</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Sarabun', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+    body {
+      background-color: #f8fafc;
+    }
+    .custom-shadow {
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white py-12 px-6 shadow-md relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.1),transparent)] pointer-events-none"></div>
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+      <div>
+        <div class="flex items-center gap-3 mb-3">
+          <span class="bg-blue-500 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider uppercase">Standard Operation</span>
+          <span class="bg-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-md">คู่มือผู้ใช้งาน (User Manual)</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">ระบบสร้างและจัดการแผนภูมิ Man-Machine Chart</h1>
+        <p class="text-slate-300 text-sm md:text-base mt-2 max-w-2xl font-light">
+          โปรแกรมสร้างแผนภูมิวิเคราะห์ความสัมพันธ์ระหว่างพนักงานและเครื่องจักรระดับพรีเมียม ออกแบบมาเพื่อเพิ่มประสิทธิภาพสายการผลิตแม่พิมพ์เป่า (Blow Molding), แม่พิมพ์ฉีด (Injection Molding) และงานประกอบ (Assembly)
+        </p>
+      </div>
+      <div class="flex-shrink-0">
+        <a href="http://localhost:3001" target="_blank" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3.5 rounded-xl shadow-lg hover:shadow-blue-500/20 transition-all text-sm">
+          📊 เปิดแอปพลิเคชันใช้งาน ➔
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <div class="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="lg:col-span-1">
+      <div class="sticky top-6 bg-white p-5 rounded-2xl border border-slate-200 custom-shadow space-y-3">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-2">สารบัญคู่มือ</h3>
+        <nav class="space-y-1 text-sm">
+          <a href="#intro" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">1. แนะนำแผนภูมิ Man-Machine</a>
+          <a href="#file-system" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">2. การจัดการไฟล์และโฟลเดอร์</a>
+          <a href="#data-entry" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">3. การกรอกข้อมูลขั้นตอนทำงาน</a>
+          <a href="#symbols" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">4. สัญลักษณ์และเส้นเวลา (Timeline)</a>
+          <a href="#summary" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">5. การวิเคราะห์สรุปกำลังการผลิต</a>
+          <a href="#layout-diagram" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">6. แผนผังพื้นที่ทำงาน (Layout Diagram)</a>
+          <a href="#export" class="block px-3 py-2 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">7. การบันทึกและส่งออก PNG / PDF</a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- Content Sections -->
+    <main class="lg:col-span-3 space-y-12">
+      
+      <!-- Section 1 -->
+      <section id="intro" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">1️⃣</span> แนะนำแผนภูมิ Man-Machine Chart
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            <strong>Man-Machine Chart</strong> หรือ <strong>แผนภูมิการทำงานของคนและเครื่องจักร</strong> เป็นเครื่องมือทางวิศวกรรมอุตสาหการ (IE) ที่ใช้สำหรับวิเคราะห์และปรับปรุงประสิทธิภาพการผลิต (Efficiency) โดยจะทำหน้าที่แสดงความสัมพันธ์ด้านเวลาระหว่างกิจกรรมของพนักงาน (Man) และเครื่องจักร (Machine) อย่างเป็นระบบบนแกนเวลาเดียวกัน
+          </p>
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg text-sm text-blue-900 my-4">
+            <strong>💡 วัตถุประสงค์หลัก:</strong> เพื่อระบุความสูญเปล่าจากการรอคอย (Idle Time), ปรับสมดุลงาน (Line Balancing) ของพนักงานหลายคน, และลดรอบเวลาการผลิต (Cycle Time) ให้เหลือน้อยที่สุด
+          </div>
+          <p>
+            โดยเฉพาะอย่างยิ่งในกระบวนการ <strong>Blow Molding (แม่พิมพ์เป่า)</strong> และ <strong>Injection Molding (แม่พิมพ์ฉีด)</strong> ซึ่งเครื่องจักรรันรอบอัตโนมัติเป็นเวลานาน แผนภูมินี้จะช่วยให้วิศวกรออกแบบขั้นตอนการทำงานขนานกันได้อย่างมีประสิทธิภาพสูงสุด
+          </p>
+        </div>
+      </section>
+
+      <!-- Section 2 -->
+      <section id="file-system" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">2️⃣</span> การจัดการไฟล์และโฟลเดอร์โครงการ (Sidebar)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            ระบบมาพร้อมกับ Sidebar จัดการไฟล์ฝั่งซ้ายมือ ช่วยให้สามารถแยกบันทึกข้อมูลได้ตาม <strong>ประเภทกระบวนการ (Process)</strong> และ <strong>รหัสสินค้า (Product/Part Number)</strong>:
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50">
+              <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2 text-sm">
+                📁 การเพิ่มโฟลเดอร์กระบวนการ
+              </h4>
+              <p class="text-xs text-slate-500">
+                คลิกปุ่ม <strong>"+ New Folder"</strong> ด้านล่าง ตั้งชื่อโฟลเดอร์ และเลือกไอคอนกระบวนการ:
+              </p>
+              <ul class="text-xs text-slate-600 list-disc list-inside mt-2 space-y-1">
+                <li>💨 <strong>Blow Molding</strong> (สีน้ำเงิน)</li>
+                <li>💉 <strong>Injection Molding</strong> (สีม่วง)</li>
+                <li>🔧 <strong>Assembly</strong> (สีเขียว)</li>
+                <li>⚙️ <strong>Custom</strong> (สีเทา)</li>
+              </ul>
+            </div>
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50">
+              <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2 text-sm">
+                📄 การจัดการไฟล์ชาร์ตในโฟลเดอร์
+              </h4>
+              <p class="text-xs text-slate-500">
+                เมื่อนำเมาส์ไปชี้ (Hover) ที่โฟลเดอร์หรือชื่อไฟล์ จะพบปุ่มคำสั่งควบคุมพิเศษ:
+              </p>
+              <ul class="text-xs text-slate-600 list-disc list-inside mt-2 space-y-1">
+                <li>➕ <strong>ปุ่มเครื่องหมายบวก (+):</strong> สร้างไฟล์ใหม่ภายใต้โฟลเดอร์นั้น</li>
+                <li>✏️ <strong>ปุ่มดินสอ:</strong> เปลี่ยนชื่อ (Rename) โฟลเดอร์หรือไฟล์</li>
+                <li>✕ <strong>ปุ่มกากบาท:</strong> ลบไฟล์หรือโฟลเดอร์ออกจากฐานข้อมูล</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3 -->
+      <section id="data-entry" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">3️⃣</span> การกรอกข้อมูลขั้นตอนทำงาน (Data Entry)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            หน้าจอการกรอกข้อมูลแบ่งออกเป็น 2 ส่วนหลัก:
+          </p>
+          <h3 class="text-base font-bold text-slate-800 mb-2">1. ส่วนหัวเอกสาร (Header Form)</h3>
+          <p class="text-sm">
+            กรอกรายละเอียดเพื่อใช้ระบุหัวเอกสารมาตรฐานการทำงาน ได้แก่ <em>Process Name, Part Number, Model, Cycle Time, Issue Date, Rev. No., Prepared By, Approved By</em> ข้อมูลเหล่านี้จะอัปเดตไปแสดงผลในแถบแสดงผลด้านบนและในเอกสารส่งออกโดยอัตโนมัติ
+          </p>
+          
+          <h3 class="text-base font-bold text-slate-800 mb-2 mt-6">2. ตารางสร้างขั้นตอน (Step Table Builder)</h3>
+          <p class="text-sm">
+            คลิก <strong>"+ Add Step"</strong> เพื่อเพิ่มขั้นตอนทำงานใหม่ทีละแถว:
+          </p>
+          <div class="overflow-x-auto my-4 border border-slate-150 rounded-xl">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 text-slate-700 font-bold">
+                <tr>
+                  <th class="p-3">หัวข้อการตั้งค่า</th>
+                  <th class="p-3">รายละเอียดและการกรอก</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-slate-600">
+                <tr>
+                  <td class="p-3 font-semibold text-slate-800">Process Description</td>
+                  <td class="p-3">พิมพ์คำอธิบายรายละเอียดงาน (เช่น "เปิดประตูปิดงาน", "ประกอบชิ้นส่วน LH")</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-semibold text-slate-800">Operator / Machine</td>
+                  <td class="p-3">
+                    เลือกผู้ปฏิบัติงานจาก Dropdown โดยรองรับพนักงาน **Worker A ถึง Worker J** (รวมสูงสุด 10 คน) หรือเลือก **Auto M/C** สำหรับรอบทำงานอัตโนมัติของเครื่องจักร
+                  </td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-semibold text-slate-800">เวลา (วินาที)</td>
+                  <td class="p-3">
+                    กรอกเวลาเป็นตัวเลขวินาทีตามสัญลักษณ์ประเภทงาน:
+                    <ul class="list-disc list-inside mt-1 space-y-0.5 text-[11px]">
+                      <li><strong>Manual:</strong> เวลาที่คนยืนหยิบจับหรือปรับแต่งหน้าเครื่อง</li>
+                      <li><strong>Machine:</strong> เวลาที่เครื่องทำงานอัตโนมัติ (กรณีระบุ Operator เป็น Auto M/C)</li>
+                      <li><strong>Walk:</strong> เวลาในการเดินระหว่างสถานี</li>
+                      <li><strong>Idle:</strong> เวลาที่คนหรือเครื่องว่างงาน (ส่วนตารางจะประเมินผลอัตโนมัติ)</li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-semibold text-slate-800">การจัดเรียง (Move)</td>
+                  <td class="p-3">ใช้ปุ่มลูกศร ▲ / ▼ เพื่อสลับตำแหน่งขั้นตอนให้สอดคล้องกับลำดับจริง (Sequence)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4 -->
+      <section id="symbols" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">4️⃣</span> สัญลักษณ์สากลและเส้นเวลา (Timeline Symbols)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            ระบบจะนำเวลาแต่ละประเภทในตารางมาวาดเป็นแถบสัญลักษณ์อุตสาหกรรมใน **Timeline Visualization** ทันที ซึ่งแสดงผลด้วยลายเส้นเฉพาะตัวดังนี้:
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 my-6">
+            <!-- Manual -->
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50 text-center">
+              <div class="h-6 w-full bg-slate-900 rounded mb-3"></div>
+              <span class="text-xs font-bold text-slate-800">Manual Time</span>
+              <p class="text-[10px] text-slate-500 mt-1">เส้นทึบหนาสีดำ แสดงงานที่ทำด้วยมือพนักงาน</p>
+            </div>
+            <!-- Machine -->
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50 text-center">
+              <div class="h-6 w-full flex items-center justify-between px-2 bg-white border border-blue-200 rounded mb-3">
+                <div class="w-0.5 h-full bg-blue-600"></div>
+                <div class="h-0.5 w-full bg-blue-600"></div>
+                <div class="w-0.5 h-full bg-blue-600"></div>
+              </div>
+              <span class="text-xs font-bold text-blue-700">Auto M/C Time</span>
+              <p class="text-[10px] text-slate-500 mt-1">เส้นบางสีน้ำเงินมีหัวปิดหัวท้าย แสดงเครื่องจักรทำงาน</p>
+            </div>
+            <!-- Walk -->
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50 text-center">
+              <div class="h-6 w-full flex items-center justify-center mb-3">
+                <svg width="100%" height="12" class="stroke-emerald-600" fill="none"><path d="M 0 6 Q 10 0 20 6 T 40 6 T 60 6 T 80 6 T 100 6" stroke-width="2.5"/></svg>
+              </div>
+              <span class="text-xs font-bold text-emerald-600">Walk Time</span>
+              <p class="text-[10px] text-slate-500 mt-1">เส้นหยักคลื่นสีเขียว (Zigzag) แสดงการเดินทำงาน</p>
+            </div>
+            <!-- Idle -->
+            <div class="p-4 border border-slate-100 rounded-xl bg-slate-50 text-center">
+              <div class="h-6 w-full border border-dashed border-red-500 rounded bg-red-50/50 mb-3 flex items-center justify-center">
+                <span class="text-[8px] font-bold text-red-500">Idle</span>
+              </div>
+              <span class="text-xs font-bold text-red-500">Idle Time</span>
+              <p class="text-[10px] text-slate-500 mt-1">กล่องกรอบเส้นประสีแดง แสดงพนักงานว่างงาน</p>
+            </div>
+          </div>
+          <p class="text-sm">
+            💡 **Cycle Time Indicator:** ด้านล่างของแผนภูมิจะแสดงลูกศรสองหัวสีแดงที่ลากขยายขนาดยาวตามเวลาจริง พร้อมระบุเวลา **Total Cycle Time** วินาที เพื่อเช็กเปรียบเทียบกับรอบเป้าหมายที่ตั้งไว้
+          </p>
+        </div>
+      </section>
+
+      <!-- Section 5 -->
+      <section id="summary" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">5️⃣</span> การวิเคราะห์สรุปกำลังการผลิต (Line Summary)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            ในคอลัมน์ด้านล่างขวา ระบบจะรวบรวมเวลาทำงานทั้งหมดของพนักงานแต่ละคนและเครื่องจักรมาแจกแจงวิเคราะห์คำนวณใน **Line Total Summary Table**:
+          </p>
+          <ul class="text-sm list-disc list-inside space-y-1">
+            <li><strong>Man Time (s):</strong> ผลรวมเวลางานแมนนวลของพนักงาน</li>
+            <li><strong>Walk Time (s):</strong> ผลรวมเวลาที่พนักงานเดิน</li>
+            <li><strong>Idle Time (s):</strong> ผลรวมเวลาที่พนักงานว่างงานหรือรอรอบเครื่องจักร</li>
+            <li><strong>Line Total (s):</strong> ผลรวมเวลากิจกรรมทั้งหมดของพนักงานนั้น (Man + Walk)</li>
+            <li>
+              <strong>Utilization % (อัตราการใช้ประโยชน์):</strong> 
+              คำนวณเป็นร้อยละเทียบกับรอบ Cycle Time หลักเพื่อดูความหนาแน่นของงานพนักงานแต่ละคน
+              <span class="text-xs text-slate-400 block mt-1">(แถบสีจะเปลี่ยนตามความพร้อมใช้งาน: สีเขียว ≥ 80%, สีส้ม 50-79%, สีแดง &lt; 50%)</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Section 6 -->
+      <section id="layout-diagram" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">6️⃣</span> แผนผังพื้นที่ทำงาน (Workstation Layout Diagram)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            บอร์ดจำลองผังการวางเครื่องจักรและทิศทางการเดินของพนักงาน ช่วยให้เข้าใจกระบวนการทำงานผ่านภาพจำลองกราฟิก (Workstation layout):
+          </p>
+          <div class="p-4 border border-slate-100 rounded-xl bg-slate-50 space-y-3">
+            <h4 class="font-bold text-slate-800 text-sm">🎮 วิธีการใช้งานผังแบบโต้ตอบ (Interactive Control)</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <ul class="list-disc list-inside space-y-1">
+                <li><strong>เพิ่มอุปกรณ์:</strong> คลิกที่แถบสติกเกอร์ด้านบน (Machine, Table, Rack, Worker Pos, Conveyor, Label) เพื่อวางลงบนกริด</li>
+                <li><strong>ย้ายพิกัด:</strong> คลิกค้างและลาก (Drag) อุปกรณ์วางในตำแหน่งที่ต้องการ</li>
+                <li><strong>เปลี่ยนชื่อ:</strong> ดับเบิลคลิก (Double-click) ที่ตัวอุปกรณ์เพื่อแก้ไขชื่อ หรือพิมพ์ป้ายในกล่องควบคุมแก้ไข</li>
+              </ul>
+              <ul class="list-disc list-inside space-y-1">
+                <li><strong>ลบอุปกรณ์:</strong> คลิกที่อุปกรณ์ที่ต้องการลบ แล้วกดปุ่ม <strong>"✕ Delete"</strong> สีแดงบนขวา</li>
+                <li><strong>เชื่อมโยงลูกศรเดินงาน:</strong> คลิกปุ่ม <strong>"↔ Connect"</strong> จากนั้นคลิกที่อุปกรณ์ต้นทาง แล้วคลิกอุปกรณ์ปลายทางเพื่อสร้างลูกศร</li>
+                <li><strong>ลบลูกศร:</strong> คลิกที่ตัวเส้นลูกศรเพื่อลบการเชื่อมต่อ</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 7 -->
+      <section id="export" class="bg-white p-8 rounded-2xl border border-slate-200 custom-shadow scroll-mt-6">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+          <span class="text-blue-600 text-lg">7️⃣</span> การบันทึกและการส่งออกข้อมูล (Save & Export)
+        </h2>
+        <div class="prose text-slate-600 max-w-none space-y-4">
+          <p>
+            เมื่อวิเคราะห์และจัดการกระบวนการจนลงตัวแล้ว ท่านสามารถสั่งการทำงานบันทึกและแชร์เอกสารต่อได้ผ่านปุ่มควบคุมบน **TopBar (แถบเมนูด้านบนขวา)**:
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center my-4">
+            <div class="p-4 border border-slate-150 rounded-xl bg-slate-50">
+              <span class="text-lg">💾</span>
+              <h4 class="font-bold text-slate-800 text-xs mt-1">บันทึกแผนงาน (Save)</h4>
+              <p class="text-[10px] text-slate-500 mt-1">กดปุ่มสีเทาเพื่อเซฟข้อมูลลง LocalStorage ทันที (หรือระบบจะทำ Auto-save ทุกครั้งที่มีการเปลี่ยนขั้นตอน)</p>
+            </div>
+            <div class="p-4 border border-slate-150 rounded-xl bg-slate-50">
+              <span class="text-lg">🖼️</span>
+              <h4 class="font-bold text-emerald-700 text-xs mt-1">ส่งออกเป็นภาพ (PNG)</h4>
+              <p class="text-[10px] text-slate-500 mt-1">บันทึกหน้าตาเอกสารแผนภูมิ Man-Machine Chart ทั้งหมดให้ออกมาเป็นไฟล์รูปภาพ PNG ความละเอียดสูง</p>
+            </div>
+            <div class="p-4 border border-slate-150 rounded-xl bg-slate-50">
+              <span class="text-lg">📄</span>
+              <h4 class="font-bold text-red-600 text-xs mt-1">ส่งออกเอกสารพิมพ์ (PDF)</h4>
+              <p class="text-[10px] text-slate-500 mt-1">แปลงข้อมูลสถิติแผนภูมิและแผนผังทั้งหมดให้เป็นแผ่นพิมพ์ PDF แนวนอน (Landscape ขนาด A3) เพื่อพร้อมพิมพ์ส่งหน้าบอร์ดโรงงาน</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12">
+    <p>© 2026 Man-Machine Chart (Standard Operation) - Industrial Engineering Division. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
