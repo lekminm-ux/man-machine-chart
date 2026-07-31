@@ -1,4 +1,4 @@
-# PROJECT_CONTEXT
+﻿# PROJECT_CONTEXT
 
 Last updated: 2026-07-31
 
@@ -33,68 +33,82 @@ This project is a web application for creating, editing, saving, visualizing, an
 - IDs: uuid
 - Export: html2canvas, jsPDF
 - Icons: lucide-react is installed, though some UI still uses text/emoji symbols
-- Backend API: Cloudflare Pages Functions under `mm-chart-app/functions/api`
-- Database: Cloudflare D1 / SQLite schema in `mm-chart-app/schema.sql`
+- Backend API: Cloudflare Pages Functions under `functions/api`
+- Database: Cloudflare D1 / SQLite schema in `schema.sql`
 - Tests: Node.js built-in test runner, TypeScript transpiled in test harness
 - Package manager: pnpm lockfile exists; npm scripts are also used
 
 ## Important Files
 
+All paths below are relative to the repository root.
+
+Project memory / documentation:
+
 - `PROJECT_CONTEXT.md`: shared project memory and working rules for all AI tools.
 - `CHANGELOG_AI.md`: AI work log. Update after every AI-assisted session.
-- `mm-chart-app/package.json`: main app scripts and dependencies.
-- `mm-chart-app/pnpm-lock.yaml`: dependency lockfile.
-- `mm-chart-app/src/app/editor/page.tsx`: main editor screen.
-- `mm-chart-app/src/store/useChartStore.ts`: central Zustand store, local/cloud persistence actions, cycle time recalculation.
-- `mm-chart-app/src/lib/chart-utils.ts`: core Man-Machine Chart calculation logic.
-- `mm-chart-app/src/lib/storage.ts`: localStorage + API client helpers.
-- `mm-chart-app/src/types/index.ts`: shared domain types.
-- `mm-chart-app/src/components/editor/StepTable.tsx`: operation steps and integrated timeline table.
-- `mm-chart-app/src/components/editor/HeaderForm.tsx`: process/header form and cycle time display.
-- `mm-chart-app/src/components/editor/SummaryTable.tsx`: worker/machine summary.
-- `mm-chart-app/src/components/chart/ManMachineChart.tsx`: chart visualization.
-- `mm-chart-app/src/components/layout-diagram/LayoutDiagram.tsx`: workstation layout editor.
-- `mm-chart-app/src/components/layout/Sidebar.tsx`: folder/file tree actions.
-- `mm-chart-app/src/components/layout/TopBar.tsx`: save/export controls.
-- `mm-chart-app/functions/api/files.js`: Cloudflare API for chart files.
-- `mm-chart-app/functions/api/folders.js`: Cloudflare API for folders.
-- `mm-chart-app/schema.sql`: D1 schema.
-- `mm-chart-app/wrangler.toml`: Cloudflare D1 binding.
-- `mm-chart-app/tests/*.test.cjs`: unit tests.
-- `Sample.xlsx`: sample spreadsheet/reference data.
-- `user_manual.html`: user-facing manual/reference.
-- `Codex_Multi_Device_Blueprint.md`: older multi-device guidance; appears mojibake/encoding-corrupted, so use this file as the current clean source of truth.
+- `README.md`: repository readme.
+- `docs/User_Manual.html`: user-facing manual/reference.
+- `docs/Deployment_Checklist.md`: deployment steps and pre-deploy checks.
+- `docs/Codex_Multi_Device_Blueprint.md`: older multi-device guidance; appears mojibake/encoding-corrupted, so use `PROJECT_CONTEXT.md` as the current clean source of truth.
+- `Docs_StandardWork_Reference/`: non-code reference material for standard work (pptx / xlsx / pdf). Not used by the app at runtime.
+
+Application code:
+
+- `package.json`: app scripts and dependencies.
+- `pnpm-lock.yaml`: dependency lockfile.
+- `src/app/editor/page.tsx`: main editor screen.
+- `src/store/useChartStore.ts`: central Zustand store, local/cloud persistence actions, cycle time recalculation.
+- `src/lib/chart-utils.ts`: core Man-Machine Chart calculation logic.
+- `src/lib/storage.ts`: localStorage + API client helpers.
+- `src/types/index.ts`: shared domain types.
+- `src/components/editor/StepTable.tsx`: operation steps and integrated timeline table.
+- `src/components/editor/HeaderForm.tsx`: process/header form and cycle time display.
+- `src/components/editor/SummaryTable.tsx`: worker/machine summary.
+- `src/components/chart/ManMachineChart.tsx`: chart visualization.
+- `src/components/layout-diagram/LayoutDiagram.tsx`: workstation layout editor.
+- `src/components/layout/Sidebar.tsx`: folder/file tree actions.
+- `src/components/layout/TopBar.tsx`: save/export controls.
+- `functions/api/files.js`: Cloudflare API for chart files.
+- `functions/api/folders.js`: Cloudflare API for folders.
+- `schema.sql`: D1 schema.
+- `wrangler.toml`: Cloudflare D1 binding.
+- `tests/*.test.cjs`: unit tests.
 
 ## Folder Structure
 
+Reorganized 2026-07-31. Rule of thumb: only build-tool config and the framework's expected
+folders stay at the root; every human-readable document lives under `docs/` (project docs) or
+`Docs_StandardWork_Reference/` (non-code reference material).
+
 ```text
 .
-|-- PROJECT_CONTEXT.md
-|-- CHANGELOG_AI.md
-|-- Codex_Multi_Device_Blueprint.md
-|-- Sample.xlsx
-|-- user_manual.html
-|-- src/                         # root-level copy; not the primary app unless confirmed
-|-- mm-chart-app/
-    |-- package.json
-    |-- pnpm-lock.yaml
-    |-- next.config.ts
-    |-- eslint.config.mjs
-    |-- tsconfig.json
-    |-- schema.sql
-    |-- wrangler.toml
-    |-- functions/api/
-    |   |-- files.js
-    |   `-- folders.js
-    |-- tests/
-    |-- public/
-    `-- src/
-        |-- app/
-        |-- components/
-        |-- lib/
-        |-- store/
-        `-- types/
+|-- PROJECT_CONTEXT.md            # project memory (must stay at root)
+|-- CHANGELOG_AI.md               # AI work log (must stay at root)
+|-- README.md
+|-- docs/                         # project documentation
+|   |-- User_Manual.html
+|   |-- Deployment_Checklist.md
+|   `-- Codex_Multi_Device_Blueprint.md
+|-- Docs_StandardWork_Reference/  # pptx / xlsx / pdf reference material (not used by the app)
+|-- src/                          # application source (the real app)
+|   |-- app/
+|   |-- components/
+|   |-- lib/
+|   |-- store/
+|   `-- types/
+|-- functions/api/                # Cloudflare Pages Functions
+|   |-- files.js
+|   `-- folders.js
+|-- public/
+|-- tests/                        # *.test.cjs, node --test
+|-- package.json / pnpm-lock.yaml / pnpm-workspace.yaml
+|-- next.config.ts / tailwind.config.ts / postcss.config.mjs / eslint.config.mjs / tsconfig.json
+|-- schema.sql                    # D1 schema
+`-- wrangler.toml                 # Cloudflare D1 binding
 ```
+
+Generated / local-only, never committed (all git-ignored): `.next/`, `out/`, `node_modules/`,
+`tsconfig.tsbuildinfo`, `next-env.d.ts`, `_Backup_scratch_OneDriveMigration_20260719/`.
 
 ## Current Features / หน้าจอหรือ Workflow หลัก
 
@@ -154,7 +168,7 @@ Cloudflare binding:
 
 - D1 binding name: `DB`
 - Database name: `mm-chart-db`
-- Database id is in `mm-chart-app/wrangler.toml`.
+- Database id is in `wrangler.toml`.
 
 ## Business Rules สำคัญ
 
@@ -202,9 +216,9 @@ http://localhost:3000/editor
 
 Cloudflare/D1 deployment details live in:
 
-- `mm-chart-app/wrangler.toml`
-- `mm-chart-app/schema.sql`
-- `mm-chart-app/functions/api/*.js`
+- `wrangler.toml`
+- `schema.sql`
+- `functions/api/*.js`
 
 ## Important Working Rules
 
@@ -214,8 +228,8 @@ Cloudflare/D1 deployment details live in:
 - Avoid having multiple AI tools edit the same file at the same time.
 - After every AI work session, update `CHANGELOG_AI.md`.
 - If changing architecture, schema, deployment, workflow, or important rules, update `PROJECT_CONTEXT.md`.
-- Before editing calculation logic, read `mm-chart-app/src/lib/chart-utils.ts`, related tests, and all UI consumers.
-- Before editing persistence, read `mm-chart-app/src/store/useChartStore.ts`, `mm-chart-app/src/lib/storage.ts`, API functions, and schema.
+- Before editing calculation logic, read `src/lib/chart-utils.ts`, related tests, and all UI consumers.
+- Before editing persistence, read `src/store/useChartStore.ts`, `src/lib/storage.ts`, API functions, and schema.
 - Prefer narrow patches. Do not refactor unrelated code during bug fixes.
 - Keep user data and chart JSON backward-compatible where possible.
 - Never overwrite local storage loaded files during hydration. Always merge files and keep unsynced local changes to prevent data loss.
@@ -270,42 +284,42 @@ Tool-specific notes:
 - Prefer Git for version control when available.
 - This root may not behave as a normal git repository in every environment, even though a `.git` folder may appear. Verify with `git status` from the exact directory before assuming Git is active.
 - Machine-specific duplicate files such as `*-Alex_PREDATOR.*` may be OneDrive/conflict artifacts. Inspect before deleting or merging.
-- Temporary Office lock files like `~$Sample.xlsx` should not be treated as source files.
+- Temporary Office lock files like `~$<name>.xlsx` inside `Docs_StandardWork_Reference/` should not be treated as source files.
+- Note: the repository now lives on a local drive (`D:\00_LocalFile_WebApp\`), not OneDrive. Git is the sync mechanism; the OneDrive rules above only apply if the project is ever moved back into a synced folder.
 
 ## High-Risk Files
 
 Be careful before editing:
 
-- `mm-chart-app/src/lib/chart-utils.ts`
+- `src/lib/chart-utils.ts`
   - Core time, cycle, summary, and segment logic.
-- `mm-chart-app/src/store/useChartStore.ts`
+- `src/store/useChartStore.ts`
   - Central state, persistence, file/folder actions, cycle recalculation.
-- `mm-chart-app/src/types/index.ts`
+- `src/types/index.ts`
   - Shared data contracts; schema/storage/UI depend on this.
-- `mm-chart-app/schema.sql`
+- `schema.sql`
   - Database shape; migration/backward compatibility risk.
-- `mm-chart-app/functions/api/files.js`
+- `functions/api/files.js`
   - Full chart persistence and JSON content handling.
-- `mm-chart-app/functions/api/folders.js`
+- `functions/api/folders.js`
   - Folder persistence and delete behavior.
-- `mm-chart-app/src/lib/storage.ts`
+- `src/lib/storage.ts`
   - Cloud/local fallback behavior.
-- `mm-chart-app/src/components/editor/StepTable.tsx`
+- `src/components/editor/StepTable.tsx`
   - Main data-entry workflow and integrated timeline.
-- `mm-chart-app/src/components/editor/SummaryTable.tsx`
+- `src/components/editor/SummaryTable.tsx`
   - Production summary calculations/user-facing numbers.
-- `mm-chart-app/src/components/layout-diagram/LayoutDiagram.tsx`
+- `src/components/layout-diagram/LayoutDiagram.tsx`
   - Interactive SVG behavior; easy to break drag/connect/delete flows.
-- `mm-chart-app/src/components/layout/TopBar.tsx`
+- `src/components/layout/TopBar.tsx`
   - Save/export behavior; html2canvas/jsPDF quirks.
-- `mm-chart-app/pnpm-lock.yaml`
+- `pnpm-lock.yaml`
   - Dependency reproducibility.
 
 ## Known Risks / Notes
 
 - Some comments/text in existing files show mojibake/encoding corruption, especially older Thai comments. Avoid broad encoding rewrites unless explicitly requested.
-- There are duplicate root-level app files and `mm-chart-app` files. Confirm target before editing.
-- Some OneDrive-generated or machine-specific files exist, for example files with `Alex_PREDATOR` in the name.
+- Resolved 2026-07-31: the duplicate `*-Alex_PREDATOR.*` config files and the obsolete `setup.ps1` (it pointed at a Google Drive path that no longer exists) were deleted. They remain recoverable from git history at commit `976203f`. If new `*-Alex_PREDATOR.*` files reappear, they are OneDrive/conflict artifacts — inspect before deleting or merging.
 - Cloud API currently has limited schema validation and may expose raw error messages in JSON responses.
 - localStorage fallback can hide cloud failures; check `syncStatus` and console logs when debugging persistence.
 - html2canvas can fail on modern color functions; `TopBar` includes stylesheet patching for OKLCH/LAB.

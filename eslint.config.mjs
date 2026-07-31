@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local-only forensic backup from the OneDrive migration — not app source.
+    "_Backup_scratch_OneDriveMigration_20260719/**",
+    // Node test-runner specs use CommonJS require() on purpose.
+    "tests/**/*.cjs",
   ]),
 ]);
 

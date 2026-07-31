@@ -298,3 +298,62 @@ Sidebar "Project Files" tree แสดงชื่อโฟลเดอร์/�
 - `npm run lint` ทั้งโปรเจกต์ยัง fail อยู่จาก error เดิม (ส่วนใหญ่มาจาก `_Backup_scratch_OneDriveMigration_20260719/`
   และ `tests/*.cjs` ที่ใช้ `require()`) — ไม่เกี่ยวกับงานรอบนี้ แต่ควรใส่ ignore ให้ eslint ในอนาคต
 - localStorage ของ `localhost:3456` ถูกใช้ seed ข้อมูลทดสอบชั่วคราวระหว่างตรวจงาน และล้างออกแล้ว
+
+## 2026-07-31 (Update 2)
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+จัดระเบียบโครงสร้างโฟลเดอร์ที่ root ของ repo และตั้งชื่อไฟล์/โฟลเดอร์ให้สื่อความหมาย
+เพื่อให้ค้นหาและใช้งานง่ายขึ้น (root เดิมมี 35 รายการ ปนกันทั้งไฟล์ config, เอกสาร, ไฟล์ซ้ำ, ไฟล์ตาย)
+
+### Completed
+
+- **ลบไฟล์ซ้ำ/ไฟล์ตาย** (ผู้ใช้อนุมัติ — ยังกู้คืนได้จาก git history ที่ commit `976203f`):
+  - `eslint.config-Alex_PREDATOR.mjs`, `next-env.d-Alex_PREDATOR.ts`,
+    `package-Alex_PREDATOR.json`, `tsconfig-Alex_PREDATOR.json`
+    (diff แล้ว = สำเนาเก่าของ config ตัวจริง ต่างกันแค่การจัดรูปแบบ/บรรทัดเดียว ไม่มีเนื้อหาใหม่)
+  - `setup.ps1` — ใช้ไม่ได้แล้ว ชี้ไปที่ `G:\My Drive\Antigravity\...\mm-chart-app`
+    ซึ่งทั้ง path และโฟลเดอร์ `mm-chart-app` ไม่มีอยู่จริงแล้ว
+- **สร้าง `docs/` รวมเอกสารโปรเจกต์** (ใช้ `git mv` เพื่อรักษา history):
+  - `Deploymen_checklist.md` → `docs/Deployment_Checklist.md` (แก้ typo ในชื่อไฟล์ด้วย)
+  - `user_manual.html` → `docs/User_Manual.html`
+  - `Codex_Multi_Device_Blueprint.md` → `docs/Codex_Multi_Device_Blueprint.md`
+- **เปลี่ยนชื่อโฟลเดอร์เอกสารอ้างอิง**: `Doc.Support_Standardized_Work/` → `Docs_StandardWork_Reference/`
+  (คงไว้ที่ root ตามที่ผู้ใช้เลือก เพราะเปิดใช้จาก File Explorer บ่อย)
+- **`eslint.config.mjs`**: เพิ่ม ignore `_Backup_scratch_OneDriveMigration_20260719/**`
+  และ `tests/**/*.cjs` — โฟลเดอร์ backup ไม่ใช่ source code และ test ใช้ `require()` โดยตั้งใจ
+- **`.gitignore`**: commit บรรทัด ignore โฟลเดอร์ backup ที่ค้างมาจาก session ก่อน
+- **`PROJECT_CONTEXT.md`**: อัปเดตให้ตรงโครงสร้างจริงทั้งไฟล์
+  - ลบ prefix `mm-chart-app/` ที่ไม่มีอยู่จริงออกจากทุก path (Important Files / High-Risk Files / Tech Stack / Deployment)
+  - เขียนหัวข้อ Important Files และ Folder Structure ใหม่ พร้อมกติกาว่าอะไรต้องอยู่ root อะไรย้ายเข้า `docs/`
+  - ลบอ้างอิงไฟล์ที่ไม่มีแล้ว (`Sample.xlsx`) และอัปเดต Known Risks
+
+### Files Added / Changed
+
+- ลบ: `eslint.config-Alex_PREDATOR.mjs`, `next-env.d-Alex_PREDATOR.ts`, `package-Alex_PREDATOR.json`,
+  `tsconfig-Alex_PREDATOR.json`, `setup.ps1`
+- ย้าย/เปลี่ยนชื่อ: `docs/*` (3 ไฟล์), `Docs_StandardWork_Reference/*` (4 ไฟล์)
+- แก้ไข: `eslint.config.mjs`, `.gitignore`, `PROJECT_CONTEXT.md`, `CHANGELOG_AI.md`
+
+### Verification
+
+- `npm run build` ผ่าน (Compiled successfully, prerender 5/5 หน้า)
+- `npm test` ผ่าน 23/23 tests
+- `npm run lint`: ปัญหาลดจาก 77 (61 errors) → 11 (7 errors) เพราะ backup folder และ tests
+  ไม่ถูก lint แล้ว — error ที่เหลือทั้งหมดเป็นของเดิมใน source (`StepTable.tsx`, `TopBar.tsx`,
+  `storage.ts`, `useChartStore.ts`, `Sidebar.tsx`) ไม่ได้เกิดจากการจัดโฟลเดอร์รอบนี้
+- ไม่มีโค้ดไฟล์ไหนอ้างถึงเอกสารที่ย้าย (ตรวจด้วย grep ก่อนย้าย) — มีแต่ไฟล์ .md ที่อ้างถึงกันเอง
+
+### Notes / Risks
+
+- ไฟล์ที่ต้องอยู่ root ต่อไปเพราะ framework/tool บังคับ: `src/`, `public/`, `functions/`, `tests/`,
+  config ทั้งหมด, `schema.sql`, `wrangler.toml` และ `PROJECT_CONTEXT.md` / `CHANGELOG_AI.md`
+  (AI workflow prompt อ่านสองไฟล์นี้ที่ root)
+- โฟลเดอร์ที่ยังเห็นใน File Explorer แต่ไม่ได้อยู่ใน git (ignored ทั้งหมด, ลบทิ้งได้ถ้าอยากให้โล่ง):
+  `.next/`, `out/`, `node_modules/`, `_Backup_scratch_OneDriveMigration_20260719/`, `tsconfig.tsbuildinfo`
+- error ของ eslint ที่เหลือ 7 ข้อยังไม่ได้แก้ ถือเป็นงานแยกรอบ (โดยเฉพาะ
+  `StepTable.tsx` ที่เรียก `useCallback` แบบมีเงื่อนไข = ผิดกติกา React Hooks จริง ควรแก้)

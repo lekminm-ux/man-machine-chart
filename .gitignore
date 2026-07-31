@@ -42,3 +42,6 @@ next-env.d.ts
 
 # old node modules backup
 /node_modules_old_*
+
+# local-only backup from OneDrive migration (forensic recovery data, not for GitHub)
+/_Backup_scratch_OneDriveMigration_20260719/
