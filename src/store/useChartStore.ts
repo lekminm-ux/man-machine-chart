@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
+  TimeStudy,
 } from '@/types';
 import {
   loadLocalDatabase, saveLocalDatabase,
@@ -13,6 +14,10 @@ import {
   createFileCloud, saveFileCloud, deleteFileCloud,
 } from '@/lib/storage';
 import { computeCycleTime } from '@/lib/chart-utils';
+import {
+  DEFAULT_READING_COUNT, stepsFromTimeStudy, timeStudyFromSteps,
+  type PushBasis,
+} from '@/lib/time-study';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
 export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
@@ -49,6 +54,13 @@ interface ChartState extends AppDatabase {
   // Header actions
   updateHeader: (partial: Partial<ChartHeader>) => void;
   updateTimeMeasurement: (partial: Partial<import('@/types').TimeMeasurement>) => void;
+
+  // Module 1 — time measurement sheet
+  updateTimeStudy: (study: TimeStudy) => void;
+  /** Seed the sheet from the steps already typed into Module 4. */
+  importTimeStudyFromSteps: () => number;
+  /** Overwrite Module 4 steps (and therefore M3/M5) from the sheet. */
+  pushTimeStudyToSteps: (basis?: PushBasis) => number;
 
   // Step actions
   addStep: () => void;
@@ -415,6 +427,56 @@ export const useChartStore = create<ChartState>((set, get) => ({
       persistLocal(next);
       return next;
     });
+  },
+
+  // ── Module 1: time measurement sheet ─────────────────────────────────────────
+  updateTimeStudy(study) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, timeStudy: study, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  importTimeStudyFromSteps() {
+    const state = get();
+    const file = state.files.find(f => f.id === state.activeFileId);
+    if (!file) return 0;
+
+    const readingCount = file.timeStudy?.readingCount ?? DEFAULT_READING_COUNT;
+    const study = timeStudyFromSteps(file.steps, readingCount, uuidv4);
+    get().updateTimeStudy(study);
+    return study.rows.length;
+  },
+
+  pushTimeStudyToSteps(basis: PushBasis = 'min') {
+    const state = get();
+    const file = state.files.find(f => f.id === state.activeFileId);
+    if (!file?.timeStudy) return 0;
+
+    const steps = stepsFromTimeStudy(file.timeStudy, basis, uuidv4);
+    const cycleTime = recalcCycleTime(steps);
+    set(s => {
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, steps, header: { ...f.header, cycleTime }, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+    return steps.length;
   },
 
   // ── Steps (local only — auto-saved on saveActiveFile) ────────────────────────

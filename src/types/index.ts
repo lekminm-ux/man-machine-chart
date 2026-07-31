@@ -119,6 +119,40 @@ export interface TimeMeasurement {
   taktTime: number;
 }
 
+// ── Module 1: Time Measurement Sheet (ตารางจับเวลา) ────────────────────────
+/**
+ * Activity type of one job element, mirroring the คน / เครื่อง / เดิน columns of
+ * the `std.com table` sheet. `idle` is not printed on the paper form (waiting is
+ * derived there) but is kept so a round-trip with the Module 4 step table is
+ * lossless.
+ */
+export type TimeStudyKind = 'man' | 'machine' | 'walk' | 'idle';
+
+export interface TimeStudyRow {
+  id: string;
+  seq: number;
+  jobElement: string;
+  operator: OperatorType;
+  kind: TimeStudyKind;
+  /** One stopwatch reading per round; `null` = not measured yet. */
+  readings: (number | null)[];
+}
+
+export interface TimeStudy {
+  /** How many reading columns the sheet shows (the paper form has 10). */
+  readingCount: number;
+  rows: TimeStudyRow[];
+}
+
+/** Per-row figures derived from `readings` — never stored, always recomputed. */
+export interface TimeStudyRowStats {
+  min: number;
+  max: number;
+  fluctuation: number;
+  average: number;
+  count: number;
+}
+
 export interface ChartFile {
   id: string;
   name: string;
@@ -128,7 +162,10 @@ export interface ChartFile {
   header: ChartHeader;
   steps: ChartStep[];
   layoutDiagram: LayoutDiagram;
+  /** Legacy stopwatch data. Kept so files saved before 2026-07-31 still open. */
   timeMeasurement?: TimeMeasurement;
+  /** Module 1 time measurement sheet — the source of truth for step times. */
+  timeStudy?: TimeStudy;
 }
 
 export interface ChartFolder {

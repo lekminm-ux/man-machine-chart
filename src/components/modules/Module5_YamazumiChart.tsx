@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { ALL_WORKERS, ChartStep } from '@/types';
+import { ALL_WORKERS } from '@/types';
+import { getCalculatedSteps, type CalculatedStep } from '@/lib/chart-utils';
 import { BarChart3 } from 'lucide-react';
 
 export default function Module5_YamazumiChart() {
@@ -21,10 +22,13 @@ export default function Module5_YamazumiChart() {
     updateTimeMeasurement({ taktTime: localTaktTime });
   };
 
-  // Group steps by operator
-  const operatorSteps: Record<string, ChartStep[]> = {};
+  // Group steps by operator.
+  // Step fields hold STOP times, not durations, so bar heights must come from
+  // getCalculatedSteps — summing the raw fields double-counts every step after
+  // the first and makes M5 disagree with M1 and M4.
+  const operatorSteps: Record<string, CalculatedStep[]> = {};
   ALL_WORKERS.forEach(w => operatorSteps[w] = []);
-  activeFile.steps.forEach(step => {
+  getCalculatedSteps(activeFile.steps).forEach(step => {
     if (operatorSteps[step.operator]) {
       operatorSteps[step.operator].push(step);
     }
@@ -35,7 +39,7 @@ export default function Module5_YamazumiChart() {
 
   // Calculate operator totals
   const operatorTotals = activeOperators.map(op => {
-    const total = operatorSteps[op].reduce((acc, step) => acc + step.manualTime + step.walkingTime + step.idleTime, 0);
+    const total = operatorSteps[op].reduce((acc, step) => acc + step.calcManual + step.calcWalk + step.calcIdle, 0);
     return { op, total };
   });
 
@@ -120,33 +124,33 @@ export default function Module5_YamazumiChart() {
                     {/* The Stacked Bar */}
                     <div className="w-16 relative flex flex-col-reverse shadow-sm rounded-t-sm overflow-hidden" style={{ height: maxTotalTime * pxPerSec }}>
                       {steps.map((step) => {
-                        const hManual = step.manualTime * pxPerSec;
-                        const hWalk = step.walkingTime * pxPerSec;
-                        const hIdle = step.idleTime * pxPerSec;
-                        
+                        const hManual = step.calcManual * pxPerSec;
+                        const hWalk = step.calcWalk * pxPerSec;
+                        const hIdle = step.calcIdle * pxPerSec;
+
                         return (
                           <React.Fragment key={step.id}>
                             {hManual > 0 && (
                               <div 
                                 className="w-full bg-slate-800 border-b border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer relative"
                                 style={{ height: hManual }}
-                                title={`${step.description} (Manual: ${step.manualTime}s)`}
+                                title={`${step.description} (Manual: ${step.calcManual}s)`}
                               >
-                                {hManual > 15 && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white opacity-0 group-hover:opacity-100 truncate px-1">{step.manualTime}s</span>}
+                                {hManual > 15 && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white opacity-0 group-hover:opacity-100 truncate px-1">{step.calcManual}s</span>}
                               </div>
                             )}
                             {hWalk > 0 && (
                               <div 
                                 className="w-full bg-emerald-500 border-b border-emerald-600 hover:bg-emerald-400 transition-colors cursor-pointer relative"
                                 style={{ height: hWalk }}
-                                title={`${step.description} (Walk: ${step.walkingTime}s)`}
+                                title={`${step.description} (Walk: ${step.calcWalk}s)`}
                               ></div>
                             )}
                             {hIdle > 0 && (
                               <div 
                                 className="w-full bg-red-500 border-b border-red-600 hover:bg-red-400 transition-colors cursor-pointer relative"
                                 style={{ height: hIdle }}
-                                title={`${step.description} (Idle: ${step.idleTime}s)`}
+                                title={`${step.description} (Idle: ${step.calcIdle}s)`}
                               ></div>
                             )}
                           </React.Fragment>

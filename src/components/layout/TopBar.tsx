@@ -194,7 +194,7 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
       {/* Module Navigator */}
       <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
         {([
-          { id: 1, name: '1: Lapping' },
+          { id: 1, name: '1: Time Sheet' },
           { id: 2, name: '2: Capacity' },
           { id: 3, name: '3: Gantt' },
           { id: 4, name: '4: Layout' },

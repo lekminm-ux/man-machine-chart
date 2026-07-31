@@ -1,215 +1,396 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+// ============================================================
+// Module 1 — Time Measurement Sheet (ตารางจับเวลา)
+//
+// A key-in grid that mirrors the paper form used on the floor. Timing itself is
+// done with a real stopwatch; only the readings are typed in here. (An earlier
+// version of this module was a stopwatch UI — that was a misreading of the
+// blueprint slide, see docs/Master_Plan.html.)
+// ============================================================
+
+import React, { useMemo, useRef, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { Play, Square, Timer, Save, RefreshCw } from 'lucide-react';
+import { ALL_WORKERS, type OperatorType, type TimeStudy, type TimeStudyKind } from '@/types';
+import {
+  DEFAULT_READING_COUNT, computeOperatorTotals, computeRowStats, computeTotals,
+  isMachineRow, makeEmptyRow, parsePastedGrid, renumber, resizeReadings,
+} from '@/lib/time-study';
+import { Download, Plus, Send, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
+const READING_LABELS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+
+const KIND_OPTIONS: { value: TimeStudyKind; label: string; cls: string }[] = [
+  { value: 'man',     label: 'คน',     cls: 'text-slate-700' },
+  { value: 'machine', label: 'เครื่อง', cls: 'text-amber-700' },
+  { value: 'walk',    label: 'เดิน',   cls: 'text-blue-700' },
+  { value: 'idle',    label: 'รอ',     cls: 'text-rose-700' },
+];
+
+const ALL_OPERATORS: OperatorType[] = [...ALL_WORKERS, 'Auto M/C'];
+
+function emptyStudy(readingCount = DEFAULT_READING_COUNT): TimeStudy {
+  return { readingCount, rows: [] };
+}
+
 export default function Module1_TimeMeasurement() {
-  const activeFile = useChartStore(s => s.activeFile());
-  const updateTimeMeasurement = useChartStore(s => s.updateTimeMeasurement);
+  const activeFile      = useChartStore(s => s.activeFile());
+  const updateTimeStudy = useChartStore(s => s.updateTimeStudy);
+  const importFromSteps = useChartStore(s => s.importTimeStudyFromSteps);
+  const pushToSteps     = useChartStore(s => s.pushTimeStudyToSteps);
 
-  // Stop watch state
-  const [isRunning, setIsRunning] = useState(false);
-  const [time, setTime] = useState(0); // in ms
-  const [laps, setLaps] = useState<{ id: string; lapNumber: number; timeMs: number }[]>(() => {
-    if (activeFile?.timeMeasurement?.laps) {
-      return activeFile.timeMeasurement.laps.map(l => ({
-        id: l.id,
-        lapNumber: l.lapNumber,
-        timeMs: l.timeSeconds * 1000,
-      }));
-    }
-    return [];
-  });
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastTickRef = useRef<number>(0);
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stopwatch logic
-  useEffect(() => {
-    if (isRunning) {
-      lastTickRef.current = Date.now() - time;
-      timerRef.current = setInterval(() => {
-        setTime(Date.now() - lastTickRef.current);
-      }, 10);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, time]);
+  const study = activeFile?.timeStudy ?? emptyStudy();
 
-  const toggleTimer = () => {
-    if (isRunning) {
-      setIsRunning(false);
-    } else {
-      setIsRunning(true);
-    }
+  const totals    = useMemo(() => computeTotals(study), [study]);
+  const perWorker = useMemo(() => computeOperatorTotals(study), [study]);
+
+  if (!activeFile) {
+    return <div className="p-8 text-center text-slate-500">เปิดไฟล์จากแถบด้านซ้ายก่อน จึงจะใช้ Module 1 ได้</div>;
+  }
+
+  const say = (msg: string) => {
+    setFlash(msg);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 4000);
   };
 
-  const handleLap = () => {
-    if (isRunning) {
-      const prevLapsTotal = laps.reduce((acc, l) => acc + l.timeMs, 0);
-      const lapTime = time - prevLapsTotal;
-      setLaps([...laps, { id: uuidv4(), lapNumber: laps.length + 1, timeMs: lapTime }]);
-    }
-  };
+  const commit = (next: TimeStudy) => updateTimeStudy(next);
 
-  const handleReset = () => {
-    setIsRunning(false);
-    setTime(0);
-    setLaps([]);
-  };
-
-  // Calculations
-  const lapTimesSeconds = laps.map(l => l.timeMs / 1000);
-  const minTime = lapTimesSeconds.length > 0 ? Math.min(...lapTimesSeconds) : 0;
-  const maxTime = lapTimesSeconds.length > 0 ? Math.max(...lapTimesSeconds) : 0;
-  const avgTime = lapTimesSeconds.length > 0 ? lapTimesSeconds.reduce((a, b) => a + b, 0) / lapTimesSeconds.length : 0;
-  const fluctuation = maxTime - minTime;
-  const totalTime = time / 1000;
-
-  const handleSaveToStore = () => {
-    updateTimeMeasurement({
-      laps: laps.map(l => ({ id: l.id, lapNumber: l.lapNumber, timeSeconds: l.timeMs / 1000 })),
-      minTime: Number(minTime.toFixed(1)),
-      maxTime: Number(maxTime.toFixed(1)),
-      avgTime: Number(avgTime.toFixed(1)),
-      fluctuation: Number(fluctuation.toFixed(1)),
-      // takt time can be updated from another input if needed
+  // ── row editing ───────────────────────────────────────────
+  const addRow = () => {
+    const last = study.rows[study.rows.length - 1];
+    commit({
+      ...study,
+      rows: [
+        ...study.rows,
+        makeEmptyRow(uuidv4(), study.rows.length + 1, study.readingCount, last?.operator ?? 'Worker A'),
+      ],
     });
   };
 
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    const msParts = Math.floor((ms % 1000) / 10);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${msParts.toString().padStart(2, '0')}`;
+  const deleteRow = (id: string) =>
+    commit({ ...study, rows: renumber(study.rows.filter(r => r.id !== id)) });
+
+  const moveRow = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= study.rows.length) return;
+    const rows = [...study.rows];
+    [rows[index], rows[target]] = [rows[target], rows[index]];
+    commit({ ...study, rows: renumber(rows) });
   };
 
-  if (!activeFile) {
-    return <div className="p-8 text-center text-slate-500">Please open a file from the sidebar to use Module 1.</div>;
-  }
+  const patchRow = (id: string, patch: Partial<(typeof study.rows)[number]>) =>
+    commit({ ...study, rows: study.rows.map(r => (r.id === id ? { ...r, ...patch } : r)) });
+
+  const setReading = (id: string, col: number, raw: string) => {
+    const value = raw.trim() === '' ? null : Number(raw);
+    if (value !== null && !Number.isFinite(value)) return;
+    commit({
+      ...study,
+      rows: study.rows.map(r =>
+        r.id === id ? { ...r, readings: r.readings.map((v, i) => (i === col ? value : v)) } : r
+      ),
+    });
+  };
+
+  const setReadingCount = (count: number) => commit(resizeReadings(study, count));
+
+  /** Paste a block copied from Excel starting at the focused cell. */
+  const handlePaste = (e: React.ClipboardEvent, rowIndex: number, colIndex: number) => {
+    const text = e.clipboardData.getData('text/plain');
+    if (!text.includes('\t') && !text.includes('\n')) return; // single value — let the browser handle it
+    e.preventDefault();
+
+    const grid = parsePastedGrid(text);
+    if (grid.length === 0) return;
+
+    const rows = [...study.rows];
+    // grow the sheet if the pasted block is taller than what is on screen
+    while (rows.length < rowIndex + grid.length) {
+      rows.push(makeEmptyRow(uuidv4(), rows.length + 1, study.readingCount, rows[rows.length - 1]?.operator ?? 'Worker A'));
+    }
+
+    grid.forEach((line, r) => {
+      const target = rows[rowIndex + r];
+      const readings = [...target.readings];
+      line.forEach((val, c) => {
+        const col = colIndex + c;
+        if (col < study.readingCount) readings[col] = val;
+      });
+      rows[rowIndex + r] = { ...target, readings };
+    });
+
+    commit({ ...study, rows: renumber(rows) });
+    say(`วางข้อมูล ${grid.length} แถว × ${grid[0].length} คอลัมน์ เรียบร้อย`);
+  };
+
+  // ── cross-module actions ──────────────────────────────────
+  const handleImport = () => {
+    if (activeFile.steps.length === 0) {
+      say('ไฟล์นี้ยังไม่มีข้อมูล step ใน M4 จึงไม่มีอะไรให้ดึง');
+      return;
+    }
+    const msg = study.rows.length > 0
+      ? `ตารางนี้มีข้อมูลอยู่แล้ว ${study.rows.length} แถว\nการดึงจาก M4 จะเขียนทับทั้งหมดด้วย ${activeFile.steps.length} แถวจาก M4\n\nยืนยันหรือไม่?`
+      : `ดึง Job Element ${activeFile.steps.length} แถวจาก M4 มาตั้งต้นในตารางนี้?\nเวลาที่ได้จะไปอยู่ในช่อง 1st ส่วนรอบที่เหลือกรอกเพิ่มได้ทีหลัง`;
+    if (!confirm(msg)) return;
+    const n = importFromSteps();
+    say(`ดึงมาแล้ว ${n} แถวจาก M4 — เวลาที่ได้อยู่ในช่อง 1st`);
+  };
+
+  const handlePush = () => {
+    if (study.rows.length === 0) {
+      say('ยังไม่มีข้อมูลในตาราง จึงยังส่งต่อไม่ได้');
+      return;
+    }
+    if (!confirm(
+      `ส่งข้อมูล ${study.rows.length} แถวไปให้ M2–M5 โดยใช้ค่า Min เป็นเวลามาตรฐาน\n\n` +
+      `⚠️ step ทั้งหมดที่กรอกไว้ใน M4 (${activeFile.steps.length} แถว) จะถูกเขียนทับ\n\nยืนยันหรือไม่?`
+    )) return;
+    const n = pushToSteps('min');
+    say(`ส่งข้อมูลแล้ว ${n} แถว — เปิด M3/M4/M5 เพื่อดูผลได้เลย`);
+  };
+
+  const labels = READING_LABELS.slice(0, study.readingCount);
 
   return (
-    <div className="flex-1 flex flex-col items-center bg-slate-50 min-h-screen p-8">
-      <div className="w-full max-w-4xl space-y-6">
-        <header className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+    <div className="space-y-4">
+      {/* ── toolbar ─────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Module 1: Digital Time Measurement</h1>
-            <p className="text-sm text-slate-500">Continuous Lapping UI for Standard Operation</p>
-          </div>
-          <button 
-            onClick={handleSaveToStore}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Save size={18} />
-            Save to Data Foundation
-          </button>
-        </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Stopwatch Section */}
-          <div className="bg-slate-900 rounded-3xl p-8 flex flex-col items-center justify-center shadow-xl text-white">
-            <div className="text-6xl font-mono mb-8 tabular-nums tracking-tight font-light">
-              {formatTime(time)}
-            </div>
-
-            <div className="flex gap-4 mb-8">
-              <button
-                onClick={toggleTimer}
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                  isRunning ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
-                }`}
-              >
-                {isRunning ? <Square size={32} /> : <Play size={32} className="ml-1" />}
-              </button>
-              
-              <button
-                onClick={handleLap}
-                disabled={!isRunning}
-                className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-slate-800 transition-all"
-              >
-                <Timer size={32} />
-              </button>
-
-              <button
-                onClick={handleReset}
-                className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all"
-              >
-                <RefreshCw size={28} />
-              </button>
-            </div>
-
-            <div className="w-full">
-              <h3 className="text-slate-400 font-semibold mb-3 border-b border-slate-800 pb-2">Recorded Laps</h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                {laps.slice().reverse().map((lap) => {
-                  const isMin = minTime === lap.timeMs / 1000;
-                  return (
-                    <div key={lap.id} className={`flex justify-between items-center p-3 rounded-lg ${isMin ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-slate-800 text-slate-300'}`}>
-                      <span className="font-medium text-sm">Lap {lap.lapNumber}</span>
-                      <span className="font-mono text-lg">{formatTime(lap.timeMs)}</span>
-                    </div>
-                  );
-                })}
-                {laps.length === 0 && (
-                  <div className="text-center text-slate-600 py-4 italic">No laps recorded yet</div>
-                )}
-              </div>
-            </div>
+            <h2 className="text-base font-bold text-slate-800">ตารางจับเวลา (Time Measurement Sheet)</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              จับเวลาหน้างานด้วยนาฬิกาจริง แล้วกรอกตัวเลขลงตารางนี้ — ระบบคำนวณ Min / Max / Fluc / Aver ให้อัตโนมัติ
+            </p>
           </div>
 
-          {/* Stats Section */}
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col">
-            <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-              <Timer className="text-blue-500" /> Auto-Calculation (Real-time)
-            </h2>
-            
-            <div className="grid grid-cols-2 gap-4 flex-1">
-              {/* Total Time */}
-              <div className="col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Total Time</span>
-                <span className="text-2xl font-mono text-slate-800 font-bold">{totalTime.toFixed(1)}s</span>
-              </div>
-
-              {/* Min Time */}
-              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex flex-col justify-center relative overflow-hidden group">
-                <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-100 rounded-full transition-transform group-hover:scale-150 opacity-50"></div>
-                <span className="text-emerald-700 font-bold text-sm relative z-10 flex items-center gap-1">
-                  Min Time 
-                  <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">Base</span>
-                </span>
-                <span className="text-3xl font-mono text-emerald-600 font-black mt-1 relative z-10">{minTime.toFixed(1)}s</span>
-              </div>
-
-              {/* Max Time */}
-              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex flex-col justify-center">
-                <span className="text-rose-700 font-bold text-sm">Max Time</span>
-                <span className="text-3xl font-mono text-rose-600 font-black mt-1">{maxTime.toFixed(1)}s</span>
-              </div>
-
-              {/* Avg Time */}
-              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                <span className="text-blue-700 font-bold text-sm">Average Time</span>
-                <span className="text-2xl font-mono text-blue-600 font-bold mt-1">{avgTime.toFixed(1)}s</span>
-              </div>
-
-              {/* Fluctuation */}
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex flex-col justify-center">
-                <span className="text-amber-700 font-bold text-sm">Fluctuation</span>
-                <span className="text-2xl font-mono text-amber-600 font-bold mt-1">{fluctuation.toFixed(1)}s</span>
-              </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5">
+              <span className="text-xs font-bold text-slate-600">จำนวนรอบ</span>
+              <select
+                value={study.readingCount}
+                onChange={e => setReadingCount(Number(e.target.value))}
+                className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+              </select>
             </div>
-            
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-800 leading-relaxed">
-              <strong>Smart Selection:</strong> The lowest recorded cycle time (Min Time) will be automatically highlighted and forwarded to other modules as the benchmark for efficiency.
-            </div>
+
+            <button
+              onClick={handleImport}
+              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              title="นำ step ที่กรอกไว้ใน M4 มาตั้งต้นในตารางนี้"
+            >
+              <Download size={14} /> ดึงข้อมูลจาก M4
+            </button>
+
+            <button
+              onClick={handlePush}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors"
+              title="ส่งค่า Min ของทุกแถวไปเป็นเวลามาตรฐานให้ M2–M5"
+            >
+              <Send size={14} /> ส่งข้อมูลไป M2–M5
+            </button>
           </div>
         </div>
+
+        {flash && (
+          <div className="mt-3 text-xs font-semibold text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            {flash}
+          </div>
+        )}
       </div>
+
+      {/* ── sheet ───────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700">
+                <th className="border border-slate-200 px-2 py-2 w-12 font-bold">Seq</th>
+                <th className="border border-slate-200 px-2 py-2 text-left font-bold min-w-[240px]">Job Element</th>
+                <th className="border border-slate-200 px-2 py-2 w-28 font-bold">Worker</th>
+                <th className="border border-slate-200 px-2 py-2 w-20 font-bold">ประเภท</th>
+                {labels.map(l => (
+                  <th key={l} className="border border-slate-200 px-1 py-2 w-16 font-bold">{l}</th>
+                ))}
+                <th className="border border-slate-200 px-2 py-2 w-16 font-bold bg-emerald-50 text-emerald-800">Min.</th>
+                <th className="border border-slate-200 px-2 py-2 w-16 font-bold bg-rose-50 text-rose-800">Max.</th>
+                <th className="border border-slate-200 px-2 py-2 w-16 font-bold bg-amber-50 text-amber-800">Fluc.</th>
+                <th className="border border-slate-200 px-2 py-2 w-16 font-bold bg-blue-50 text-blue-800">Aver.</th>
+                <th className="border border-slate-200 px-1 py-2 w-20 font-bold"></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {study.rows.map((row, rowIndex) => {
+                const stats = computeRowStats(row);
+                const machine = isMachineRow(row);
+                return (
+                  <tr key={row.id} className={machine ? 'bg-yellow-50' : 'hover:bg-slate-50'}>
+                    <td className="border border-slate-200 px-2 py-1 text-center font-mono text-slate-500">{row.seq}</td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <input
+                        value={row.jobElement}
+                        onChange={e => patchRow(row.id, { jobElement: e.target.value })}
+                        placeholder="รายละเอียดงาน…"
+                        className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                      />
+                    </td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <select
+                        value={row.operator}
+                        onChange={e => {
+                          const operator = e.target.value as OperatorType;
+                          patchRow(row.id, {
+                            operator,
+                            ...(operator === 'Auto M/C' ? { kind: 'machine' as TimeStudyKind } : {}),
+                          });
+                        }}
+                        className="w-full bg-transparent text-slate-700 font-semibold focus:outline-none focus:bg-white rounded px-0.5"
+                      >
+                        {ALL_OPERATORS.map(op => <option key={op} value={op}>{op}</option>)}
+                      </select>
+                    </td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <select
+                        value={row.kind}
+                        onChange={e => patchRow(row.id, { kind: e.target.value as TimeStudyKind })}
+                        className={`w-full bg-transparent font-semibold focus:outline-none focus:bg-white rounded px-0.5 ${
+                          KIND_OPTIONS.find(k => k.value === row.kind)?.cls ?? ''
+                        }`}
+                      >
+                        {KIND_OPTIONS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+                      </select>
+                    </td>
+
+                    {row.readings.slice(0, study.readingCount).map((val, col) => (
+                      <td key={col} className="border border-slate-200 p-0">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={val ?? ''}
+                          onChange={e => setReading(row.id, col, e.target.value)}
+                          onPaste={e => handlePaste(e, rowIndex, col)}
+                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                        />
+                      </td>
+                    ))}
+
+                    <td className="border border-slate-200 px-2 py-1 text-right font-mono font-bold text-emerald-700 bg-emerald-50/60">
+                      {stats.count ? stats.min.toFixed(2) : ''}
+                    </td>
+                    <td className="border border-slate-200 px-2 py-1 text-right font-mono text-rose-700 bg-rose-50/60">
+                      {stats.count ? stats.max.toFixed(2) : ''}
+                    </td>
+                    <td className="border border-slate-200 px-2 py-1 text-right font-mono text-amber-700 bg-amber-50/60">
+                      {stats.count ? stats.fluctuation.toFixed(2) : ''}
+                    </td>
+                    <td className="border border-slate-200 px-2 py-1 text-right font-mono text-blue-700 bg-blue-50/60">
+                      {stats.count ? stats.average.toFixed(2) : ''}
+                    </td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30" title="เลื่อนขึ้น">
+                          <ArrowUp size={12} />
+                        </button>
+                        <button onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === study.rows.length - 1}
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30" title="เลื่อนลง">
+                          <ArrowDown size={12} />
+                        </button>
+                        <button onClick={() => deleteRow(row.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="ลบแถว">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {study.rows.length === 0 && (
+                <tr>
+                  <td colSpan={study.readingCount + 9} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
+                    ยังไม่มีข้อมูล — กด <b>เพิ่มแถว</b> เพื่อกรอกเอง หรือ <b>ดึงข้อมูลจาก M4</b> เพื่อนำ step ที่มีอยู่แล้วมาตั้งต้น
+                  </td>
+                </tr>
+              )}
+            </tbody>
+
+            {study.rows.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-800 text-white font-bold">
+                  <td className="border border-slate-700 px-2 py-2 text-center" colSpan={4}>
+                    TOTAL <span className="font-normal text-slate-300">(ไม่รวมแถวเครื่องจักร)</span>
+                  </td>
+                  {totals.perReading.map((v, i) => (
+                    <td key={i} className="border border-slate-700 px-1 py-2 text-right font-mono">{v ? v.toFixed(2) : ''}</td>
+                  ))}
+                  <td className="border border-slate-700 px-2 py-2 text-right font-mono text-emerald-300">{totals.min.toFixed(2)}</td>
+                  <td className="border border-slate-700 px-2 py-2 text-right font-mono text-rose-300">{totals.max.toFixed(2)}</td>
+                  <td className="border border-slate-700 px-2 py-2 text-right font-mono text-amber-300">
+                    {(totals.max - totals.min).toFixed(2)}
+                  </td>
+                  <td className="border border-slate-700 px-2 py-2 text-right font-mono text-blue-300">{totals.average.toFixed(2)}</td>
+                  <td className="border border-slate-700"></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center gap-3">
+          <button
+            onClick={addRow}
+            className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+          >
+            <Plus size={14} /> เพิ่มแถว
+          </button>
+          <span className="text-[11px] text-slate-500">
+            เพิ่มได้ไม่จำกัด · คัดลอกช่วงเวลาจาก Excel แล้ววางลงช่องรอบแรกได้ทั้งบล็อก · แถวเครื่องจักรจะไฮไลต์สีเหลืองและไม่ถูกนับใน TOTAL
+          </span>
+        </div>
+      </div>
+
+      {/* ── cross-check panel ───────────────────────────── */}
+      {study.rows.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <h3 className="text-sm font-bold text-slate-800 mb-1">สรุปตามผู้ปฏิบัติงาน</h3>
+          <p className="text-[11px] text-slate-500 mb-3">
+            ใช้ทวนสอบตัวเลขข้ามโมดูล — ค่า Min ของแต่ละคนคือความสูงแท่งที่จะไปโผล่ใน M5 และเวลาเครื่องคือเส้นประใน M3
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {perWorker.map(t => {
+              const machine = t.operator === 'Auto M/C';
+              return (
+                <div key={t.operator}
+                  className={`rounded-lg border p-3 ${machine ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className={`text-xs font-bold ${machine ? 'text-amber-800' : 'text-slate-700'}`}>{t.operator}</div>
+                  <div className="text-[10px] text-slate-500 mb-1.5">{t.rowCount} งาน</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-mono font-black text-emerald-700">{t.min.toFixed(2)}</span>
+                    <span className="text-[10px] text-slate-500">s (Min)</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                    Max {t.max.toFixed(2)} · Aver {t.average.toFixed(2)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

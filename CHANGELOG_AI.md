@@ -417,3 +417,80 @@ Sidebar "Project Files" tree แสดงชื่อโฟลเดอร์/�
 - ในระบบนี้ไม่มี skill ของ Toyota Production System ติดตั้งอยู่ (ตามที่ผู้ใช้ขอให้ใช้)
   จึงวิเคราะห์ด้วยความรู้ TPS ตรงๆ แทน
 - M4 ไม่ถูกแตะต้องตามคำสั่งผู้ใช้ — งานเสริมเลื่อนไป Phase 6
+
+## 2026-07-31 (Update 4) — Phase 1
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+Phase 1 ตาม Master Plan: เปลี่ยน Module 1 จากนาฬิกาจับเวลาเป็น **ตาราง key-in** ตามฟอร์ม
+Time Measurement Sheet และเชื่อมข้อมูลกับ M4 ทั้งสองทาง เพื่อให้เห็นความสัมพันธ์ของตัวเลขข้ามโมดูล
+
+### Completed
+
+- **`src/types/index.ts`**: เพิ่ม `TimeStudy`, `TimeStudyRow`, `TimeStudyKind`, `TimeStudyRowStats`
+  และ field `timeStudy?` ใน `ChartFile` — คง `timeMeasurement` (laps) ไว้เพื่อ backward compatibility
+- **`src/lib/time-study.ts` (ใหม่)**: logic ทั้งหมดของ M1
+  - `computeRowStats` = MIN / MAX / AVERAGE / Fluctuation ตามสูตร Excel (ช่องว่างถูกข้าม)
+  - `computeTotals` = `=SUM(column)-<แถวเครื่อง>` — เวลาเครื่องไม่ถูกนับเป็นภาระคน
+  - `computeOperatorTotals` = สรุปรายคน แยกเครื่องออกเป็น Auto M/C
+  - `timeStudyFromSteps` / `stepsFromTimeStudy` = สะพานแปลงข้อมูลกับ M4
+    **ผ่าน `getCalculatedSteps` เสมอ** เพราะ M4 เก็บ "เวลาหยุด" ส่วน M1 เก็บ "ระยะเวลา"
+  - `parsePastedGrid` = รองรับวางบล็อกจาก Excel (tab/newline)
+- **`src/store/useChartStore.ts`**: เพิ่ม `updateTimeStudy`, `importTimeStudyFromSteps`,
+  `pushTimeStudyToSteps(basis)` — push จะคำนวณ cycleTime ใหม่ให้ด้วย
+- **`src/components/modules/Module1_TimeMeasurement.tsx`**: เขียนใหม่ทั้งไฟล์
+  - ตาราง: Seq · Job Element · Worker (A–J / Auto M/C) · ประเภท (คน/เครื่อง/เดิน/รอ) ·
+    1st–10th · Min · Max · Fluc · Aver
+  - แถวเครื่องจักรไฮไลต์เหลืองอัตโนมัติและไม่ถูกนับใน TOTAL
+  - เพิ่ม/ลบ/เลื่อนแถวได้ไม่จำกัด · สลับจำนวนรอบ 5/10 · วางจาก Excel ได้ (ขยายแถวอัตโนมัติ)
+  - ปุ่ม "ดึงข้อมูลจาก M4" และ "ส่งข้อมูลไป M2–M5" พร้อมกล่องยืนยันที่ระบุจำนวนแถวที่จะถูกเขียนทับ
+  - แผงสรุปรายคนสำหรับทวนสอบตัวเลขข้ามโมดูล
+- **แก้บั๊ก `Module5_YamazumiChart.tsx`**: เดิมบวก `manualTime + walkingTime + idleTime` ซึ่งเป็น
+  **เวลาหยุด** ไม่ใช่ระยะเวลา ทำให้แท่งสูงเกินจริง (Worker B ขึ้น 53s ทั้งที่ M1/M4 ได้ 33s)
+  เปลี่ยนไปใช้ `getCalculatedSteps` แล้วตัวเลขตรงกับ M1 และ M4
+- **`TopBar.tsx`**: เปลี่ยนป้ายแท็บ "1: Lapping" → "1: Time Sheet" ให้ตรงกับของจริง
+- **`tests/time-study.test.cjs` (ใหม่)**: 15 เทสต์ ทวนสอบกับตัวเลขจริงจากไฟล์ Excel
+- **`tests/store.test.cjs`**: เพิ่ม module mapping ให้ `@/lib/time-study`
+- **`docs/Master_Plan.html`**: อัปเดตเป็น v1.1 — สถานะโมดูล, Roadmap Phase 1, Decision Log, Change Log
+
+### Files Added / Changed
+
+- ใหม่: `src/lib/time-study.ts`, `tests/time-study.test.cjs`
+- แก้: `src/types/index.ts`, `src/store/useChartStore.ts`,
+  `src/components/modules/Module1_TimeMeasurement.tsx`,
+  `src/components/modules/Module5_YamazumiChart.tsx`,
+  `src/components/layout/TopBar.tsx`, `tests/store.test.cjs`,
+  `docs/Master_Plan.html`, `CHANGELOG_AI.md`
+
+### Verification
+
+- `npm test` → **37/37 ผ่าน** (เดิม 22 + ใหม่ 15) รวมเทสต์เทียบกับตัวเลขจริงในชีต JOB_C CAP_1:
+  แถว "เดินไปที่ rack" Min 1.50 / Max 2.00 / Aver 1.73 และแถวเครื่อง 46.99 / 48.72 / 47.83
+- `npx tsc --noEmit` ไม่มี error · `npm run build` ผ่าน
+- `npx eslint` บนไฟล์ที่แก้: ไม่มี error ใหม่ (เหลือเฉพาะของเดิมใน TopBar และ `any` เดิมใน store)
+- **ทดสอบบนเบราว์เซอร์จริง** ด้วยข้อมูลจำลอง BYD Side step (6 step, 2 คน + 1 เครื่อง):
+  - ดึงจาก M4 → ได้ระยะเวลา 12 / 4 / 14 / 48 / 20 / 13 ถูกต้อง (แปลงจากเวลาหยุด 12/16/30/48/20/33)
+  - ประเภทถูกจำแนกเอง: คน / เดิน / เครื่อง
+  - TOTAL = 63.00 ตัดแถวเครื่อง 48s ออก — ตรงกับ Line Total ใน M4
+  - กรอกรอบที่ 2 → Min/Max/Fluc/Aver อัปเดตทันที (12/14/2/13)
+  - วางบล็อก 2×3 จาก Excel → ลงถูกช่อง TOTAL เปลี่ยนเป็น Min 63.00 / Max 67.50 / Aver 65.48
+  - ส่งไป M2–M5 → step กลับมาเป็นเวลาหยุดชุดเดิมเป๊ะ cycle time 48s
+  - M4 หลัง push: man 59 / walk 4 / line total 63 / CT 48 เท่าเดิมทุกตัว
+  - M5 หลังแก้บั๊ก: Worker A 30s · Worker B 33s ตรงกับ M1 และ M4
+  - ไฟล์เก่าที่มีแต่ `laps` และไม่มี `timeStudy` → เปิดได้ปกติ ไม่ crash ข้อมูลเดิมยังอยู่ครบ
+  - console ไม่มี error
+- ล้างข้อมูลทดสอบใน localStorage ของ localhost:3456 แล้ว
+
+### Notes / Risks
+
+- ปุ่ม "ส่งข้อมูลไป M2–M5" **เขียนทับ step ทั้งหมดใน M4** จึงมีกล่องยืนยันที่ระบุจำนวนแถวเสมอ
+  ยังเป็นแบบกดเอง (manual push) ตามที่ตกลงไว้ ส่วน auto-sync อยู่ในแผนระยะถัดไป
+- ค่าที่ส่งต่อใช้ **Min** เป็นเวลามาตรฐานตาม blueprint (`stepsFromTimeStudy` รองรับ average/max แล้ว
+  แต่ยังไม่เปิดให้เลือกบน UI)
+- M2 และ M3 ยังเป็นหน้าว่าง — ปุ่มส่งข้อมูลจึงมีผลกับ M4/M5 ก่อน
+- **ยังต้องรอคำตอบก่อนเริ่ม Phase 2**: เลข 39 และ 8.66 ในสูตร `=39*8.66` ของชีต Machine Capacity
+  และเวลาทำงาน 1 กะ (หักพักแล้ว) ของโรงงาน

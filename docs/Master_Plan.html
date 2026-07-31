@@ -144,11 +144,11 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.0</div>
+      <div><b>Version</b>1.1</div>
       <div><b>Updated</b>31 ก.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>dbb941d</div>
-      <div><b>Status</b>รออนุมัติเริ่ม Phase 1</div>
+      <div><b>Baseline commit</b>e779f07</div>
+      <div><b>Status</b>Phase 1 เสร็จแล้ว · ถัดไป Phase 2</div>
     </div>
   </div>
 </header>
@@ -314,9 +314,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <thead><tr><th style="width:8%">โมดูล</th><th style="width:12%">สถานะ</th><th style="width:38%">ของที่มีตอนนี้</th><th style="width:42%">สิ่งที่ต้องแก้</th></tr></thead>
     <tbody>
       <tr>
-        <td><b>M1</b></td><td><span class="b b-fix">ต้องเขียนใหม่</span></td>
-        <td>นาฬิกาจับเวลา + ปุ่ม Lap + รายการ Lap (<code>Module1_TimeMeasurement.tsx</code>)</td>
-        <td><b>ถอดนาฬิกาออกทั้งหมด</b> เปลี่ยนเป็นตาราง key-in ตามฟอร์ม Time Measurement Sheet</td>
+        <td><b>M1</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
+        <td>ตาราง key-in ตามฟอร์ม Excel: Seq · Job Element · Worker · ประเภท(คน/เครื่อง/เดิน/รอ) · 1st–10th · Min/Max/Fluc/Aver · TOTAL หักแถวเครื่อง · เพิ่มแถวไม่จำกัด · วางจาก Excel ได้ · ปุ่มดึงจาก M4 และส่งไป M2–M5</td>
+        <td>— (นาฬิกาจับเวลาถูกถอดออกแล้ว) งานต่อยอด: เชื่อม Takt Time และพิมพ์ฟอร์มลงกระดาษ</td>
       </tr>
       <tr>
         <td><b>M2</b></td><td><span class="b b-todo">ยังว่าง</span></td>
@@ -334,9 +334,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td><b>รอบนี้ไม่แก้ตามที่สั่ง</b> — งานเสริม (Symbol Library, Walking Path) เลื่อนไป Phase 6</td>
       </tr>
       <tr>
-        <td><b>M5</b></td><td><span class="b b-wip">ใช้ได้แต่ยังไม่ตรง</span></td>
-        <td>แท่ง Yamazumi คำนวณจาก manual+walk+idle ของ steps ใน M4</td>
-        <td>เปลี่ยนฐานเป็น <b>Min จาก M1</b> + ทับ Max + จุด Avg + เส้น Takt + แถบ Periodical/Changeover</td>
+        <td><b>M5</b></td><td><span class="b b-wip">แก้บั๊กแล้ว · ยังไม่ครบตาม PDF</span></td>
+        <td>แท่ง Yamazumi + เส้น Takt — <b>แก้บั๊กเวลา 31 ก.ค.</b> เดิมบวก "เวลาหยุด" ดิบ ทำให้ตัวเลขเกินความจริง ตอนนี้ใช้ระยะเวลาจริงและตรงกับ M1/M4 แล้ว</td>
+        <td>เพิ่มส่วนทับ Max + จุด Avg + แถบ Periodical/Changeover + Drag &amp; Drop จัดสมดุล</td>
       </tr>
       <tr>
         <td><b>M6</b></td><td><span class="b b-todo">ยังไม่มี</span></td>
@@ -492,23 +492,26 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
+    <div class="tag"><span class="b b-done">เสร็จแล้ว</span></div>
     <div class="body">
       <h4>Phase 1 · M1 ตารางจับเวลา (หัวใจของงาน)</h4>
-      <p>ถอดนาฬิกาจับเวลาออก เปลี่ยนเป็นตาราง key-in ตามฟอร์มจริง</p>
+      <p>ถอดนาฬิกาจับเวลาออก เปลี่ยนเป็นตาราง key-in ตามฟอร์มจริง — ทดสอบผ่านครบแล้ว</p>
       <ul>
-        <li>ตาราง: Seq · Job Element · ประเภท(คน/เครื่อง/เดิน) · 1st–10th · Min · Max · Fluc · Aver</li>
-        <li>แถวเครื่องจักรไฮไลต์สีเหลืองและถูกหักออกจาก TOTAL ตามสูตร Excel</li>
-        <li>สลับจำนวนรอบ 5 / 10 คอลัมน์ได้</li>
-        <li>รองรับวางทับ (paste) จาก Excel ทั้งบล็อกทีเดียว</li>
-        <li>ปุ่ม "ส่งข้อมูลไป M2–M5" พร้อมกล่องยืนยัน</li>
-        <li>ไฟล์เก่าที่มีข้อมูล laps ต้องเปิดได้ไม่พัง</li>
+        <li>✅ ตาราง: Seq · Job Element · <b>Worker (แยกคน)</b> · ประเภท คน/เครื่อง/เดิน/รอ · 1st–10th · Min · Max · Fluc · Aver</li>
+        <li>✅ แถวเครื่องจักรไฮไลต์สีเหลืองและถูกหักออกจาก TOTAL ตามสูตร <code>=SUM(C8:C44)-C25</code></li>
+        <li>✅ สลับจำนวนรอบ 5 / 10 คอลัมน์ได้ · <b>เพิ่มแถวได้ไม่จำกัด</b></li>
+        <li>✅ วางทับ (paste) จาก Excel ได้ทั้งบล็อก ตารางขยายแถวให้อัตโนมัติ</li>
+        <li>✅ ปุ่ม <b>ดึงข้อมูลจาก M4</b> — นำ step ที่กรอกไว้มาตั้งต้น (ตามที่ขอสำหรับไฟล์ BYD Side step)</li>
+        <li>✅ ปุ่ม <b>ส่งข้อมูลไป M2–M5</b> พร้อมกล่องยืนยันที่บอกชัดว่าจะเขียนทับกี่แถว</li>
+        <li>✅ แผงสรุปตามผู้ปฏิบัติงาน สำหรับทวนสอบตัวเลขข้ามโมดูล</li>
+        <li>✅ ไฟล์เก่าที่มีข้อมูล laps เปิดได้ปกติ ข้อมูลเดิมไม่ถูกลบ</li>
+        <li>✅ แก้ป้ายแท็บจาก "1: Lapping" เป็น "1: Time Sheet"</li>
       </ul>
     </div>
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
     <div class="body">
       <h4>Phase 2 · M2 ความสามารถกระบวนการ</h4>
       <p>ตารางเครื่องจักร + Completion Time + Capacity/กะ + Donut % + Bottleneck Alert เทียบ Takt <b>(ต้องยืนยันสูตร 39×8.66 ก่อนเริ่ม)</b></p>
@@ -645,6 +648,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <tr><td>31 ก.ค. 69</td><td>ชีต kaizen ไปอยู่ไหน</td><td><b>M6 แยกต่างหาก</b> เพราะ M3/M4 ไม่ได้ยุบรวมกัน จึงมีที่ว่างพอดีตาม 6 ชีตใน Excel</td></tr>
       <tr><td>31 ก.ค. 69</td><td>M4 รอบนี้</td><td><b>ไม่แตะ</b> ตามที่สั่ง — งานเสริมเลื่อนไป Phase 6</td></tr>
       <tr><td>31 ก.ค. 69</td><td>ทิศทางระยะยาว</td><td>ขยายเป็น <b>Web TPS Activity ครบ 4M</b> (Material · Man · Method · Management)</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>M1 แยกตามคนไหม</td><td><b>แยก</b> — ทุกแถวมีคอลัมน์ Worker (A–J / Auto M/C) เพื่อส่งต่อให้ M5 รู้ว่างานไหนของใคร</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>จำนวนแถวสูงสุดของ M1</td><td><b>ไม่จำกัด</b> เพิ่มแถวได้เรื่อยๆ เหมือน M4</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>ข้อมูลเดิมในไฟล์ BYD Side step</td><td>เพิ่มปุ่ม <b>ดึงข้อมูลจาก M4</b> เพื่อนำ step ที่กรอกมือไว้มาตั้งต้นใน M1 แล้วส่งต่อให้โมดูลอื่น จะได้เห็นความสัมพันธ์ของตัวเลขทันที ส่วนที่ขาดค่อยกรอกเพิ่ม</td></tr>
     </tbody>
   </table>
   </div>
@@ -657,9 +663,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">เฟส</th><th style="width:34%">คำถาม</th><th>ทำไมต้องรู้</th></tr></thead>
     <tbody>
-      <tr><td><b>1</b></td><td>ตารางจับเวลาต้องแยกตาม "คน" ด้วยไหม (Worker A/B/C) หรือ 1 ตาราง = 1 กระบวนการ ตามฟอร์ม Excel</td><td>กระทบโครงสร้างข้อมูลและการส่งต่อไป M5 ที่ต้องรู้ว่างานไหนของใคร</td></tr>
-      <tr><td><b>1</b></td><td>ต้องรองรับกี่แถวสูงสุด (ฟอร์มเปล่ามี 30 แถว ของจริงใช้ 37 แถว)</td><td>ออกแบบ UI ให้ scroll และพิมพ์ออกมาได้พอดีหน้า</td></tr>
-      <tr><td><b>2</b></td><td><b>เลข 39 และ 8.66 ในสูตร <code>=39*8.66</code> คืออะไร</b></td><td>เป็นสูตรกำลังการผลิตหลักของ M2 — เดาไม่ได้</td></tr>
+      <tr><td><b>2</b></td><td><b>เลข 39 และ 8.66 ในสูตร <code>=39*8.66</code> คืออะไร</b></td><td>เป็นสูตรกำลังการผลิตหลักของ M2 — เดาไม่ได้ <span class="b b-fix">ต้องตอบก่อนเริ่ม</span></td></tr>
       <tr><td><b>2</b></td><td>เวลาทำงาน 1 กะของโรงงานคือกี่นาที (หักพักแล้ว)</td><td>ตัวหารของสูตร Capacity และใช้คำนวณ Takt Time</td></tr>
       <tr><td><b>5</b></td><td>Revision ปัจจุบันใช้แบบพิมพ์เลขเอง — ต้องการให้ระบบล็อกและเก็บ snapshot อัตโนมัติไหม</td><td>กระทบการเทียบ Before/After ว่าจะเทียบได้จริงหรือไม่</td></tr>
     </tbody>
@@ -674,6 +678,15 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.1</b></td><td>31 ก.ค. 2569</td><td><code>e779f07</code> → Phase 1</td>
+        <td>
+          <b>Phase 1 เสร็จ — M1 เปลี่ยนเป็นตาราง key-in แล้ว</b> (นาฬิกาจับเวลาถูกถอดออก)<br>
+          เพิ่มปุ่มดึงข้อมูลจาก M4 และส่งข้อมูลไป M2–M5 · เพิ่มคอลัมน์ Worker · เพิ่มแถวไม่จำกัด · วางจาก Excel ได้<br>
+          <b>แก้บั๊ก M5:</b> เดิมบวก "เวลาหยุด" ดิบแทนระยะเวลา ทำให้ Worker B ขึ้น 53s ทั้งที่ของจริง 33s — ตอนนี้ตรงกับ M1/M4 แล้ว<br>
+          <b>ทดสอบ:</b> unit test 37/37 ผ่าน (รวมเทสต์ทวนสอบกับตัวเลขจริงในไฟล์ Excel) · <code>tsc</code> ไม่มี error · <code>npm run build</code> ผ่าน · ทดสอบบนเบราว์เซอร์จริงครบทั้ง import → กรอก → paste → push → ตรวจ M4/M5 · ไฟล์เก่าที่มี laps เปิดได้ไม่พัง
+        </td>
+      </tr>
       <tr>
         <td><b>1.0</b></td><td>31 ก.ค. 2569</td><td><code>dbb941d</code></td>
         <td>สร้างแผนแม่บทฉบับแรก — วิเคราะห์ PDF 13 หน้า + แกะสูตรจาก Excel 2 ไฟล์ · ยืนยันว่า M1 ตีความผิดเป็นนาฬิกาจับเวลา · เทียบ M3 กับ M4 ตามหลัก TPS · เพิ่ม M6 Kaizen · วางแผน TPS Activity 4M</td>
