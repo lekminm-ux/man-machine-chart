@@ -1,14 +1,16 @@
 # PROJECT_CONTEXT
 
-Last updated: 2026-07-08
+Last updated: 2026-07-31
 
 ## Project Name
 
 Man-Machine Chart (Standard Operation)
 
-Primary app folder: `mm-chart-app`
+Repository root: `D:\00_LocalFile_WebApp\ManMachineChart_StandardOperation`
 
-Important note: the repository root also contains a partial copy of `src`, `package.json`, and config files. Treat `mm-chart-app` as the main runnable application unless a user explicitly asks to edit the root copy.
+Primary app folder: the repository root itself (`src/`, `functions/`, `tests/`, `package.json` are all at root).
+
+Important note (updated 2026-07-31): the old `mm-chart-app/` sub-folder no longer exists. It was flattened into the repository root during the OneDrive migration. Any path written as `mm-chart-app/<x>` elsewhere in this document should be read as `<x>` relative to the repository root.
 
 ## Purpose / เป้าหมายของระบบ
 
@@ -171,10 +173,10 @@ Cloudflare binding:
 
 ## Deployment / Run / Test Instructions
 
-Work from the main app folder:
+Work from the repository root:
 
 ```powershell
-cd "D:\OneDrive\00_WebApp\Man-Mahcine Chart(Standard Operation)\mm-chart-app"
+cd "D:\00_LocalFile_WebApp\ManMachineChart_StandardOperation"
 ```
 
 Install dependencies:

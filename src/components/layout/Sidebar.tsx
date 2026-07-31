@@ -57,6 +57,19 @@ export default function Sidebar() {
   
   const [movingTarget, setMovingTarget]         = useState<ContextTarget>(null);
 
+  // Tooltip for truncated folder/file names
+  const [nameTip, setNameTip] = useState<{ text: string; x: number; y: number; flip: boolean } | null>(null);
+
+  const showNameTip = (e: React.MouseEvent<HTMLElement>, text: string) => {
+    const el = e.currentTarget;
+    // Only pop up when the name is actually clipped by `truncate`
+    if (el.scrollWidth <= el.clientWidth + 1) return;
+    const r = el.getBoundingClientRect();
+    const flip = r.bottom + 56 > window.innerHeight;
+    setNameTip({ text, x: r.left, y: flip ? r.top - 6 : r.bottom + 6, flip });
+  };
+  const hideNameTip = () => setNameTip(null);
+
   const filesInFolder = (folderId: string) => files.filter(f => f.folderId === folderId);
 
   const submitNewFolder = () => {
@@ -144,6 +157,8 @@ export default function Sidebar() {
             <span
               className={`flex-1 text-sm font-semibold truncate ${getLevelColor(level)} ${movingTarget?.id === folder.id ? 'opacity-30' : ''}`}
               onClick={() => toggleFolder(folder.id)}
+              onMouseEnter={e => showNameTip(e, folder.name)}
+              onMouseLeave={hideNameTip}
             >
               {folder.name}
             </span>
@@ -241,7 +256,11 @@ export default function Sidebar() {
                     onClick={e => e.stopPropagation()}
                   />
                 ) : (
-                  <span className={`flex-1 text-xs font-medium truncate ${movingTarget?.id === file.id ? 'opacity-30' : ''}`}>
+                  <span
+                    className={`flex-1 text-xs font-medium truncate ${movingTarget?.id === file.id ? 'opacity-30' : ''}`}
+                    onMouseEnter={e => showNameTip(e, file.name)}
+                    onMouseLeave={hideNameTip}
+                  >
                     {file.name}
                   </span>
                 )}
@@ -314,9 +333,23 @@ export default function Sidebar() {
       </div>
 
       {/* Folder tree */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto py-2" onScroll={hideNameTip}>
         {rootFolders.map(folder => renderFolderNode(folder, 0))}
       </div>
+
+      {/* Full-name tooltip (fixed so it is not clipped by the sidebar) */}
+      {nameTip && (
+        <div
+          className="fixed z-50 pointer-events-none max-w-[420px] rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg break-words"
+          style={{
+            left: `${nameTip.x}px`,
+            top: `${nameTip.y}px`,
+            transform: nameTip.flip ? 'translateY(-100%)' : undefined,
+          }}
+        >
+          {nameTip.text}
+        </div>
+      )}
 
       {/* New folder panel */}
       <div className="border-t border-slate-200 p-3 bg-white">
