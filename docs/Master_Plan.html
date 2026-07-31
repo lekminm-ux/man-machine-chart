@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Plan — TPS Digital Activity WebApp</title>
+<style>
+:root{
+  --bg:#f6f8fb; --panel:#ffffff; --ink:#111827; --muted:#5b6675; --line:#e3e8ef;
+  --blue:#1d4ed8; --blue-soft:#eff4ff; --green:#047857; --green-soft:#ecfdf5;
+  --amber:#b45309; --amber-soft:#fffbeb; --red:#b91c1c; --red-soft:#fef2f2;
+  --slate:#334155; --slate-soft:#f1f5f9;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f141b; --panel:#161d26; --ink:#e8edf4; --muted:#9aa7b8; --line:#27313d;
+    --blue:#7aa2ff; --blue-soft:#182238; --green:#4ade80; --green-soft:#12261d;
+    --amber:#fbbf24; --amber-soft:#2a2010; --red:#fca5a5; --red-soft:#2a1516;
+    --slate:#cbd5e1; --slate-soft:#1b232e;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Sarabun","Leelawadee UI","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.7;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 80px}
+
+/* ── header ─────────────────────────────── */
+header.top{
+  background:linear-gradient(135deg,#0f2c6b,#1d4ed8 55%,#0e7490);
+  color:#fff; padding:38px 0 30px; margin-bottom:26px;
+}
+header.top .wrap{padding-bottom:0}
+header.top h1{margin:0 0 6px; font-size:30px; letter-spacing:-.5px}
+header.top p{margin:0; opacity:.9}
+.docctl{
+  display:flex; flex-wrap:wrap; gap:10px; margin-top:20px;
+}
+.docctl div{
+  background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22);
+  border-radius:8px; padding:7px 12px; font-size:12.5px;
+}
+.docctl b{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.8px; opacity:.75}
+
+/* ── nav ────────────────────────────────── */
+nav.toc{
+  position:sticky; top:0; z-index:20; background:var(--panel);
+  border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+  display:flex; flex-wrap:wrap; gap:6px; margin-bottom:26px;
+  box-shadow:0 2px 10px rgba(15,23,42,.06);
+}
+nav.toc a{
+  color:var(--muted); text-decoration:none; font-size:12.5px; font-weight:600;
+  padding:5px 10px; border-radius:6px;
+}
+nav.toc a:hover{background:var(--slate-soft); color:var(--ink)}
+
+/* ── sections ───────────────────────────── */
+section{
+  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  padding:24px 26px; margin-bottom:22px;
+}
+h2{
+  margin:0 0 4px; font-size:20px; letter-spacing:-.3px;
+  display:flex; align-items:center; gap:10px;
+}
+h2 .num{
+  background:var(--blue); color:#fff; font-size:12px; font-weight:800;
+  width:26px; height:26px; border-radius:7px; display:grid; place-items:center; flex:none;
+}
+h3{margin:24px 0 8px; font-size:15.5px; color:var(--blue)}
+.lead{color:var(--muted); margin:0 0 18px; font-size:14px}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px; padding-left:22px}
+li{margin-bottom:5px}
+code{
+  background:var(--slate-soft); border:1px solid var(--line); border-radius:5px;
+  padding:1px 6px; font-family:"Cascadia Mono",Consolas,monospace; font-size:12.5px;
+}
+
+/* ── tables ─────────────────────────────── */
+.tablewrap{overflow-x:auto; margin-bottom:14px}
+table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:640px}
+th,td{border:1px solid var(--line); padding:9px 11px; text-align:left; vertical-align:top}
+th{background:var(--slate-soft); font-weight:700; font-size:12.5px}
+tbody tr:nth-child(even) td{background:rgba(127,141,163,.045)}
+
+/* ── badges ─────────────────────────────── */
+.b{display:inline-block; font-size:11px; font-weight:800; padding:2px 9px; border-radius:99px; white-space:nowrap}
+.b-done{background:var(--green-soft); color:var(--green); border:1px solid currentColor}
+.b-wip{background:var(--amber-soft); color:var(--amber); border:1px solid currentColor}
+.b-todo{background:var(--slate-soft); color:var(--muted); border:1px solid var(--line)}
+.b-fix{background:var(--red-soft); color:var(--red); border:1px solid currentColor}
+.b-plan{background:var(--blue-soft); color:var(--blue); border:1px solid currentColor}
+
+/* ── callouts ───────────────────────────── */
+.note{border-left:4px solid var(--blue); background:var(--blue-soft); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0}
+.warn{border-left:4px solid var(--amber); background:var(--amber-soft); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0}
+.stop{border-left:4px solid var(--red); background:var(--red-soft); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0}
+.ok{border-left:4px solid var(--green); background:var(--green-soft); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0}
+.note p:last-child,.warn p:last-child,.stop p:last-child,.ok p:last-child{margin-bottom:0}
+
+/* ── module cards ───────────────────────── */
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin:16px 0}
+.card{border:1px solid var(--line); border-radius:12px; padding:16px; background:var(--panel)}
+.card h4{margin:0 0 2px; font-size:14.5px}
+.card .jp{font-size:11.5px; color:var(--muted); margin-bottom:10px}
+.card p{font-size:13px; margin:0 0 8px; color:var(--muted)}
+
+/* ── flow diagram ───────────────────────── */
+.flow{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:18px 0; font-size:13px}
+.node{border:2px solid var(--blue); background:var(--blue-soft); color:var(--blue);
+  border-radius:10px; padding:10px 14px; font-weight:700; text-align:center; min-width:120px}
+.node.src{border-color:var(--green); background:var(--green-soft); color:var(--green)}
+.node.future{border-style:dashed; border-color:var(--muted); background:transparent; color:var(--muted)}
+.arrow{color:var(--muted); font-weight:800; font-size:18px}
+.stack{display:flex; flex-direction:column; gap:8px}
+
+/* ── phase timeline ─────────────────────── */
+.phase{display:flex; gap:14px; padding:14px 0; border-bottom:1px dashed var(--line)}
+.phase:last-child{border-bottom:0}
+.phase .tag{flex:none; width:78px}
+.phase .body{flex:1}
+.phase h4{margin:0 0 4px; font-size:14.5px}
+.phase p{margin:0 0 6px; font-size:13.5px; color:var(--muted)}
+.phase ul{font-size:13.5px; margin-bottom:0}
+
+footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
+
+@media print{
+  body{background:#fff}
+  nav.toc{display:none}
+  section{break-inside:avoid; box-shadow:none}
+  header.top{background:#1d4ed8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>Master Plan — TPS Digital Activity WebApp</h1>
+    <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
+    <div class="docctl">
+      <div><b>Version</b>1.0</div>
+      <div><b>Updated</b>31 ก.ค. 2569</div>
+      <div><b>Repo</b>ManMachineChart_StandardOperation</div>
+      <div><b>Baseline commit</b>dbb941d</div>
+      <div><b>Status</b>รออนุมัติเริ่ม Phase 1</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <a href="#vision">วิสัยทัศน์</a>
+  <a href="#tps">หลักการ TPS</a>
+  <a href="#m3m4">M3 vs M4</a>
+  <a href="#status">สถานะโมดูล</a>
+  <a href="#data">สถาปัตยกรรมข้อมูล</a>
+  <a href="#formula">สูตรมาตรฐาน</a>
+  <a href="#kaizen">Kaizen &amp; Before-After</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#tps4m">TPS Activity 4M</a>
+  <a href="#rules">กติกาการทำงาน</a>
+  <a href="#decisions">Decision Log</a>
+  <a href="#open">คำถามค้าง</a>
+  <a href="#changelog">Change Log</a>
+</nav>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="vision">
+  <h2><span class="num">0</span> วิสัยทัศน์ปลายทาง</h2>
+  <p class="lead">ระบบนี้ไม่ได้จบที่ Man-Machine Chart แต่จะเป็น <b>Web TPS Activity</b> ที่รวมงานปรับปรุงกระบวนการผลิตรถยนต์ไว้ที่เดียว</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>ระยะที่ 1 — Standard Work Digital</h4>
+      <div class="jp">Phase 1–6 · แผนปัจจุบัน</div>
+      <p>แปลงเอกสารงานมาตรฐาน 5 ฟอร์มจาก Excel เป็นระบบดิจิทัลที่ข้อมูลเชื่อมกัน กรอกครั้งเดียวใช้ได้ทุกโมดูล</p>
+    </div>
+    <div class="card">
+      <h4>ระยะที่ 2 — Kaizen Loop</h4>
+      <div class="jp">Phase 5 · Before / After</div>
+      <p>ปิดวงจร: วัดเวลา → หาปัญหา → ปรับปรุง → วัดใหม่ → เทียบ Before/After แล้วออกมาตรฐานใหม่</p>
+    </div>
+    <div class="card">
+      <h4>ระยะที่ 3 — TPS Activity 4M</h4>
+      <div class="jp">Phase 7+ · แผนอนาคต</div>
+      <p>ขยายครอบคลุม Material / Man / Method / Management ให้เป็นศูนย์กลางกิจกรรมปรับปรุงของทั้งสายการผลิต</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <p><b>หลักคิดที่ยึดตลอดทั้งแผน:</b> ในระบบ TPS <b>งานมาตรฐาน (Standardized Work) คือฐานของการไคเซ็น</b> — ถ้าไม่มีมาตรฐานที่วัดได้ ก็ไม่มีอะไรให้เทียบว่าปรับปรุงแล้วดีขึ้นจริงไหม ดังนั้นลำดับการพัฒนาจึงต้องทำ M1 (ข้อมูลเวลาจริง) ให้แน่นก่อนเสมอ</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="tps">
+  <h2><span class="num">1</span> หลักการ TPS ที่ระบบนี้ยึด</h2>
+  <p class="lead">งานมาตรฐานของ Toyota ประกอบด้วยเอกสารหลัก 3 ใบ + เครื่องมือจัดสมดุลอีก 1 — ซึ่งตรงกับ 5 ชีตใน Excel ของโรงงานพอดี</p>
+
+  <h3>องค์ประกอบ 3 อย่างของงานมาตรฐาน</h3>
+  <ul>
+    <li><b>Takt Time</b> — จังหวะที่ลูกค้าต้องการ (เวลาทำงาน ÷ จำนวนที่ต้องการ)</li>
+    <li><b>Work Sequence</b> — ลำดับการทำงานของคน 1 คนใน 1 รอบ</li>
+    <li><b>Standard WIP</b> — งานค้างมาตรฐานขั้นต่ำที่ต้องมีเพื่อให้งานไหลได้</li>
+  </ul>
+
+  <h3>เอกสารมาตรฐาน ↔ ชีต Excel ↔ โมดูลในระบบ</h3>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:22%">เอกสาร TPS</th><th style="width:18%">ชีตใน Excel</th><th style="width:10%">โมดูล</th><th>หน้าที่หลัก</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Time Measurement Sheet</b><br><span style="color:var(--muted);font-size:12px">ตารางจับเวลา (ข้อมูลดิบ)</span></td>
+        <td><code>ตารางจับเวลา</code><br><code>JOB_C CAP_1..3</code></td>
+        <td><span class="b b-plan">M1</span></td>
+        <td>บันทึกเวลาที่จับได้จริงหน้างาน แยกตาม Job Element แล้วสกัดค่า Min / Max / Fluctuation / Average — <b>เป็นต้นทางของข้อมูลทั้งระบบ</b></td>
+      </tr>
+      <tr>
+        <td><b>Production Capacity Sheet</b><br><span style="color:var(--muted);font-size:12px">工程別能力表 ตารางความสามารถกระบวนการ</span></td>
+        <td><code>Machine Capacity Sheet</code></td>
+        <td><span class="b b-plan">M2</span></td>
+        <td>คำนวณกำลังการผลิตต่อกะของแต่ละเครื่อง จากเวลาคน + เวลาเครื่อง + เวลาเปลี่ยนรุ่น เพื่อหาคอขวด</td>
+      </tr>
+      <tr>
+        <td><b>Standardized Work<br>Combination Table</b><br><span style="color:var(--muted);font-size:12px">標準作業組合せ票 ตารางงานมาตรฐานผสม</span></td>
+        <td><code>std.com table</code></td>
+        <td><span class="b b-plan">M3</span></td>
+        <td>กราฟ<b>แกนเวลา</b> — คน / เครื่อง / เดิน ซ้อนกันใน 1 รอบงาน เทียบกับเส้น Takt</td>
+      </tr>
+      <tr>
+        <td><b>Standardized Work Chart</b><br><span style="color:var(--muted);font-size:12px">標準作業票 แผนภาพงานมาตรฐาน</span></td>
+        <td><code>std.work chart</code></td>
+        <td><span class="b b-done">M4</span></td>
+        <td>ผัง<b>แกนพื้นที่</b> — ตำแหน่งเครื่อง เส้นทางเดินของคน จุดตรวจคุณภาพ จุดอันตราย งานค้างมาตรฐาน</td>
+      </tr>
+      <tr>
+        <td><b>Yamazumi / Work Balance</b><br><span style="color:var(--muted);font-size:12px">山積み表 แผนภาพภาระงาน</span></td>
+        <td><code>yamazumi chart</code></td>
+        <td><span class="b b-wip">M5</span></td>
+        <td>แท่งภาระงานของคนแต่ละคนเทียบเส้น Takt เพื่อจัดสมดุลสายการผลิต (Line Balancing)</td>
+      </tr>
+      <tr>
+        <td><b>Kaizen Sheet</b><br><span style="color:var(--muted);font-size:12px">ใบไคเซ็น Before/After</span></td>
+        <td><code>kaizen</code></td>
+        <td><span class="b b-plan">M6</span></td>
+        <td>บันทึกปัญหา → มาตรการแก้ไข → ผู้รับผิดชอบ → ผลลัพธ์ Before/After</td>
+      </tr>
+      <tr>
+        <td><b>Material &amp; Information<br>Flow Chart</b><br><span style="color:var(--muted);font-size:12px">MIFC (VSM ฉบับ Toyota)</span></td>
+        <td><code>MIFC 1</code>, <code>MIFC 2</code></td>
+        <td><span class="b b-todo">อนาคต</span></td>
+        <td>ผังการไหลของวัสดุและข้อมูลทั้งสาย — เป็นจุดตั้งต้นของเสา Material ในระยะที่ 3</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="ok">
+    <p><b>ข้อสรุปสำคัญ:</b> โครงสร้าง 5 โมดูลที่วางไว้เดิม<b>ตรงกับมาตรฐาน TPS อยู่แล้ว</b> ไม่ต้องรื้อ สิ่งที่ต้องแก้คือ <b>รายละเอียดภายในของ M1</b> ที่ตีความจากสไลด์ผิดไปเป็นนาฬิกาจับเวลา</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="m3m4">
+  <h2><span class="num">2</span> M3 กับ M4 ต่างกันอย่างไร — และควรยุบรวมไหม</h2>
+  <p class="lead">คำตอบ: <b>ไม่ควรยุบรวม</b> เพราะทั้งสองเป็นคนละแกนของปัญหาเดียวกัน และในระบบ TPS ถือเป็นเอกสารคนละใบที่ต้องมีคู่กัน</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:16%">ประเด็น</th><th style="width:42%">M3 — Combination Table</th><th style="width:42%">M4 — Standardized Work Chart</th></tr></thead>
+    <tbody>
+      <tr><td><b>แกนหลัก</b></td><td>⏱️ <b>เวลา</b> (แกนนอนคือวินาที)</td><td>📐 <b>พื้นที่</b> (ผังสถานีงานมองจากด้านบน)</td></tr>
+      <tr><td><b>ตอบคำถามว่า</b></td>
+          <td>คน 1 คนทำครบ 1 รอบ<b>ทันเวลา Takt ไหม</b>? เครื่องทำงานทับกับคนช่วงไหน? รอเปล่าตรงไหนกี่วินาที?</td>
+          <td>คน<b>เดินเส้นทางไหน</b>? ระยะเดินเท่าไหร่? งานค้างมาตรฐานวางกี่ชิ้นตรงไหน? จุดตรวจคุณภาพ/จุดอันตรายอยู่ตรงไหน?</td></tr>
+      <tr><td><b>มองเห็นความสูญเปล่า</b></td>
+          <td>เวลารอคอย (Waiting), เครื่องล้นเกิน Takt, ลำดับงานไม่สมดุล</td>
+          <td>การเดินที่ไม่จำเป็น (Motion/Transport), ผังวางเครื่องไม่ดี, WIP เกินจำเป็น</td></tr>
+      <tr><td><b>ใช้ตอนไหน</b></td><td>ตอน<b>ออกแบบลำดับงาน</b>ของคน 1 คน</td><td>ตอน<b>จัดวางสถานีงาน</b>และลดระยะเดิน</td></tr>
+      <tr><td><b>ข้อมูลที่ใช้</b></td><td>Job Element + เวลาคน/เครื่อง/เดิน (จาก M1)</td><td>Job Element เดียวกัน + <b>พิกัด x,y ของอุปกรณ์</b> (ข้อมูลที่ M3 ไม่มี)</td></tr>
+      <tr><td><b>ผลถ้ายุบรวม</b></td><td colspan="2">กราฟแกนเวลากับผังแกนพื้นที่ใช้ระบบพิกัดคนละแบบสิ้นเชิง ยุบรวมแล้วจะอ่านไม่รู้เรื่องทั้งคู่ และผิดหลักการตรวจงานมาตรฐานที่ต้องดูทั้งเวลาและการเคลื่อนที่ควบคู่กัน</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><b>สิ่งที่ควรทำแทนการยุบรวม — เชื่อมสองโมดูลเข้าหากัน:</b></p>
+    <ul>
+      <li>ทั้ง M3 และ M4 ดึง Job Element <b>ชุดเดียวกัน</b> จาก M1 (กรอกครั้งเดียว)</li>
+      <li>คลิกแถบงานใน M3 → ไฮไลต์ตำแหน่ง/เส้นทางเดินอันนั้นใน M4 (และกลับกัน)</li>
+      <li>ระยะเดินที่วาดใน M4 ป้อนกลับมาเป็น "เวลาเดิน" ที่ใช้ตรวจสอบใน M3 ได้ในอนาคต</li>
+    </ul>
+  </div>
+
+  <div class="ok">
+    <p><b>ผลต่อ Kaizen:</b> เมื่อ M3/M4 ไม่ยุบรวม ชีต kaizen จึงไม่ต้องไปเบียดอยู่ใน M5 — จัดเป็น <b>M6: Kaizen &amp; Before/After</b> แยกต่างหาก ซึ่งตรงกับที่ Excel มี 6 ชีตพอดี</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="status">
+  <h2><span class="num">3</span> สถานะโมดูลปัจจุบัน</h2>
+  <p class="lead">ประเมินจากโค้ดจริงใน <code>src/</code> ณ commit dbb941d</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:8%">โมดูล</th><th style="width:12%">สถานะ</th><th style="width:38%">ของที่มีตอนนี้</th><th style="width:42%">สิ่งที่ต้องแก้</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>M1</b></td><td><span class="b b-fix">ต้องเขียนใหม่</span></td>
+        <td>นาฬิกาจับเวลา + ปุ่ม Lap + รายการ Lap (<code>Module1_TimeMeasurement.tsx</code>)</td>
+        <td><b>ถอดนาฬิกาออกทั้งหมด</b> เปลี่ยนเป็นตาราง key-in ตามฟอร์ม Time Measurement Sheet</td>
+      </tr>
+      <tr>
+        <td><b>M2</b></td><td><span class="b b-todo">ยังว่าง</span></td>
+        <td>หน้าจอ placeholder 🚧</td>
+        <td>สร้างใหม่ทั้งหมด: ตารางความสามารถกระบวนการ + Donut % + Bottleneck Alert</td>
+      </tr>
+      <tr>
+        <td><b>M3</b></td><td><span class="b b-todo">ยังว่าง</span></td>
+        <td>หน้าจอ placeholder 🚧</td>
+        <td>สร้างใหม่ทั้งหมด: กราฟ Gantt แกนเวลา + เส้น Takt/Cycle + Rule 1/2/3</td>
+      </tr>
+      <tr>
+        <td><b>M4</b></td><td><span class="b b-done">ใช้งานได้ — ยังไม่แตะ</span></td>
+        <td>StepTable + LayoutDiagram + SummaryTable ครบ ใช้งานจริงอยู่</td>
+        <td><b>รอบนี้ไม่แก้ตามที่สั่ง</b> — งานเสริม (Symbol Library, Walking Path) เลื่อนไป Phase 6</td>
+      </tr>
+      <tr>
+        <td><b>M5</b></td><td><span class="b b-wip">ใช้ได้แต่ยังไม่ตรง</span></td>
+        <td>แท่ง Yamazumi คำนวณจาก manual+walk+idle ของ steps ใน M4</td>
+        <td>เปลี่ยนฐานเป็น <b>Min จาก M1</b> + ทับ Max + จุด Avg + เส้น Takt + แถบ Periodical/Changeover</td>
+      </tr>
+      <tr>
+        <td><b>M6</b></td><td><span class="b b-todo">ยังไม่มี</span></td>
+        <td>—</td>
+        <td>สร้างใหม่: Kaizen Sheet + หน้าสรุป Before/After ข้ามโมดูล</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="data">
+  <h2><span class="num">4</span> สถาปัตยกรรมข้อมูล</h2>
+  <p class="lead">หลัก "Enter Data Once, Render Everywhere" — M1 เป็นต้นทางเดียว ที่เหลือเป็นมุมมอง</p>
+
+  <div class="flow">
+    <div class="node src">M1<br><span style="font-weight:500;font-size:11.5px">ตารางจับเวลา<br>(ต้นทางเดียว)</span></div>
+    <div class="arrow">→</div>
+    <div class="node">Data Foundation<br><span style="font-weight:500;font-size:11.5px">Job Element + เวลา</span></div>
+    <div class="arrow">→</div>
+    <div class="stack">
+      <div class="node">M2 · Capacity</div>
+      <div class="node">M3 · Combination</div>
+      <div class="node">M4 · Work Chart</div>
+      <div class="node">M5 · Yamazumi</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node future">M6 · Kaizen<br><span style="font-weight:500;font-size:11.5px">Before / After</span></div>
+  </div>
+
+  <h3>วิธีส่งข้อมูล — เริ่มด้วยแบบกดปุ่มเอง</h3>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:20%">แบบ</th><th style="width:12%">สถานะ</th><th>รายละเอียด</th></tr></thead>
+    <tbody>
+      <tr><td><b>Manual Push</b><br>กดปุ่มส่งเอง</td><td><span class="b b-plan">ใช้อันนี้ก่อน</span></td>
+        <td>มีปุ่ม <i>"ส่งข้อมูลไป M2–M5"</i> พร้อมกล่องยืนยันที่บอกชัดว่าจะเขียนทับอะไรบ้าง — ปลอดภัยกับไฟล์เดิมที่กรอก step ไว้แล้วใน M4</td></tr>
+      <tr><td><b>Auto Sync</b><br>ซิงก์อัตโนมัติ</td><td><span class="b b-todo">เก็บไว้ในแผน</span></td>
+        <td>แก้ใน M1 แล้วโมดูลอื่นเปลี่ยนทันทีตามแนวคิดใน PDF — จะเปิดใช้เมื่อ M1–M5 นิ่งแล้ว และต้องมีระบบเตือน/ย้อนกลับก่อน เพราะเสี่ยงเขียนทับข้อมูลที่กรอกมือ</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>โครงสร้างข้อมูลใหม่ที่จะเพิ่ม</h3>
+  <p>เพิ่ม <code>timeStudy</code> ลงใน <code>ChartFile</code> โดย<b>ไม่ลบ</b>ของเดิม (<code>timeMeasurement.laps</code>) เพื่อให้ไฟล์เก่าเปิดได้ปกติ:</p>
+  <ul>
+    <li><code>readingCount</code> — จำนวนรอบที่จับ (5 หรือ 10 คอลัมน์)</li>
+    <li><code>rows[]</code> — แต่ละแถว: <code>seq</code>, <code>jobElement</code>, <code>kind</code> (คน / เครื่อง / เดิน), <code>readings[]</code></li>
+    <li>ค่า Min / Max / Fluc / Aver / TOTAL <b>คำนวณสด ไม่เก็บลงฐานข้อมูล</b> เพื่อไม่ให้ค่าเพี้ยนจากข้อมูลดิบ</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="formula">
+  <h2><span class="num">5</span> สูตรมาตรฐาน (ยืนยันจากไฟล์ Excel จริง)</h2>
+  <p class="lead">ทุกสูตรด้านล่างแกะจาก <code>3 TEN SET Line SUV_Rev.01.xlsx</code> ไม่ได้เดาเอง</p>
+
+  <h3>M1 — ตารางจับเวลา (ชีต JOB_C CAP_1 แถว 8–45)</h3>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:16%">ค่า</th><th style="width:34%">สูตรใน Excel</th><th>ความหมาย</th></tr></thead>
+    <tbody>
+      <tr><td>Min.</td><td><code>=MIN(C8:G8)</code></td><td>รอบที่เร็วที่สุด → ใช้เป็น <b>ค่าฐานส่งต่อให้โมดูลอื่น</b></td></tr>
+      <tr><td>Max.</td><td><code>=MAX(C8:G8)</code></td><td>รอบที่ช้าที่สุด</td></tr>
+      <tr><td>Fluc.</td><td>(ในไฟล์เว้นว่างไว้)</td><td>ความแกว่ง = <b>Max − Min</b> ตามที่ PDF ระบุ</td></tr>
+      <tr><td>Aver.</td><td><code>=AVERAGE(C8:G8)</code></td><td>ค่าเฉลี่ย</td></tr>
+      <tr><td><b>TOTAL</b></td><td><code>=SUM(C8:C44)-C25</code></td><td><b>รวมทั้งคอลัมน์แล้วหักแถวเครื่องจักรออก</b> (แถว 25 = "เครื่องจักรทำงาน" 47.83s ไฮไลต์เหลือง) ใช้กฎเดียวกันกับคอลัมน์ Min / Max / Aver</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="warn">
+    <p><b>กฎที่ห้ามพลาด:</b> เวลาเครื่องจักรทำงานอัตโนมัติ<b>ไม่นับเป็นภาระงานของคน</b> ทุกแถวจึงต้องระบุประเภทได้ว่าเป็น คน / เครื่อง / เดิน — ซึ่งตรงกับคอลัมน์ <code>คน | เครื่อง | เดิน</code> ในชีต <code>std.com table</code> และเป็นข้อมูลที่ M3 ต้องใช้พอดี</p>
+  </div>
+
+  <h3>M2 — ความสามารถกระบวนการ (ชีต Machine Capacity Sheet)</h3>
+  <ul>
+    <li><b>Completion Time</b> = <code>=SUM(Basic Time : Auto Time)</code> → เวลาคน + เวลาเครื่อง (ตัวอย่างจริง: 4.13 + 46.54 = 50.67 วินาที)</li>
+    <li><b>Production Capacity</b> = เวลาทำงาน 1 กะ ÷ (Completion Time + เวลาเปลี่ยนรุ่นเฉลี่ยต่อชิ้น) &nbsp;<span style="color:var(--muted)">— ตามสูตรในสไลด์หน้า 5</span></li>
+  </ul>
+  <div class="stop">
+    <p><b>⚠️ จุดที่ต้องถามก่อนเขียนโค้ด:</b> ในไฟล์จริงเซลล์กำลังการผลิตเป็นสูตรตายตัว <code>=39*8.66</code> ยังไม่ทราบที่มาของเลข 39 และ 8.66 — <b>ตอนเริ่ม Phase 2 จะขอให้พี่ยืนยันก่อน ไม่เดาเอง</b></p>
+  </div>
+
+  <h3>M3 — ตารางงานมาตรฐานผสม (ชีต std.com table)</h3>
+  <ul>
+    <li>คอลัมน์ต่อแถว: <code>คน (E)</code> · <code>เครื่อง (F)</code> · <code>เดิน (G)</code></li>
+    <li>เวลาเริ่มของแถวถัดไป = เวลาเริ่มเดิม + เวลาคน + เวลาเดินของแถวก่อน (<code>=H11+G11+E11</code>) → เป็นการไล่เวลาสะสมแบบต่อเนื่อง</li>
+    <li>เส้นแดง = Takt Time · เส้นน้ำเงิน = Cycle Time</li>
+    <li>Rule 1: เครื่องล้นเกิน Takt → ตัดจบแล้ววนกลับเริ่มที่ 0 ในบรรทัดเดิม</li>
+    <li>Rule 2: Cycle &lt; Takt → แสดงลูกศรรอ พร้อมตัวเลขวินาทีที่ต้องรอ</li>
+    <li>Rule 3: เครื่อง 2 เครื่องเริ่มพร้อมกัน → วาดเส้นคู่ขนาน ไม่ให้ทับกัน</li>
+  </ul>
+
+  <h3>M5 — Yamazumi</h3>
+  <ul>
+    <li>แท่งฐาน = <b>Min</b> จาก M1 · ส่วนทับด้านบน = <b>Max</b> · จุดกลางแท่ง = <b>Average</b></li>
+    <li>เส้นแดงแนวนอน = Takt Time Benchmark</li>
+    <li>แถบบนสุดแยกลาย: งานทำเป็นรอบ (Periodical) = ลายทแยง · เวลาเปลี่ยนรุ่น (Changeover) = ลายตาราง</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="kaizen">
+  <h2><span class="num">6</span> Kaizen Loop และหน้าสรุป Before / After</h2>
+  <p class="lead">ตอบคำถามที่ถามไว้: <b>ใช่ครับ — ทำไคเซ็นแล้วต้องจับเวลาใหม่เสมอ</b> ไม่งั้นจะพิสูจน์ไม่ได้ว่าดีขึ้นจริง</p>
+
+  <h3>วงจรที่ระบบต้องรองรับ</h3>
+  <div class="flow">
+    <div class="node src">1. วัดเวลา<br><span style="font-weight:500;font-size:11.5px">M1</span></div>
+    <div class="arrow">→</div>
+    <div class="node">2. วิเคราะห์<br><span style="font-weight:500;font-size:11.5px">M2–M5</span></div>
+    <div class="arrow">→</div>
+    <div class="node">3. ไคเซ็น<br><span style="font-weight:500;font-size:11.5px">M6</span></div>
+    <div class="arrow">→</div>
+    <div class="node">4. <b>วัดเวลาใหม่</b><br><span style="font-weight:500;font-size:11.5px">M1 (Rev ใหม่)</span></div>
+    <div class="arrow">→</div>
+    <div class="node">5. เทียบ Before/After<br><span style="font-weight:500;font-size:11.5px">M6</span></div>
+  </div>
+
+  <h3>สิ่งที่ต้องเพิ่มในระบบเพื่อให้วงจรนี้ทำงานได้</h3>
+  <ul>
+    <li><b>Revision Snapshot</b> — ตอนกด "ปิด Revision" ระบบเก็บภาพนิ่งของข้อมูล M1–M5 ทั้งชุดไว้ (Rev.01, Rev.02, …) ไม่ใช่แค่เปลี่ยนเลข Rev แบบตอนนี้</li>
+    <li><b>หน้าสรุป Before/After</b> — เลือก 2 Revision มาเทียบกัน แสดง:
+      <ul>
+        <li>Cycle Time ก่อน/หลัง + % ที่ลดลง</li>
+        <li>จำนวนคนที่ใช้ ก่อน/หลัง</li>
+        <li>ระยะเดิน / เวลารอ ก่อนหลัง</li>
+        <li>กำลังการผลิตต่อกะ ก่อน/หลัง</li>
+        <li>กราฟ Yamazumi ซ้อนทับ ก่อน–หลัง</li>
+      </ul>
+    </li>
+    <li><b>ใบ Kaizen</b> ตามฟอร์มชีต <code>kaizen</code>: ช่อง BEFORE / AFTER, Problem, รายการมาตรการ, ผู้รับผิดชอบ, กำหนดเสร็จ</li>
+    <li><b>Export</b> หน้าสรุปเป็น PNG/PDF เพื่อใช้นำเสนอในกิจกรรมไคเซ็น</li>
+  </ul>
+
+  <div class="note">
+    <p><b>เหตุผลเชิง TPS:</b> การไคเซ็นที่ไม่ตั้งอยู่บนมาตรฐานที่วัดได้ จะกลายเป็นการ "เปลี่ยนวิธีทำงาน" เฉยๆ ไม่ใช่การปรับปรุง — ระบบจึงต้องบังคับให้ทุกไคเซ็นมีข้อมูลเวลา<b>ก่อน</b>และ<b>หลัง</b>เสมอ</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="roadmap">
+  <h2><span class="num">7</span> Roadmap</h2>
+  <p class="lead">ทำทีละเฟส ทดสอบผ่านแล้วค่อยขยับ — แต่ละเฟสจบด้วยการ commit + push + อัปเดตแผนนี้</p>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-done">เสร็จแล้ว</span></div>
+    <div class="body">
+      <h4>Phase 0 · วางแผนและจัดบ้าน</h4>
+      <p>จัดโครงสร้างโฟลเดอร์ · แก้ tooltip ชื่อไฟล์ใน Sidebar · อ่าน PDF 13 หน้า + แกะสูตร Excel · สร้างแผนแม่บทฉบับนี้</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
+    <div class="body">
+      <h4>Phase 1 · M1 ตารางจับเวลา (หัวใจของงาน)</h4>
+      <p>ถอดนาฬิกาจับเวลาออก เปลี่ยนเป็นตาราง key-in ตามฟอร์มจริง</p>
+      <ul>
+        <li>ตาราง: Seq · Job Element · ประเภท(คน/เครื่อง/เดิน) · 1st–10th · Min · Max · Fluc · Aver</li>
+        <li>แถวเครื่องจักรไฮไลต์สีเหลืองและถูกหักออกจาก TOTAL ตามสูตร Excel</li>
+        <li>สลับจำนวนรอบ 5 / 10 คอลัมน์ได้</li>
+        <li>รองรับวางทับ (paste) จาก Excel ทั้งบล็อกทีเดียว</li>
+        <li>ปุ่ม "ส่งข้อมูลไป M2–M5" พร้อมกล่องยืนยัน</li>
+        <li>ไฟล์เก่าที่มีข้อมูล laps ต้องเปิดได้ไม่พัง</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="body">
+      <h4>Phase 2 · M2 ความสามารถกระบวนการ</h4>
+      <p>ตารางเครื่องจักร + Completion Time + Capacity/กะ + Donut % + Bottleneck Alert เทียบ Takt <b>(ต้องยืนยันสูตร 39×8.66 ก่อนเริ่ม)</b></p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="body">
+      <h4>Phase 3 · M3 ตารางงานมาตรฐานผสม</h4>
+      <p>กราฟแกนเวลา SVG: เส้นทึบ=คน · เส้นประ=เครื่อง · เส้นคลื่น=เดิน · เส้นแดง Takt · เส้นน้ำเงิน Cycle · Rule 1/2/3 · ลูกศรแสดงเวลารอ</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="body">
+      <h4>Phase 4 · M5 Yamazumi ฉบับสมบูรณ์</h4>
+      <p>เปลี่ยนฐานเป็น Min จาก M1 · ทับ Max · จุด Avg · เส้น Takt · แถบ Periodical/Changeover · Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="body">
+      <h4>Phase 5 · M6 Kaizen + Before/After</h4>
+      <p>ใบ Kaizen · Revision Snapshot · หน้าสรุปเทียบก่อน–หลังข้ามโมดูล · Export PNG/PDF</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="body">
+      <h4>Phase 6 · M4 งานเสริม</h4>
+      <p><b>ยังไม่แตะตามที่สั่ง</b> — เมื่อถึงคิวจะเพิ่ม Symbol Library (◇ ตรวจคุณภาพ · ✚ ความปลอดภัย · ⊕ งานค้างมาตรฐาน · ↓ รอคอย · ∿ เดิน) พร้อม tooltip และเส้นทางเดินอัตโนมัติ</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="tag"><span class="b b-todo">อนาคต</span></div>
+    <div class="body">
+      <h4>Phase 7+ · ขยายเป็น TPS Activity 4M</h4>
+      <p>ดูหัวข้อถัดไป</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="tps4m">
+  <h2><span class="num">8</span> แผนอนาคต — Web TPS Activity ครบ 4M</h2>
+  <p class="lead">ต่อยอดจากฐานงานมาตรฐาน ขยายเป็นศูนย์กลางกิจกรรมปรับปรุงของทั้งสายการผลิต</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>🧱 Material — วัสดุ</h4>
+      <div class="jp">การไหลของของและข้อมูล</div>
+      <p>• MIFC / Value Stream Map (มีชีตอยู่แล้วในไฟล์ Excel)<br>
+         • ระบบคัมบัง + จุดสั่งซื้อ<br>
+         • งานค้างมาตรฐาน (Standard WIP) ต่อสถานี<br>
+         • Plan For Every Part (PFEP)<br>
+         • เส้นทางรถส่งของ (Mizusumashi)</p>
+    </div>
+    <div class="card">
+      <h4>👤 Man — คน</h4>
+      <div class="jp">ทักษะและภาระงาน</div>
+      <p>• ตารางทักษะพนักงาน (Skill Matrix / ILUO)<br>
+         • แผนฝึกอบรมและ OJT<br>
+         • ภาระงานต่อคน (ต่อยอดจาก M5)<br>
+         • ข้อเสนอไคเซ็นจากพนักงาน (Suggestion)<br>
+         • การหมุนเวียนงานและ Multi-skill</p>
+    </div>
+    <div class="card">
+      <h4>⚙️ Method — วิธีการ</h4>
+      <div class="jp">ฐานที่กำลังสร้างอยู่</div>
+      <p>• งานมาตรฐาน M1–M4 <span class="b b-plan">กำลังทำ</span><br>
+         • ใบ Kaizen M6 <span class="b b-plan">อยู่ในแผน</span><br>
+         • คู่มือปฏิบัติงาน (SOP/WI) พร้อมรูป<br>
+         • Poka-Yoke และจุดควบคุมคุณภาพ<br>
+         • SMED ลดเวลาเปลี่ยนรุ่น</p>
+    </div>
+    <div class="card">
+      <h4>📊 Management — การบริหาร</h4>
+      <div class="jp">ควบคุมและติดตาม</div>
+      <p>• กระดานควบคุมประจำวัน (Daily Control)<br>
+         • KPI: OEE · Productivity · คุณภาพ<br>
+         • ตรวจติดตามงานมาตรฐาน (Layered Audit)<br>
+         • แก้ปัญหาแบบ A3 / 5 Why<br>
+         • ติดตามผลไคเซ็นสะสมทั้งปี</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <p><b>ข้อเสนอลำดับการทำ:</b> ทำเสา <b>Method ให้จบก่อน</b> (Phase 1–6) เพราะเป็นฐานข้อมูลที่เสาอื่นต้องใช้ → ต่อด้วย <b>Man</b> (ต่อยอดจาก M5 ได้ทันที ข้อมูลพร้อมแล้ว) → <b>Material</b> (MIFC มีต้นแบบใน Excel) → ปิดท้ายด้วย <b>Management</b> ที่ดึงข้อมูลจากทั้ง 3 เสามาสรุป</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="rules">
+  <h2><span class="num">9</span> กติกาการทำงานของแผนนี้</h2>
+
+  <div class="stop">
+    <p><b>กฎเหล็ก:</b> ห้ามอัปเดตแผนแม่บทฉบับนี้ก่อนที่โค้ดจะผ่านการทดสอบจริง</p>
+  </div>
+
+  <p>ลำดับที่ต้องทำทุกครั้งที่แก้โค้ด:</p>
+  <ol>
+    <li>แก้โค้ด</li>
+    <li><b>Debug จริง</b> — <code>npm run build</code> ผ่าน · <code>npm test</code> ผ่าน · เปิด dev server ทดสอบหน้าจอจริงและอ่าน console ว่าไม่มี error</li>
+    <li>ถ้าทดสอบไม่ผ่าน → แก้ให้ผ่านก่อน <b>ห้ามข้ามไปขั้นถัดไป</b></li>
+    <li>เมื่อผ่านครบแล้ว → อัปเดตแผนนี้ (สถานะโมดูล · Roadmap · Change Log ท้ายเอกสาร)</li>
+    <li>อัปเดต <code>CHANGELOG_AI.md</code></li>
+    <li><code>git commit</code> + <code>git push</code></li>
+  </ol>
+
+  <p>เอกสารอ้างอิงของโปรเจกต์:</p>
+  <ul>
+    <li><code>PROJECT_CONTEXT.md</code> — ความจำโปรเจกต์ กฎการทำงาน โครงสร้างไฟล์</li>
+    <li><code>CHANGELOG_AI.md</code> — บันทึกงานทุก session</li>
+    <li><code>docs/Master_Plan.html</code> — เอกสารฉบับนี้ (ภาพรวมและทิศทาง)</li>
+    <li><code>Docs_StandardWork_Reference/</code> — ไฟล์ต้นฉบับ Excel และ PDF blueprint</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="decisions">
+  <h2><span class="num">10</span> Decision Log — สิ่งที่ตัดสินใจแล้ว</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:12%">วันที่</th><th style="width:30%">เรื่อง</th><th>มติ</th></tr></thead>
+    <tbody>
+      <tr><td>31 ก.ค. 69</td><td>M1 เป็นนาฬิกาจับเวลาหรือตาราง</td><td><b>ตาราง key-in</b> — ถอดนาฬิกาออกจาก WebApp ทั้งหมด (การจับเวลาใช้นาฬิกาจริงหน้างาน)</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>วิธีส่งข้อมูล M1 → M2-M5</td><td><b>กดปุ่มส่งเองก่อน</b> · เก็บ Auto Sync ไว้ในแผนสำหรับอนาคต</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>ยุบรวม M3 กับ M4 ไหม</td><td><b>ไม่ยุบ</b> — คนละแกน (เวลา vs พื้นที่) และเป็นเอกสาร TPS คนละใบ ให้เชื่อมข้อมูลกันแทน</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>ชีต kaizen ไปอยู่ไหน</td><td><b>M6 แยกต่างหาก</b> เพราะ M3/M4 ไม่ได้ยุบรวมกัน จึงมีที่ว่างพอดีตาม 6 ชีตใน Excel</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>M4 รอบนี้</td><td><b>ไม่แตะ</b> ตามที่สั่ง — งานเสริมเลื่อนไป Phase 6</td></tr>
+      <tr><td>31 ก.ค. 69</td><td>ทิศทางระยะยาว</td><td>ขยายเป็น <b>Web TPS Activity ครบ 4M</b> (Material · Man · Method · Management)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="open">
+  <h2><span class="num">11</span> คำถามที่ยังค้าง — ต้องได้คำตอบก่อนถึงเฟสนั้น</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:10%">เฟส</th><th style="width:34%">คำถาม</th><th>ทำไมต้องรู้</th></tr></thead>
+    <tbody>
+      <tr><td><b>1</b></td><td>ตารางจับเวลาต้องแยกตาม "คน" ด้วยไหม (Worker A/B/C) หรือ 1 ตาราง = 1 กระบวนการ ตามฟอร์ม Excel</td><td>กระทบโครงสร้างข้อมูลและการส่งต่อไป M5 ที่ต้องรู้ว่างานไหนของใคร</td></tr>
+      <tr><td><b>1</b></td><td>ต้องรองรับกี่แถวสูงสุด (ฟอร์มเปล่ามี 30 แถว ของจริงใช้ 37 แถว)</td><td>ออกแบบ UI ให้ scroll และพิมพ์ออกมาได้พอดีหน้า</td></tr>
+      <tr><td><b>2</b></td><td><b>เลข 39 และ 8.66 ในสูตร <code>=39*8.66</code> คืออะไร</b></td><td>เป็นสูตรกำลังการผลิตหลักของ M2 — เดาไม่ได้</td></tr>
+      <tr><td><b>2</b></td><td>เวลาทำงาน 1 กะของโรงงานคือกี่นาที (หักพักแล้ว)</td><td>ตัวหารของสูตร Capacity และใช้คำนวณ Takt Time</td></tr>
+      <tr><td><b>5</b></td><td>Revision ปัจจุบันใช้แบบพิมพ์เลขเอง — ต้องการให้ระบบล็อกและเก็บ snapshot อัตโนมัติไหม</td><td>กระทบการเทียบ Before/After ว่าจะเทียบได้จริงหรือไม่</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section id="changelog">
+  <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>1.0</b></td><td>31 ก.ค. 2569</td><td><code>dbb941d</code></td>
+        <td>สร้างแผนแม่บทฉบับแรก — วิเคราะห์ PDF 13 หน้า + แกะสูตรจาก Excel 2 ไฟล์ · ยืนยันว่า M1 ตีความผิดเป็นนาฬิกาจับเวลา · เทียบ M3 กับ M4 ตามหลัก TPS · เพิ่ม M6 Kaizen · วางแผน TPS Activity 4M</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  Master Plan — TPS Digital Activity WebApp · ซัมมิท โอโตซีท อินดัสตรี จำกัด<br>
+  อัปเดตทุกครั้งที่มีการแก้ไขโค้ดและผ่านการทดสอบแล้วเท่านั้น
+</footer>
+
+</div>
+</body>
+</html>

@@ -47,6 +47,7 @@ Project memory / documentation:
 - `PROJECT_CONTEXT.md`: shared project memory and working rules for all AI tools.
 - `CHANGELOG_AI.md`: AI work log. Update after every AI-assisted session.
 - `README.md`: repository readme.
+- `docs/Master_Plan.html`: **แผนแม่บท** — vision, TPS module mapping, roadmap, decision log, open questions. Read this before starting any module work.
 - `docs/User_Manual.html`: user-facing manual/reference.
 - `docs/Deployment_Checklist.md`: deployment steps and pre-deploy checks.
 - `docs/Codex_Multi_Device_Blueprint.md`: older multi-device guidance; appears mojibake/encoding-corrupted, so use `PROJECT_CONTEXT.md` as the current clean source of truth.
@@ -86,6 +87,7 @@ folders stay at the root; every human-readable document lives under `docs/` (pro
 |-- CHANGELOG_AI.md               # AI work log (must stay at root)
 |-- README.md
 |-- docs/                         # project documentation
+|   |-- Master_Plan.html          # roadmap / decisions / open questions
 |   |-- User_Manual.html
 |   |-- Deployment_Checklist.md
 |   `-- Codex_Multi_Device_Blueprint.md
@@ -223,6 +225,9 @@ Cloudflare/D1 deployment details live in:
 ## Important Working Rules
 
 - Every AI must read `PROJECT_CONTEXT.md` and `CHANGELOG_AI.md` before starting code changes.
+- For any work on modules M1-M6, also read `docs/Master_Plan.html` first — it holds the agreed scope, the TPS reasoning behind each module, the decision log, and the questions that must be answered before a phase starts.
+- **Master Plan update rule (user requirement, 2026-07-31):** update `docs/Master_Plan.html` only AFTER the change has been verified for real — `npm run build` passes, `npm test` passes, and the screen was exercised in a running dev server with no console errors. Never update the plan on the strength of "the code looks right". Order: fix code -> verify -> update Master Plan -> update CHANGELOG_AI.md -> commit -> push.
+- Module 1 is a key-in time-measurement table, not a stopwatch. The stopwatch UI was a misreading of the blueprint slide; timing is done with a real stopwatch on the shop floor and the readings are typed in.
 - Always inspect real files from disk before patching.
 - Do not rely on chat history alone.
 - Avoid having multiple AI tools edit the same file at the same time.

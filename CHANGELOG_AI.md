@@ -357,3 +357,63 @@ Sidebar "Project Files" tree แสดงชื่อโฟลเดอร์/�
   `.next/`, `out/`, `node_modules/`, `_Backup_scratch_OneDriveMigration_20260719/`, `tsconfig.tsbuildinfo`
 - error ของ eslint ที่เหลือ 7 ข้อยังไม่ได้แก้ ถือเป็นงานแยกรอบ (โดยเฉพาะ
   `StepTable.tsx` ที่เรียก `useCallback` แบบมีเงื่อนไข = ผิดกติกา React Hooks จริง ควรแก้)
+
+## 2026-07-31 (Update 3)
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+อ่าน blueprint PDF และไฟล์ Excel ต้นฉบับอย่างละเอียด เพื่อตรวจสอบว่า Module M1-M5 ตรงกับเอกสารจริงหรือไม่
+แล้วจัดทำแผนแม่บท (Master Plan) เป็น HTML ให้ผู้ใช้อนุมัติ — **รอบนี้ยังไม่แก้โค้ดแอป**
+
+### Completed
+
+- **อ่าน `Antigravity_WebApp_Development_Blueprint_(2).pdf` ครบ 13 หน้า**
+  - PDF เป็นสไลด์แบบรูปภาพ ไม่มี text layer และเครื่องนี้ไม่มี poppler/python
+  - เขียน Node script แปลง image XObject (FlateDecode + PNG predictor 15) เป็นไฟล์ PNG โดยห่อ deflate stream
+    เข้า IDAT chunk ตรงๆ แล้วอ่านทีละหน้า (script อยู่ใน scratchpad ไม่ได้ commit)
+- **แกะสูตรจาก Excel** (unzip xlsx แล้วอ่าน sheet XML ด้วย Node)
+  - `3 TEN SET Line SUV_Rev.01.xlsx` (32 ชีต) และ `แบบฟอร์มตารางจับเวลา 1.xlsx` (6 ชีต)
+  - ชีต `JOB_C CAP_1`: `Min=MIN(C:G)`, `Max=MAX(C:G)`, `Aver=AVERAGE(C:G)`,
+    `TOTAL=SUM(C8:C44)-C25` → **ยอดรวมหักแถวเครื่องจักรออก**
+  - ชีต `Machine Capacity Sheet`: `Completion Time = SUM(Basic Time:Auto Time)`
+  - ชีต `std.com table`: คอลัมน์ คน/เครื่อง/เดิน + เวลาสะสม `=H11+G11+E11`
+  - ชีต `kaizen`: มีบล็อก BEFORE/AFTER + Problem + มาตรการ + ผู้รับผิดชอบ จริง
+  - มีชีต `MIFC 1`, `MIFC 2` (Material & Information Flow Chart) อยู่แล้ว
+- **ยืนยันว่า M1 ตีความผิดจริง**: สไลด์วาดเป็น iPad ปุ่ม LAP แต่ชื่อโมดูลคือ "ตารางจับเวลา"
+  และฟอร์ม Excel เป็นตาราง key-in → นาฬิกาจับเวลาไม่ควรอยู่ใน WebApp
+- **วิเคราะห์ M3 vs M4 ตามหลัก TPS**: M3 = แกนเวลา (Standardized Work Combination Table),
+  M4 = แกนพื้นที่ (Standardized Work Chart) → **ไม่ควรยุบรวม** เป็นเอกสารคนละใบในระบบ TPS
+  ผลคือ kaizen ไม่ต้องเบียดเข้า M5 แต่แยกเป็น M6
+- **สร้าง `docs/Master_Plan.html`** — แผนแม่บท 13 หัวข้อ: วิสัยทัศน์ / หลักการ TPS / M3-M4 /
+  สถานะโมดูล / สถาปัตยกรรมข้อมูล / สูตรมาตรฐาน / Kaizen loop + Before-After /
+  Roadmap 8 เฟส / TPS Activity 4M / กติกาการทำงาน / Decision log / คำถามค้าง / Change log
+- **`PROJECT_CONTEXT.md`**: เพิ่ม Master_Plan.html เข้า Important Files + Folder Structure
+  และเพิ่มกติกา 2 ข้อ (Master Plan update rule, M1 เป็นตารางไม่ใช่นาฬิกา)
+
+### Files Added / Changed
+
+- `docs/Master_Plan.html` (ใหม่)
+- `PROJECT_CONTEXT.md`
+- `CHANGELOG_AI.md`
+- ไม่มีการแก้ไฟล์โค้ดแอปในรอบนี้
+
+### Verification
+
+- เปิด `docs/Master_Plan.html` ใน browser จริง ตรวจ DOM: section ครบ 13 หัวข้อ,
+  ลิงก์สารบัญไม่มีอันไหนเสีย (0 broken anchors), badge ทุกอันมี class ถูกต้อง,
+  ไม่มี horizontal overflow ทั้งจอ desktop (1280px) และ mobile (375px),
+  ตารางทุกอันอยู่ใน container ที่ scroll แนวนอนได้
+
+### Notes / Risks
+
+- **กติกาใหม่จากผู้ใช้**: อัปเดต `docs/Master_Plan.html` ได้ก็ต่อเมื่อโค้ดผ่านการทดสอบจริงแล้วเท่านั้น
+  (build + test + เปิดหน้าจอจริงไม่มี error) ห้ามอัปเดตแผนจากโค้ดที่ยังไม่ได้ทดสอบ
+- **คำถามค้างที่ต้องได้คำตอบก่อนเริ่ม Phase 2**: สูตร `=39*8.66` ในชีต Machine Capacity
+  ยังไม่ทราบที่มาของเลข 39 และ 8.66 และยังไม่ทราบเวลาทำงาน 1 กะ (หักพักแล้ว) ของโรงงาน
+- ในระบบนี้ไม่มี skill ของ Toyota Production System ติดตั้งอยู่ (ตามที่ผู้ใช้ขอให้ใช้)
+  จึงวิเคราะห์ด้วยความรู้ TPS ตรงๆ แทน
+- M4 ไม่ถูกแตะต้องตามคำสั่งผู้ใช้ — งานเสริมเลื่อนไป Phase 6
