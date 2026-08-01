@@ -45,3 +45,6 @@ next-env.d.ts
 
 # local-only backup from OneDrive migration (forensic recovery data, not for GitHub)
 /_Backup_scratch_OneDriveMigration_20260719/
+
+# Office temporary lock files (created while a workbook is open)
+~$*
