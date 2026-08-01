@@ -10,6 +10,7 @@ import SummaryTable from '@/components/editor/SummaryTable';
 import LayoutDiagram from '@/components/layout-diagram/LayoutDiagram';
 import Module1_TimeMeasurement from '@/components/modules/Module1_TimeMeasurement';
 import Module2_MachineCapacity from '@/components/modules/Module2_MachineCapacity';
+import Module3_CombinationTable from '@/components/modules/Module3_CombinationTable';
 import Module5_YamazumiChart from '@/components/modules/Module5_YamazumiChart';
 
 export default function EditorPage() {
@@ -108,17 +109,8 @@ export default function EditorPage() {
 
               {activeModule === 1 && <Module1_TimeMeasurement />}
               {activeModule === 2 && <Module2_MachineCapacity />}
+              {activeModule === 3 && <Module3_CombinationTable />}
               {activeModule === 5 && <Module5_YamazumiChart />}
-
-              {activeModule === 3 && (
-                <div className="w-full h-64 bg-white rounded-xl shadow-sm border border-dashed border-slate-300 flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-4xl block mb-2 opacity-50">🚧</span>
-                    <h3 className="text-slate-700 font-bold">Module {activeModule}</h3>
-                    <p className="text-slate-500 text-sm mt-1">This module is part of upcoming sprints.</p>
-                  </div>
-                </div>
-              )}
 
               {/* ── Approval section ───────────────────────────────── */}
               <div className="rounded-xl shadow-md border border-slate-200 p-4 bg-white">

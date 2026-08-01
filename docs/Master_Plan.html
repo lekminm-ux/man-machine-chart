@@ -144,11 +144,11 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.3</div>
+      <div><b>Version</b>1.4</div>
       <div><b>Updated</b>1 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>880236c</div>
-      <div><b>Status</b>Phase 1-2 เสร็จ + ขึ้น production แล้ว · ถัดไป Phase 3</div>
+      <div><b>Baseline commit</b>23b3264</div>
+      <div><b>Status</b>Phase 1-3 เสร็จ + ขึ้น production แล้ว · ถัดไป Phase 4</div>
     </div>
   </div>
 </header>
@@ -324,9 +324,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td>งานต่อยอด: เทียบ Before/After ตอนทำไคเซ็น</td>
       </tr>
       <tr>
-        <td><b>M3</b></td><td><span class="b b-todo">ยังว่าง</span></td>
-        <td>หน้าจอ placeholder 🚧</td>
-        <td>สร้างใหม่ทั้งหมด: กราฟ Gantt แกนเวลา + เส้น Takt/Cycle + Rule 1/2/3</td>
+        <td><b>M3</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
+        <td>กราฟ SVG แกนเวลา: เส้นทึบ=คน · เส้นประ=เครื่อง · เส้นคลื่น=เดิน · เส้นแดง Takt · เส้นน้ำเงิน Cycle · Rule 1 วนกลับเมื่อเกิน Takt · Rule 2 แสดงเวลารอรายคน · Rule 3 เครื่องขนานกันคนละแถว · Takt ดึงจาก M2 อัตโนมัติหรือกรอกเอง</td>
+        <td>งานต่อยอด: คลิกแถบใน M3 แล้วไฮไลต์ตำแหน่งใน M4</td>
       </tr>
       <tr>
         <td><b>M4</b></td><td><span class="b b-done">ใช้งานได้ — ยังไม่แตะ</span></td>
@@ -538,15 +538,24 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
+    <div class="tag"><span class="b b-done">เสร็จแล้ว</span></div>
     <div class="body">
       <h4>Phase 3 · M3 ตารางงานมาตรฐานผสม</h4>
-      <p>กราฟแกนเวลา SVG: เส้นทึบ=คน · เส้นประ=เครื่อง · เส้นคลื่น=เดิน · เส้นแดง Takt · เส้นน้ำเงิน Cycle · Rule 1/2/3 · ลูกศรแสดงเวลารอ</p>
+      <p>กราฟแกนเวลา SVG วาดจากข้อมูล M1 โดยตรง — ทดสอบผ่านแล้ว</p>
+      <ul>
+        <li>✅ เส้นทึบ = คนทำงาน · เส้นประ = เครื่องทำงานเอง · เส้นคลื่น = เดิน</li>
+        <li>✅ เส้นแดง Takt Time (ดึงจาก M2 อัตโนมัติ กรอกทับเองได้ และกดกลับไปใช้ค่า M2 ได้)</li>
+        <li>✅ เส้นน้ำเงิน Cycle Time</li>
+        <li>✅ <b>Rule 1</b> — แถบที่ยาวเกิน Takt ถูกตัดที่เส้นแดงแล้ววนกลับไปเริ่มที่ 0 พร้อมสัญลักษณ์ ↩</li>
+        <li>✅ <b>Rule 2</b> — แสดงเวลารอของแต่ละคนจนถึง Takt และเตือนเมื่อใครเกิน Takt</li>
+        <li>✅ <b>Rule 3</b> — เครื่องที่ทำงานพร้อมกันอยู่คนละแถวอยู่แล้ว เส้นไม่ทับกัน</li>
+        <li>✅ โมเดลเวลา: คนแต่ละคนมีนาฬิกาของตัวเอง ส่วนเครื่องเริ่มนับเมื่องานก่อนหน้าจบ (คนโหลดเสร็จ) แล้วทำงานขนานไป โดยไม่ดันนาฬิกาของคน</li>
+      </ul>
     </div>
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-todo">รอคิว</span></div>
+    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
     <div class="body">
       <h4>Phase 4 · M5 Yamazumi ฉบับสมบูรณ์</h4>
       <p>เปลี่ยนฐานเป็น Min จาก M1 · ทับ Max · จุด Avg · เส้น Takt · แถบ Periodical/Changeover · Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล</p>
@@ -713,6 +722,18 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.4</b></td><td>1 ส.ค. 2569</td><td><code>23b3264</code> → Phase 3</td>
+        <td>
+          <b>Phase 3 เสร็จ — M3 ตารางงานมาตรฐานผสม</b> วาดกราฟ SVG แกนเวลาจากข้อมูล M1<br>
+          <b>ทดสอบ:</b> 69/69 ผ่าน (เพิ่มเทสต์ M3 17 ข้อ) · <code>tsc</code> clean · eslint สะอาด · build ผ่าน ·
+          ทดสอบบน dev server: Takt 460 วิ ดึงจาก M2 ถูกต้อง · Worker A 235 วิ (65+150+20) รอ 225 ·
+          Worker B 255 วิ รอ 205 · เครื่อง 385 วิ → Cycle Time 385 ·
+          ปรับ Takt เป็น 300 → สถานะเปลี่ยนเป็น "เกิน Takt" มีสัญลักษณ์วนกลับ 1 จุด
+          เครื่องเกิน Takt 85.00 วิ และเวลารอปรับเป็น 65 / 45 ถูกต้องทุกค่า ·
+          deploy แล้วเปิดเว็บจริงยืนยัน
+        </td>
+      </tr>
       <tr>
         <td><b>1.3</b></td><td>1 ส.ค. 2569</td><td><code>880236c</code> → Phase 2</td>
         <td>
