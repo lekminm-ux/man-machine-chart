@@ -542,3 +542,62 @@ Time Measurement Sheet และเชื่อมข้อมูลกับ M4
   เพราะอยู่นอกขอบเขตที่ขอ ถ้าเพิ่มจะสั่ง deploy ได้สั้นลงและไม่มี warning
 - `curl` บนเครื่องนี้ fail ด้วย TLS revocation error (`CRYPT_E_NO_REVOCATION_CHECK`)
   ทำให้สคริปต์ polling ที่ใช้ curl รายงานผลเชื่อไม่ได้ — ให้ตรวจผ่าน browser tool แทน
+
+## 2026-08-01 (Update 2)
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+เพิ่มปุ่ม Insert แทรกแถวใน M1 ให้เหมือน M4 · เอาโลโก้ Antigravity ออก ·
+และยกระดับกฎ deploy ให้เป็นขั้นตอนบังคับใน checklist ท้าย session
+
+### Completed
+
+- **`Module1_TimeMeasurement.tsx`**: เพิ่มคอลัมน์ **Insert** พร้อมปุ่ม `+▲` / `+▼`
+  (หน้าตาและตำแหน่งเดียวกับ M4)
+  - `insertRow(index, 'above' | 'below')` แทรกแถวเปล่าแล้ว renumber Seq ใหม่ทั้งตาราง
+  - แถวใหม่รับค่า Worker จากแถวข้างเคียง เพื่อลดการคลิกเวลากรอกงานของคนเดิมติดกันยาวๆ
+  - แก้ `colSpan` ของ empty state (`readingCount + 9` → `+10`) และของแถว TOTAL (`4` → `5`)
+    ให้ตรงกับจำนวนคอลัมน์ที่เพิ่มขึ้น
+- **`TopBar.tsx`**: ลบบล็อกโลโก้ "A / Antigravity / Full System" ออกจากแถบบนสุด
+  และเอาเส้นคั่น `border-l` ของ breadcrumb ออกเพราะกลายเป็นอิลิเมนต์แรกแล้ว
+- **`PROJECT_CONTEXT.md`**: เขียนหัวข้อ Important Working Rules ใหม่ เพิ่ม
+  **Mandatory end-of-session checklist 6 ขั้น** โดยใส่ **Deploy เป็นขั้นที่ 3**
+  และ "ทวนสอบตัวเลขข้ามโมดูล" เป็นขั้นที่ 2 พร้อมเหตุผลว่าทำไมข้ามไม่ได้
+  รวมถึงบันทึกว่า `curl` บนเครื่องนี้ fail TLS revocation จึงห้ามใช้ตรวจ deploy
+- **`docs/Master_Plan.html` → v1.2**: เพิ่ม Deploy เข้าไปในลำดับกติกา (จาก 6 ขั้นเป็น 8 ขั้น)
+  พร้อมกล่องเตือนว่างานที่ commit แต่ไม่ deploy จะดูเหมือนไม่มีอะไรเกิดขึ้น
+
+### Files Added / Changed
+
+- `src/components/modules/Module1_TimeMeasurement.tsx`
+- `src/components/layout/TopBar.tsx`
+- `PROJECT_CONTEXT.md`
+- `docs/Master_Plan.html`
+- `CHANGELOG_AI.md`
+
+### Verification
+
+- `npm test` → 37/37 ผ่าน · `npx tsc --noEmit` ไม่มี error · `npm run build` ผ่าน
+- `npx eslint` ไฟล์ที่แก้: ไม่มี error ใหม่ (เหลือของเดิมใน TopBar เรื่อง `withPatchedStylesheets`)
+- **ทดสอบบน dev server จริง**:
+  - แทรกแถวด้านบนแถวที่ 2 → แถวเปล่าเข้าที่ตำแหน่ง 2 และ Seq เรียงใหม่เป็น 1-4 ถูกต้อง
+  - แทรกด้านล่างแถวสุดท้าย → ได้แถวที่ 5 ถูกต้อง
+  - แถวใหม่รับ Worker จากแถวข้างเคียงตามที่ออกแบบ
+  - TOTAL ยังคำนวณถูกหลังแทรก: 216.00 (65 + 151, ตัดแถวเครื่อง 450 ออก)
+  - โลโก้หายจาก header แล้ว (header เริ่มด้วยชื่อไฟล์)
+  - console ไม่มี error
+- **Deploy ขึ้น production แล้ว** (`wrangler pages deploy` อัปโหลด 55 ไฟล์) และเปิดเว็บจริงตรวจซ้ำ:
+  โลโก้หายไปแล้ว และหัวตาราง M1 มีคอลัมน์ `Insert` ขึ้นจริง
+- ตรวจ `Master_Plan.html` ด้วย tag-balance checker: 0 unclosed, 0 mismatch, 13 sections
+- ล้างข้อมูลทดสอบใน localStorage แล้ว
+
+### Notes / Risks
+
+- ยังเหลือคำว่า "Antigravity" อีก 2 จุดที่ **ไม่ได้แตะ** เพราะผู้ใช้ระบุเฉพาะโลโก้:
+  ข้อความตอนโหลด `Loading Antigravity System…` (`src/app/editor/page.tsx:31`)
+  และบรรทัดใต้ชื่อโมดูล `ANTIGRAVITY FULL SYSTEM` (`src/app/editor/page.tsx:77`)
+- ต้นเหตุ Cloudflare auto-deploy ยังไม่ได้แก้ ต้องเข้า Dashboard ตรวจ Git integration

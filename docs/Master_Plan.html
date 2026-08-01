@@ -144,11 +144,11 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.1</div>
-      <div><b>Updated</b>31 ก.ค. 2569</div>
+      <div><b>Version</b>1.2</div>
+      <div><b>Updated</b>1 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>e779f07</div>
-      <div><b>Status</b>Phase 1 เสร็จแล้ว · ถัดไป Phase 2</div>
+      <div><b>Baseline commit</b>a100224</div>
+      <div><b>Status</b>Phase 1 เสร็จ + ขึ้น production แล้ว · ถัดไป Phase 2</div>
     </div>
   </div>
 </header>
@@ -315,7 +315,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <tbody>
       <tr>
         <td><b>M1</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
-        <td>ตาราง key-in ตามฟอร์ม Excel: Seq · Job Element · Worker · ประเภท(คน/เครื่อง/เดิน/รอ) · 1st–10th · Min/Max/Fluc/Aver · TOTAL หักแถวเครื่อง · เพิ่มแถวไม่จำกัด · วางจาก Excel ได้ · ปุ่มดึงจาก M4 และส่งไป M2–M5</td>
+        <td>ตาราง key-in ตามฟอร์ม Excel: Seq · <b>Insert (แทรกแถวบน/ล่าง)</b> · Job Element · Worker · ประเภท(คน/เครื่อง/เดิน/รอ) · 1st–10th · Min/Max/Fluc/Aver · TOTAL หักแถวเครื่อง · เพิ่มแถวไม่จำกัด · วางจาก Excel ได้ · ปุ่มดึงจาก M4 และส่งไป M2–M5</td>
         <td>— (นาฬิกาจับเวลาถูกถอดออกแล้ว) งานต่อยอด: เชื่อม Takt Time และพิมพ์ฟอร์มลงกระดาษ</td>
       </tr>
       <tr>
@@ -506,6 +506,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <li>✅ แผงสรุปตามผู้ปฏิบัติงาน สำหรับทวนสอบตัวเลขข้ามโมดูล</li>
         <li>✅ ไฟล์เก่าที่มีข้อมูล laps เปิดได้ปกติ ข้อมูลเดิมไม่ถูกลบ</li>
         <li>✅ แก้ป้ายแท็บจาก "1: Lapping" เป็น "1: Time Sheet"</li>
+        <li>✅ <b>ปุ่ม Insert แทรกแถวบน/ล่าง</b> เหมือน M4 — แถวใหม่รับค่า Worker จากแถวข้างเคียง และ Seq เรียงใหม่อัตโนมัติ</li>
+        <li>✅ เอาโลโก้ "A Antigravity Full System" ออกจากแถบบนสุด</li>
+        <li>✅ Deploy ขึ้น production และตรวจเว็บจริงแล้ว</li>
       </ul>
     </div>
   </div>
@@ -616,15 +619,21 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <p><b>กฎเหล็ก:</b> ห้ามอัปเดตแผนแม่บทฉบับนี้ก่อนที่โค้ดจะผ่านการทดสอบจริง</p>
   </div>
 
-  <p>ลำดับที่ต้องทำทุกครั้งที่แก้โค้ด:</p>
+  <p>ลำดับที่ต้องทำทุกครั้งที่แก้โค้ด — <b>ห้ามข้ามข้อไหนแม้จะเป็นการแก้เล็กน้อย</b>:</p>
   <ol>
     <li>แก้โค้ด</li>
-    <li><b>Debug จริง</b> — <code>npm run build</code> ผ่าน · <code>npm test</code> ผ่าน · เปิด dev server ทดสอบหน้าจอจริงและอ่าน console ว่าไม่มี error</li>
+    <li><b>Debug จริง</b> — <code>npm test</code> ผ่าน · <code>npm run build</code> ผ่าน · เปิด dev server ทดสอบหน้าจอจริงและอ่าน console ว่าไม่มี error</li>
+    <li><b>ทวนสอบตัวเลข</b> — ถ้าแตะเรื่องเวลา/ยอดรวม/สะพานเชื่อมโมดูล ต้องเช็คว่าตัวเลขใน M1, M4, M5 ยังตรงกัน</li>
     <li>ถ้าทดสอบไม่ผ่าน → แก้ให้ผ่านก่อน <b>ห้ามข้ามไปขั้นถัดไป</b></li>
-    <li>เมื่อผ่านครบแล้ว → อัปเดตแผนนี้ (สถานะโมดูล · Roadmap · Change Log ท้ายเอกสาร)</li>
+    <li><b>Deploy ขึ้น production</b> (ดูกล่องแดงด้านล่าง) แล้ว<b>เปิดเว็บจริงตรวจซ้ำ</b></li>
+    <li>อัปเดตแผนนี้ (สถานะโมดูล · Roadmap · Change Log ท้ายเอกสาร)</li>
     <li>อัปเดต <code>CHANGELOG_AI.md</code></li>
     <li><code>git commit</code> + <code>git push</code></li>
   </ol>
+  <div class="warn">
+    <p><b>ทำไมข้อ 5 ถึงสำคัญ:</b> พี่เห็นแค่เว็บที่ deploy แล้ว งานที่ commit แต่ไม่ได้ deploy
+       จะดูเหมือน "ไม่มีอะไรเกิดขึ้น" — เคยเกิดมาแล้วกับ Phase 1</p>
+  </div>
 
   <div class="stop">
     <p><b>⚠️ Deploy ขึ้นเว็บจริงต้องสั่งเอง — git push อย่างเดียวไม่พอ</b></p>
@@ -688,6 +697,17 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.2</b></td><td>1 ส.ค. 2569</td><td><code>a100224</code> →</td>
+        <td>
+          เพิ่ม <b>ปุ่ม Insert แทรกแถวบน/ล่าง</b> ใน M1 (เหมือน M4) · เอา <b>โลโก้ A Antigravity</b> ออกจากแถบบนสุด<br>
+          <b>เพิ่มขั้นตอน Deploy เข้าไปในกติกาการทำงาน</b> ทั้งในเอกสารนี้และ <code>PROJECT_CONTEXT.md</code> —
+          หลังจากพบว่า Cloudflare Pages ไม่ auto-deploy ทำให้งาน Phase 1 ที่เสร็จแล้วไม่ขึ้นเว็บอยู่ 13 ชั่วโมง<br>
+          <b>ทดสอบ:</b> 37/37 ผ่าน · <code>tsc</code> clean · build ผ่าน · ทดสอบแทรกแถวบน/ล่างบน dev server
+          (Seq เรียงใหม่ถูก, TOTAL ยังคำนวณถูก 216 = 65+151 ตัดเครื่อง 450 ออก) ·
+          deploy แล้วเปิดเว็บจริงยืนยันว่าโลโก้หายและคอลัมน์ Insert ขึ้นแล้ว
+        </td>
+      </tr>
       <tr>
         <td><b>1.1</b></td><td>31 ก.ค. 2569</td><td><code>e779f07</code> → Phase 1</td>
         <td>

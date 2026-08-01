@@ -72,6 +72,15 @@ export default function Module1_TimeMeasurement() {
     });
   };
 
+  /** Insert a blank row next to an existing one, keeping that row's operator. */
+  const insertRow = (index: number, position: 'above' | 'below') => {
+    const at = position === 'above' ? index : index + 1;
+    const neighbour = study.rows[index];
+    const rows = [...study.rows];
+    rows.splice(at, 0, makeEmptyRow(uuidv4(), at + 1, study.readingCount, neighbour?.operator ?? 'Worker A'));
+    commit({ ...study, rows: renumber(rows) });
+  };
+
   const deleteRow = (id: string) =>
     commit({ ...study, rows: renumber(study.rows.filter(r => r.id !== id)) });
 
@@ -214,6 +223,7 @@ export default function Module1_TimeMeasurement() {
             <thead>
               <tr className="bg-slate-100 text-slate-700">
                 <th className="border border-slate-200 px-2 py-2 w-12 font-bold">Seq</th>
+                <th className="border border-slate-200 px-1 py-2 w-16 font-bold">Insert</th>
                 <th className="border border-slate-200 px-2 py-2 text-left font-bold min-w-[240px]">Job Element</th>
                 <th className="border border-slate-200 px-2 py-2 w-28 font-bold">Worker</th>
                 <th className="border border-slate-200 px-2 py-2 w-20 font-bold">ประเภท</th>
@@ -235,6 +245,21 @@ export default function Module1_TimeMeasurement() {
                 return (
                   <tr key={row.id} className={machine ? 'bg-yellow-50' : 'hover:bg-slate-50'}>
                     <td className="border border-slate-200 px-2 py-1 text-center font-mono text-slate-500">{row.seq}</td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <div className="flex gap-0.5 justify-center">
+                        <button
+                          onClick={() => insertRow(rowIndex, 'above')}
+                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                          title="แทรกแถวเปล่าด้านบน"
+                        >+▲</button>
+                        <button
+                          onClick={() => insertRow(rowIndex, 'below')}
+                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                          title="แทรกแถวเปล่าด้านล่าง"
+                        >+▼</button>
+                      </div>
+                    </td>
 
                     <td className="border border-slate-200 px-1 py-1">
                       <input
@@ -321,7 +346,7 @@ export default function Module1_TimeMeasurement() {
 
               {study.rows.length === 0 && (
                 <tr>
-                  <td colSpan={study.readingCount + 9} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
+                  <td colSpan={study.readingCount + 10} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
                     ยังไม่มีข้อมูล — กด <b>เพิ่มแถว</b> เพื่อกรอกเอง หรือ <b>ดึงข้อมูลจาก M4</b> เพื่อนำ step ที่มีอยู่แล้วมาตั้งต้น
                   </td>
                 </tr>
@@ -331,7 +356,7 @@ export default function Module1_TimeMeasurement() {
             {study.rows.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white font-bold">
-                  <td className="border border-slate-700 px-2 py-2 text-center" colSpan={4}>
+                  <td className="border border-slate-700 px-2 py-2 text-center" colSpan={5}>
                     TOTAL <span className="font-normal text-slate-300">(ไม่รวมแถวเครื่องจักร)</span>
                   </td>
                   {totals.perReading.map((v, i) => (

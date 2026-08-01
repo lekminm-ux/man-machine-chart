@@ -224,10 +224,47 @@ Cloudflare/D1 deployment details live in:
 
 ## Important Working Rules
 
+### Mandatory end-of-session checklist
+
+Run these in order, every time, and do not skip a step because the change "looks
+small". Steps 1-3 are what make the work real; steps 4-6 are what make it visible
+to the user.
+
+1. **Test for real** — `npm test` and `npm run build` must both pass. If the change
+   is visible in the UI, also run the dev server and exercise the actual screen,
+   reading the console for errors. A change that only compiles is not verified.
+2. **Cross-check the numbers** — for anything touching times, totals or a module
+   bridge, confirm the figures still agree across M1, M4 and M5 (they share one
+   dataset and must never disagree).
+3. **Deploy to production** — `npm run build`, then
+   `npx wrangler pages deploy out --project-name=man-machine-chart --branch=main --commit-dirty=true`.
+   Then **fetch the live site and confirm the new bundle is being served.** The
+   deploy command exiting 0 is not proof.
+4. Update `docs/Master_Plan.html` — status table, roadmap, change log.
+5. Update `CHANGELOG_AI.md`.
+6. `git add -A`, `git commit`, `git push`.
+
+Why steps 3 and 4 are in this order and are not optional:
+
+- **Deployment is manual (verified 2026-08-01).** Pushing to GitHub does NOT publish
+  the site. A push sat for 13 hours with zero Cloudflare Pages builds, so the Git
+  integration is either disabled or its builds fail. The user sees only the deployed
+  site, so work that is committed but not deployed looks like nothing happened.
+  wrangler is already authenticated on this machine. The root cause still needs
+  fixing in the Cloudflare dashboard (Workers & Pages -> man-machine-chart ->
+  Settings -> Builds & deployments); until then, deploy by hand every time.
+- **Master Plan update rule (user requirement, 2026-07-31).** Update
+  `docs/Master_Plan.html` only AFTER verification passes. Never move a status badge
+  to "done" on the strength of code that merely looks right.
+
+Verification gotcha: `curl` on this machine fails TLS revocation checks
+(`CRYPT_E_NO_REVOCATION_CHECK`), so any polling script built on curl reports
+garbage. Check the live site with the browser tools instead.
+
+### General rules
+
 - Every AI must read `PROJECT_CONTEXT.md` and `CHANGELOG_AI.md` before starting code changes.
 - For any work on modules M1-M6, also read `docs/Master_Plan.html` first — it holds the agreed scope, the TPS reasoning behind each module, the decision log, and the questions that must be answered before a phase starts.
-- **Master Plan update rule (user requirement, 2026-07-31):** update `docs/Master_Plan.html` only AFTER the change has been verified for real — `npm run build` passes, `npm test` passes, and the screen was exercised in a running dev server with no console errors. Never update the plan on the strength of "the code looks right". Order: fix code -> verify -> update Master Plan -> update CHANGELOG_AI.md -> commit -> push.
-- **Deployment is manual (verified 2026-08-01):** pushing to GitHub does NOT publish the site. A push sat for 13 hours with no Cloudflare Pages build, so Git integration is either off or its builds fail. To publish: `npm run build`, then `npx wrangler pages deploy out --project-name=man-machine-chart --branch=main --commit-dirty=true`, then re-check the live bundle. wrangler is already authenticated on this machine. Never report a change as live without checking production itself.
 - Module 1 is a key-in time-measurement table, not a stopwatch. The stopwatch UI was a misreading of the blueprint slide; timing is done with a real stopwatch on the shop floor and the readings are typed in.
 - Always inspect real files from disk before patching.
 - Do not rely on chat history alone.
