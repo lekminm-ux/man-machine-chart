@@ -80,9 +80,30 @@ test('a machine starts when the element before it finishes and runs in parallel'
   assert.deepEqual([load.start, load.end], [0, 10]);
   assert.deepEqual([auto.start, auto.end], [10, 50]);  // starts after loading
   assert.deepEqual([next.start, next.end], [10, 16]);  // operator does NOT wait
+  assert.equal(r.cycleTime, 50);                       // gated by the machine
 });
 
-test('machine rows are pooled under Auto M/C and take their longest run', () => {
+test('a machine gates the cycle at its END time, loading time included', () => {
+  // Worker A loads for 65 s, the machine then runs 385 s and stops at 450.
+  // Worker A's own work only adds up to 356 s and fits inside that run, but the
+  // next cycle cannot start until the machine is unloaded at 450.
+  const r = ct.buildCombinationTable(study([
+    row('load', 'Worker A', 'man', 65),
+    row('Blow molding', 'Auto M/C', 'machine', 385),
+    row('cut scrap', 'Worker A', 'man', 150),
+    row('check', 'Worker A', 'man', 20),
+    row('send', 'Worker A', 'man', 30),
+    row('prepare nut', 'Worker A', 'man', 91),
+  ]), 0);
+
+  const worker = r.actors.find(a => a.operator === 'Worker A');
+  const machine = r.actors.find(a => a.isMachine);
+  assert.equal(worker.cycle, 356);      // 65 + 150 + 20 + 30 + 91
+  assert.equal(machine.cycle, 450);     // 65 loading + 385 running
+  assert.equal(r.cycleTime, 450);       // not 385
+});
+
+test('machine rows are pooled under Auto M/C and the last one to finish wins', () => {
   const r = ct.buildCombinationTable(study([
     row('load', 'Worker A', 'man', 5),
     row('m1', 'Auto M/C', 'machine', 40),
@@ -90,8 +111,8 @@ test('machine rows are pooled under Auto M/C and take their longest run', () => 
   ]), 0);
 
   const machine = r.actors.find(a => a.isMachine);
-  assert.equal(machine.cycle, 60);      // not 100 — the machines are separate
-  assert.equal(r.cycleTime, 60);
+  assert.equal(machine.cycle, 105);     // m1 ends at 45, m2 chains to 105
+  assert.equal(r.cycleTime, 105);
 });
 
 test('a row assigned to Auto M/C counts as a machine even if typed man', () => {

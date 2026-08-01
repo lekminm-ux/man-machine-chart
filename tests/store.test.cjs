@@ -89,12 +89,13 @@ test('cycle time follows the stop-time model when steps change', async () => {
   store.getState().updateStep(step1.id, { manualTime: 10 });
   assert.equal(store.getState().activeFile().header.cycleTime, 10);
 
-  // Machine runs in parallel from t=5 until t=40 → busy for 35s.
-  // Cycle time = the busiest actor's TOTAL time (35), not the timeline end (40).
+  // Machine is loaded at t=5 and runs until t=40, so it is busy for 35 s but
+  // only frees up at 40. Nobody can unload it — or start the next cycle —
+  // before then, so the cycle time is the machine's END time.
   store.getState().addStep();
   const step2 = store.getState().activeFile().steps[1];
   store.getState().updateStep(step2.id, { operator: 'Auto M/C', machineTime: 40, startTime: 5 });
-  assert.equal(store.getState().activeFile().header.cycleTime, 35);
+  assert.equal(store.getState().activeFile().header.cycleTime, 40);
 
   // Deleting the machine step drops the cycle time back to 10
   store.getState().deleteStep(step2.id);

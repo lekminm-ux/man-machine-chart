@@ -161,31 +161,34 @@ export function computeTotalDuration(steps: ChartStep[]): number {
 }
 
 /**
- * Cycle Time = the longest single track in the man-machine chart.
+ * Cycle Time = the earliest moment the next cycle can start.
  *
- * Each operator has two PARALLEL tracks that must not be added together:
- *   • a manual track   = Σ (manual + walk + idle)  — the time the person is
- *     occupied or waiting;
- *   • a machine track   = Σ (machine)              — the auto-run time of the
- *     machine that person tends.
+ * Two kinds of track are compared and the longest one wins:
  *
- * The machine runs on its own while the worker waits (that wait shows up as
- * idle on the manual track), so machine time is never summed into the worker's
- * busy time. CT is the maximum of every track.
+ *   • Operator tracks — Σ (manual + walk + idle). A person's own busy time.
+ *     Deliberately NOT their end time: entering steps with late explicit start
+ *     times pushes the chart axis out without making anyone busier.
  *
- * Example (Rev.01): workers 411 / 415 / 413, Auto M/C machine 450 → CT = 450.
- * Example (Rev.00): Worker D tends the crusher — manual+idle = 450 on one
- * track, machine 388 on another → the worker still contributes 450, not 838.
+ *   • Machine tracks — the auto-run's END time, i.e. when it was loaded plus
+ *     how long it runs. A machine cannot be unloaded before it finishes, and
+ *     the operator who unloads it cannot begin the next cycle until then, so
+ *     the loading time in front of the run is part of the cycle.
+ *
+ * Worked example (BYD Side Step, corrected 2026-08-01): Worker A loads for 65 s,
+ * Blow molding then runs 385 s and ends at 450. Worker A's own elements only add
+ * up to 356 s and fit inside that run. The cycle is 450 s — the machine's end —
+ * because Worker A cannot unload before it. Counting only the 385 s run gave the
+ * wrong answer.
  */
 export function computeCycleTime(steps: ChartStep[]): number {
   if (steps.length === 0) return 0;
-  const manual: Record<string, number> = {};
-  const machine: Record<string, number> = {};
+  const operatorBusy: Record<string, number> = {};
+  let machineEnd = 0;
   for (const s of getCalculatedSteps(steps)) {
-    manual[s.operator] = (manual[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
-    machine[s.operator] = (machine[s.operator] ?? 0) + s.calcMachine;
+    operatorBusy[s.operator] = (operatorBusy[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
+    if (s.calcMachine > 0) machineEnd = Math.max(machineEnd, s.calcEnd);
   }
-  return Math.max(0, ...Object.values(manual), ...Object.values(machine));
+  return Math.max(0, machineEnd, ...Object.values(operatorBusy));
 }
 
 export function formatSeconds(s: number): string {

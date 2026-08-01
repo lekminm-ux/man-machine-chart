@@ -394,6 +394,23 @@ export default function StepTable() {
                           );
                         })}
 
+                        {/* Cycle time guide — the moment the next cycle can start */}
+                        {cycleTime > 0 && (
+                          <g>
+                            <rect
+                              x={tX(Math.min(cycleTime, totalDur))} y={0}
+                              width={Math.max(0, timelineWidth - tX(Math.min(cycleTime, totalDur)))}
+                              height={calcSteps.length * ROW_HEIGHT}
+                              fill="rgba(239, 68, 68, 0.05)"
+                            />
+                            <line
+                              x1={tX(Math.min(cycleTime, totalDur))} y1={0}
+                              x2={tX(Math.min(cycleTime, totalDur))} y2={calcSteps.length * ROW_HEIGHT}
+                              stroke="#ef4444" strokeWidth={2.5}
+                            />
+                          </g>
+                        )}
+
                         {/* Timeline Row segments */}
                         {calcSteps.map((s, ri) => {
                           const rowY = ri * ROW_HEIGHT;
@@ -459,35 +476,50 @@ export default function StepTable() {
                   </>
                 )}
 
-                {/* Timeline Footer (Red Cycle Time Arrow) */}
+                {/* Timeline Footer — bold cycle time measure */}
                 <td className="p-0 border-l border-slate-700 bg-slate-950/80 select-none" style={{ width: timelineWidth }}>
                   <div className="h-full flex items-center py-1">
-                    <svg width={timelineWidth} height={28} className="block mx-auto">
+                    <svg width={timelineWidth} height={44} className="block mx-auto">
                       <defs>
-                        <marker id="arr-s" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
-                          <path d="M0 0 L6 3 L0 6 Z" fill="#f87171" />
+                        <marker id="ct-arrow-start" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto-start-reverse">
+                          <path d="M0 0 L10 5 L0 10 Z" fill="#ef4444" />
                         </marker>
-                        <marker id="arr-e" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-                          <path d="M0 0 L6 3 L0 6 Z" fill="#f87171" />
+                        <marker id="ct-arrow-end" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                          <path d="M0 0 L10 5 L0 10 Z" fill="#ef4444" />
                         </marker>
                       </defs>
-                      {/* Arrow line — spans the cycle time (max per-actor total), not the timeline end */}
-                      <line
-                        x1={tX(0)} y1={14}
-                        x2={tX(Math.min(cycleTime, totalDur))} y2={14}
-                        stroke="#f87171" strokeWidth={2}
-                        markerStart="url(#arr-s)" markerEnd="url(#arr-e)"
-                      />
-                      {/* Arrow label */}
-                      <text
-                        x={(tX(0) + tX(Math.min(cycleTime, totalDur))) / 2} y={9}
-                        textAnchor="middle" fontSize={8} fill="#f87171" fontWeight="700"
-                      >
-                        Cycle Time: {cycleTime}s
-                      </text>
-                      {/* End caps */}
-                      <line x1={tX(0)} y1={8} x2={tX(0)} y2={20} stroke="#f87171" strokeWidth={1.5} />
-                      <line x1={tX(Math.min(cycleTime, totalDur))} y1={8} x2={tX(Math.min(cycleTime, totalDur))} y2={20} stroke="#f87171" strokeWidth={1.5} />
+
+                      {(() => {
+                        const xEnd = tX(Math.min(cycleTime, totalDur));
+                        const y = 28;
+                        const label = `CYCLE TIME  ${cycleTime}s`;
+                        const labelW = Math.max(120, label.length * 7.4);
+                        const labelX = Math.min(Math.max((tX(0) + xEnd) / 2, labelW / 2 + 2), timelineWidth - labelW / 2 - 2);
+                        return (
+                          <>
+                            {/* end posts */}
+                            <line x1={tX(0)} y1={y - 12} x2={tX(0)} y2={y + 8} stroke="#ef4444" strokeWidth={3} />
+                            <line x1={xEnd} y1={y - 12} x2={xEnd} y2={y + 8} stroke="#ef4444" strokeWidth={3} />
+                            {/* measure bar */}
+                            <line
+                              x1={tX(0)} y1={y} x2={xEnd} y2={y}
+                              stroke="#ef4444" strokeWidth={4}
+                              markerStart="url(#ct-arrow-start)" markerEnd="url(#ct-arrow-end)"
+                            />
+                            {/* label chip */}
+                            <rect
+                              x={labelX - labelW / 2} y={2} width={labelW} height={18} rx={9}
+                              fill="#ef4444"
+                            />
+                            <text
+                              x={labelX} y={15} textAnchor="middle"
+                              fontSize={11} fill="#fff" fontWeight="800" letterSpacing="0.5"
+                            >
+                              {label}
+                            </text>
+                          </>
+                        );
+                      })()}
                     </svg>
                   </div>
                 </td>

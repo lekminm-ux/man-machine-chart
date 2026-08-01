@@ -179,8 +179,11 @@ Cloudflare binding:
 - Start time is explicit `startTime` when provided and non-zero; otherwise it falls back to the previous end time for the same actor.
 - The active category is the category whose stop-time value is the maximum among manual/machine/walk/idle.
 - `computeTotalDuration(steps)` means timeline axis extent: maximum calculated end time across all steps.
-- `computeCycleTime(steps)` means actual cycle time: maximum total calculated duration per actor, including Worker A-J and Auto M/C.
-- Do not replace cycle time with timeline end. Late explicit starts can extend the chart axis without increasing the cycle.
+- `computeCycleTime(steps)` means actual cycle time: the earliest moment the next cycle can begin. It compares two kinds of track and takes the largest:
+  - **operator tracks** = the sum of that person's manual + walk + idle. Their own busy time, NOT their end time.
+  - **machine tracks** = the auto-run's END time (load time + run time). A machine cannot be unloaded before it stops, and the operator who unloads it cannot restart until then, so the loading time in front of the run counts.
+- Corrected 2026-08-01 (BYD Side Step): Worker A loads for 65 s, Blow molding runs 385 s and ends at 450. Worker A's own elements total 356 s and fit inside the run. CT = **450**, the machine's end — counting only the 385 s run was wrong.
+- Do not replace cycle time with timeline end either. A step given a late explicit `startTime` stretches the chart axis without making anyone busier.
 - Auto M/C is included in `OperatorType` but excluded from `ALL_WORKERS`.
 - Worker summary includes manual + walk as line total; idle is displayed separately in the summary table.
 - Duplicating a file must clone step IDs, layout element IDs, and remap connector IDs.

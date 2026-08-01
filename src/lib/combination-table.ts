@@ -125,10 +125,14 @@ export function buildCombinationTable(study: TimeStudy, taktTime: number): Combi
 
   const actors: CombinationActor[] = [...byActor.entries()].map(([operator, list]) => {
     const isMachine = operator === 'Auto M/C';
-    // A worker's cycle is the sum of their elements; a machine's is its longest
-    // single run, since separate machines do not queue behind each other.
+    // A worker's cycle is the sum of their own elements — a late start pushes
+    // the axis out but does not make them busier.
+    //
+    // A machine's cycle is its END time: it cannot be unloaded before it stops,
+    // and the operator who unloads it cannot begin the next cycle until then,
+    // so the loading time in front of the run belongs to the cycle.
     const cycle = isMachine
-      ? round2(Math.max(0, ...list.map(r => r.duration)))
+      ? round2(Math.max(0, ...list.map(r => r.end)))
       : round2(list.reduce((a, r) => a + r.duration, 0));
     const wait = taktTime > 0 && cycle < taktTime ? round2(taktTime - cycle) : 0;
     return { operator, isMachine, cycle, wait, overTakt: taktTime > 0 && cycle > taktTime };

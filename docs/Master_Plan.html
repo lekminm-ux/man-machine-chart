@@ -144,11 +144,11 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.4</div>
+      <div><b>Version</b>1.5</div>
       <div><b>Updated</b>1 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>23b3264</div>
-      <div><b>Status</b>Phase 1-3 เสร็จ + ขึ้น production แล้ว · ถัดไป Phase 4</div>
+      <div><b>Baseline commit</b>a8d520f</div>
+      <div><b>Status</b>Phase 1-3 เสร็จ + แก้สูตร Cycle Time · ถัดไป Phase 4</div>
     </div>
   </div>
 </header>
@@ -439,6 +439,21 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <li>Rule 3: เครื่อง 2 เครื่องเริ่มพร้อมกัน → วาดเส้นคู่ขนาน ไม่ให้ทับกัน</li>
   </ul>
 
+  <h3>Cycle Time — นิยามที่ถูกต้อง (แก้ไข 1 ส.ค. 2569)</h3>
+  <p>Cycle Time คือ <b>เวลาที่เร็วที่สุดที่รอบถัดไปจะเริ่มได้</b> ระบบเทียบ 2 แบบแล้วเอาค่าที่มากกว่า:</p>
+  <ul>
+    <li><b>สายของคน</b> = ผลรวมเวลาทำงาน + เดิน + รอ ของคนนั้น (ไม่ใช่เวลาที่งานสุดท้ายจบ
+        เพราะการกรอก Start Time ช้าๆ ทำให้แกนกราฟยาวขึ้นแต่คนไม่ได้ยุ่งขึ้น)</li>
+    <li><b>สายของเครื่อง</b> = <b>เวลาที่เครื่องหยุด</b> (เวลาโหลด + เวลาเครื่องทำงาน)
+        เพราะปลดชิ้นงานออกก่อนเครื่องหยุดไม่ได้ และคนที่ต้องปลดก็เริ่มรอบใหม่ไม่ได้จนกว่าจะถึงตอนนั้น
+        <b>เวลาโหลดที่อยู่หน้าเครื่องจึงนับเป็นส่วนหนึ่งของรอบ</b></li>
+  </ul>
+  <div class="warn">
+    <p><b>ตัวอย่างจริง BYD Side Step:</b> Worker A โหลด 65 วิ → Blow molding ทำงาน 385 วิ จบที่ <b>450</b> ·
+       งานของ Worker A เองรวมได้ 356 วิ ซึ่งแทรกอยู่ในช่วงที่เครื่องทำงาน · <b>CT = 450</b>
+       เพราะ Worker A ปลดงานก่อน 450 ไม่ได้ — เดิมระบบตอบ 385 ซึ่งผิด</p>
+  </div>
+
   <h3>M5 — Yamazumi</h3>
   <ul>
     <li>แท่งฐาน = <b>Min</b> จาก M1 · ส่วนทับด้านบน = <b>Max</b> · จุดกลางแท่ง = <b>Average</b></li>
@@ -722,6 +737,18 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.5</b></td><td>1 ส.ค. 2569</td><td><code>a8d520f</code> →</td>
+        <td>
+          <b>แก้สูตร Cycle Time ให้ถูกต้อง</b> — สายของเครื่องนับ<b>เวลาที่เครื่องหยุด</b> (รวมเวลาโหลดที่อยู่ข้างหน้า)
+          แทนที่จะนับแค่เวลาเครื่องทำงาน · BYD Side Step เดิมตอบ 385 ตอนนี้ตอบ 450 ถูกต้อง<br>
+          <b>ปรับการแสดงผล M4:</b> เส้นแดงแนวตั้งลากผ่านทุกแถวที่ตำแหน่ง Cycle Time · แรเงาพื้นที่ที่เลยรอบไปแล้ว ·
+          ลูกศรวัดรอบหนาขึ้นพร้อมหัวลูกศรทึบและป้าย "CYCLE TIME 450s" ชัดเจน<br>
+          <b>ทดสอบ:</b> 71/71 ผ่าน (เพิ่มเทสต์เคส BYD จริง) · <code>tsc</code> clean · build ผ่าน ·
+          ทดสอบด้วยข้อมูล BYD จริงบน dev server: CT 450 · Worker A 356 (79%) · Auto M/C 385 (86%) ·
+          deploy แล้วเปิดเว็บจริงยืนยัน
+        </td>
+      </tr>
       <tr>
         <td><b>1.4</b></td><td>1 ส.ค. 2569</td><td><code>23b3264</code> → Phase 3</td>
         <td>

@@ -180,10 +180,9 @@ test('computeTotalDuration of an empty chart is 0', () => {
   assert.equal(chartUtils.computeTotalDuration([]), 0);
 });
 
-test('computeCycleTime = max per-actor total, not the timeline end', () => {
-  // Mirrors the reported bug: Worker B/C start late (explicit startTime),
-  // pushing the timeline end to 826s — but the cycle time must be the
-  // busiest actor's total: max(411, 415, 413, 450) = 450.
+test('a late-starting operator stretches the axis but not the cycle', () => {
+  // Worker B/C are entered with late explicit start times, pushing the timeline
+  // end out to 826 s. That must not inflate the cycle: nobody got busier.
   const mk = (id, operator, dur, start) => ({
     id, no: 0, description: id, operator,
     manualTime: operator === 'Auto M/C' ? 0 : start + dur,
@@ -197,8 +196,38 @@ test('computeCycleTime = max per-actor total, not the timeline end', () => {
     mk('c', 'Worker C', 413, 413),
   ];
 
-  assert.equal(chartUtils.computeCycleTime(steps), 450);
+  // The machine is loaded at 62 and runs 450 s, so it stops at 512 and nobody
+  // can start the next cycle before then.
+  assert.equal(chartUtils.computeCycleTime(steps), 512);
   assert.equal(chartUtils.computeTotalDuration(steps), 826, 'timeline end stays 826 for the axis');
+});
+
+test('BYD Side Step: the cycle is the machine end (450), not its run time (385)', () => {
+  // Reported 2026-08-01. Worker A loads for 65 s, Blow molding then runs 385 s
+  // and stops at 450. Worker A's own elements total 356 s and fit inside the
+  // run, but Worker A cannot unload — and so cannot restart — before 450.
+  const w = (id, stop, start) => ({
+    id, no: 0, description: id, operator: 'Worker A',
+    manualTime: stop, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: start,
+  });
+  const steps = [
+    w('unload+insert', 65, 0),
+    { id: 'blow', no: 2, description: 'Blow molding', operator: 'Auto M/C',
+      manualTime: 0, machineTime: 450, walkingTime: 0, idleTime: 0, startTime: 65 },
+    w('cutting scrap', 215, 65),
+    w('check weight', 235, 215),
+    w('send part', 265, 235),
+    w('prepare nut', 356, 265),
+  ];
+
+  const calc = chartUtils.getCalculatedSteps(steps);
+  assert.equal(calc[1].calcDuration, 385, 'the machine runs for 385 s');
+  assert.equal(calc[1].calcEnd, 450, 'and stops at 450');
+
+  const summary = chartUtils.buildSummary(steps);
+  assert.equal(summary.find(s => s.operator === 'Worker A').lineTotal, 356);
+
+  assert.equal(chartUtils.computeCycleTime(steps), 450);
 });
 
 test('computeCycleTime sums multiple steps per actor and includes idle', () => {
