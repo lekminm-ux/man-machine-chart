@@ -626,6 +626,16 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <li><code>git commit</code> + <code>git push</code></li>
   </ol>
 
+  <div class="stop">
+    <p><b>⚠️ Deploy ขึ้นเว็บจริงต้องสั่งเอง — git push อย่างเดียวไม่พอ</b></p>
+    <p>ตรวจแล้วเมื่อ 1 ส.ค. 2569: push ขึ้น GitHub แล้วรอ 13 ชั่วโมง Cloudflare Pages <b>ไม่ได้ build ให้เลย</b>
+       (ไม่มี deployment ใหม่เกิดขึ้น) แปลว่า Git integration ไม่ได้เปิดใช้หรือ build ฝั่ง Cloudflare ล้มเหลว</p>
+    <p>จนกว่าจะแก้ที่ Cloudflare Dashboard ทุกครั้งที่จบงานต้องสั่ง deploy เองแบบนี้:</p>
+    <p><code>npm run build</code> แล้วตามด้วย<br>
+       <code>npx wrangler pages deploy out --project-name=man-machine-chart --branch=main --commit-dirty=true</code></p>
+    <p>แล้ว<b>ตรวจซ้ำที่เว็บจริงเสมอ</b>ว่าบันเดิลใหม่ขึ้นแล้ว อย่าถือว่า deploy สำเร็จเพราะคำสั่งไม่ error</p>
+  </div>
+
   <p>เอกสารอ้างอิงของโปรเจกต์:</p>
   <ul>
     <li><code>PROJECT_CONTEXT.md</code> — ความจำโปรเจกต์ กฎการทำงาน โครงสร้างไฟล์</li>

@@ -494,3 +494,51 @@ Time Measurement Sheet และเชื่อมข้อมูลกับ M4
 - M2 และ M3 ยังเป็นหน้าว่าง — ปุ่มส่งข้อมูลจึงมีผลกับ M4/M5 ก่อน
 - **ยังต้องรอคำตอบก่อนเริ่ม Phase 2**: เลข 39 และ 8.66 ในสูตร `=39*8.66` ของชีต Machine Capacity
   และเวลาทำงาน 1 กะ (หักพักแล้ว) ของโรงงาน
+
+## 2026-08-01 — Deploy Phase 1 ขึ้น production
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+ผู้ใช้แจ้งว่าเว็บจริงยังเป็นหน้าเดิม (นาฬิกาจับเวลา) ทั้งที่ Phase 1 เสร็จและ push แล้ว — หาสาเหตุและแก้
+
+### Completed
+
+- **หาสาเหตุ**: ไม่ใช่แคชเบราว์เซอร์ และไม่ใช่ build ค้าง
+  - ยืนยันโค้ดขึ้น GitHub แล้ว (`git ls-remote origin` → `main = da9d8e0`)
+  - ดึงไฟล์ JS ที่ production เสิร์ฟจริงมาตรวจ: เจอข้อความ `Continuous Lapping UI` (โค้ดเก่า)
+    ไม่เจอ `Time Sheet` เลย และชื่อไฟล์บันเดิลไม่เปลี่ยนตลอด 13 ชั่วโมง
+  - สรุป: **Cloudflare Pages ไม่ได้ auto-deploy จาก GitHub** ไม่มี deployment ใหม่เกิดขึ้นเลย
+- **Deploy เอง** (ผู้ใช้อนุมัติ): `npm run build` แล้ว
+  `npx wrangler pages deploy out --project-name=man-machine-chart --branch=main --commit-dirty=true`
+  → อัปโหลด 55 ไฟล์ สำเร็จ
+- **บันทึกกติกาใหม่**: เพิ่มหัวข้อ deploy ใน `docs/Master_Plan.html` และ `PROJECT_CONTEXT.md`
+  ว่า git push อย่างเดียวไม่พอ ต้องสั่ง deploy เองและตรวจเว็บจริงซ้ำทุกครั้ง
+
+### Files Added / Changed
+
+- `docs/Master_Plan.html` (เพิ่มหัวข้อ Deploy ในกติกาการทำงาน)
+- `PROJECT_CONTEXT.md` (เพิ่มกฎ deployment เป็น manual)
+- `CHANGELOG_AI.md`
+- ไม่มีการแก้โค้ดแอปในรอบนี้
+
+### Verification
+
+- ตรวจ production หลัง deploy: บันเดิลเก่าหายหมด (`old: []`) เหลือแต่ `0vw67_zsttwh5.js` ที่มีโค้ดใหม่
+- เปิด https://man-machine-chart.pages.dev/editor แล้วเปิดไฟล์ BYDSidestep Rev.00 จาก D1 จริง:
+  - แท็บเปลี่ยนเป็น **1: Time Sheet** แล้ว
+  - หัวตารางครบ: Seq · Job Element · Worker · ประเภท · 1st–10th · Min. · Max. · Fluc. · Aver.
+  - ปุ่ม "ดึงข้อมูลจาก M4" และ "ส่งข้อมูลไป M2–M5" แสดงครบ
+  - ไม่มีร่องรอยนาฬิกาจับเวลาเหลืออยู่
+
+### Notes / Risks
+
+- **ยังไม่ได้แก้ที่ต้นเหตุ** — Git integration ของ Cloudflare Pages ยังไม่ทำงาน ต้องเข้า Dashboard
+  ไปดูว่าไม่ได้ผูก repo ไว้ หรือ build ล้มเหลว จนกว่าจะแก้ ทุกครั้งที่จบงานต้อง deploy เอง
+- wrangler เตือนว่า `wrangler.toml` ไม่มีฟิลด์ `pages_build_output_dir` — ยังไม่ได้เพิ่มให้
+  เพราะอยู่นอกขอบเขตที่ขอ ถ้าเพิ่มจะสั่ง deploy ได้สั้นลงและไม่มี warning
+- `curl` บนเครื่องนี้ fail ด้วย TLS revocation error (`CRYPT_E_NO_REVOCATION_CHECK`)
+  ทำให้สคริปต์ polling ที่ใช้ curl รายงานผลเชื่อไม่ได้ — ให้ตรวจผ่าน browser tool แทน

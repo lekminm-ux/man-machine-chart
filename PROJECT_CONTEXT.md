@@ -227,6 +227,7 @@ Cloudflare/D1 deployment details live in:
 - Every AI must read `PROJECT_CONTEXT.md` and `CHANGELOG_AI.md` before starting code changes.
 - For any work on modules M1-M6, also read `docs/Master_Plan.html` first — it holds the agreed scope, the TPS reasoning behind each module, the decision log, and the questions that must be answered before a phase starts.
 - **Master Plan update rule (user requirement, 2026-07-31):** update `docs/Master_Plan.html` only AFTER the change has been verified for real — `npm run build` passes, `npm test` passes, and the screen was exercised in a running dev server with no console errors. Never update the plan on the strength of "the code looks right". Order: fix code -> verify -> update Master Plan -> update CHANGELOG_AI.md -> commit -> push.
+- **Deployment is manual (verified 2026-08-01):** pushing to GitHub does NOT publish the site. A push sat for 13 hours with no Cloudflare Pages build, so Git integration is either off or its builds fail. To publish: `npm run build`, then `npx wrangler pages deploy out --project-name=man-machine-chart --branch=main --commit-dirty=true`, then re-check the live bundle. wrangler is already authenticated on this machine. Never report a change as live without checking production itself.
 - Module 1 is a key-in time-measurement table, not a stopwatch. The stopwatch UI was a misreading of the blueprint slide; timing is done with a real stopwatch on the shop floor and the readings are typed in.
 - Always inspect real files from disk before patching.
 - Do not rely on chat history alone.
