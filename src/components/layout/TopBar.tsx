@@ -165,9 +165,14 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 shadow-sm flex-shrink-0 z-10 relative">
+      {/* App name */}
+      <span className="font-bold text-slate-800 text-sm tracking-tight whitespace-nowrap">
+        Machine-Chart Man-STD-Operation
+      </span>
+
       {/* Active file breadcrumb */}
       {activeFile && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 border-l border-slate-200 pl-4">
           <span className="font-medium text-slate-700">{activeFile.name}</span>
           <span className="text-slate-400">·</span>
           <span>{activeFile.header.processName || 'Unnamed Process'}</span>

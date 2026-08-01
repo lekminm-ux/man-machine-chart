@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
-  TimeStudy,
+  TimeStudy, MachineCapacity,
 } from '@/types';
 import {
   loadLocalDatabase, saveLocalDatabase,
@@ -18,6 +18,7 @@ import {
   DEFAULT_READING_COUNT, stepsFromTimeStudy, timeStudyFromSteps,
   type PushBasis,
 } from '@/lib/time-study';
+import { emptyMachineCapacity, machineCapacityFromTimeStudy } from '@/lib/machine-capacity';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
 export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
@@ -61,6 +62,11 @@ interface ChartState extends AppDatabase {
   importTimeStudyFromSteps: () => number;
   /** Overwrite Module 4 steps (and therefore M3/M5) from the sheet. */
   pushTimeStudyToSteps: (basis?: PushBasis) => number;
+
+  // Module 2 — machine capacity sheet
+  updateMachineCapacity: (mc: MachineCapacity) => void;
+  /** Seed one process per machine row in the Module 1 sheet. */
+  importMachineCapacityFromTimeStudy: () => number;
 
   // Step actions
   addStep: () => void;
@@ -477,6 +483,34 @@ export const useChartStore = create<ChartState>((set, get) => ({
       return next;
     });
     return steps.length;
+  },
+
+  // ── Module 2: machine capacity sheet ─────────────────────────────────────────
+  updateMachineCapacity(mc) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, machineCapacity: mc, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  importMachineCapacityFromTimeStudy() {
+    const state = get();
+    const file = state.files.find(f => f.id === state.activeFileId);
+    if (!file?.timeStudy) return 0;
+
+    const base = file.machineCapacity ?? emptyMachineCapacity();
+    const seeded = machineCapacityFromTimeStudy(file.timeStudy, base, uuidv4);
+    get().updateMachineCapacity(seeded);
+    return seeded.rows.length;
   },
 
   // ── Steps (local only — auto-saved on saveActiveFile) ────────────────────────

@@ -144,6 +144,32 @@ export interface TimeStudy {
   rows: TimeStudyRow[];
 }
 
+// ── Module 2: Machine Capacity Sheet (ใบแสดงความสามารถของเครื่องจักร) ──────
+export interface MachineCapacityRow {
+  id: string;
+  no: number;
+  processName: string;
+  machineNo: string;
+  /** Operator time per unit at this machine, seconds. */
+  manualTime: number;
+  /** Machine auto-run time per unit, seconds. */
+  autoTime: number;
+  /** Units produced between tool changes. 0 = no tool change. */
+  changeQty: number;
+  /** Seconds one tool change takes. */
+  changeTime: number;
+}
+
+export interface MachineCapacity {
+  /** Length of the shift before breaks are taken out, minutes. */
+  shiftGrossMinutes: number;
+  /** Total break minutes inside the shift. */
+  breakMinutes: number;
+  /** Units the customer needs from this shift. 0 = not set. */
+  requiredPerShift: number;
+  rows: MachineCapacityRow[];
+}
+
 /** Per-row figures derived from `readings` — never stored, always recomputed. */
 export interface TimeStudyRowStats {
   min: number;
@@ -166,6 +192,8 @@ export interface ChartFile {
   timeMeasurement?: TimeMeasurement;
   /** Module 1 time measurement sheet — the source of truth for step times. */
   timeStudy?: TimeStudy;
+  /** Module 2 machine capacity sheet. */
+  machineCapacity?: MachineCapacity;
 }
 
 export interface ChartFolder {

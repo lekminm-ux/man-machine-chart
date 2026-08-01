@@ -601,3 +601,68 @@ Time Measurement Sheet และเชื่อมข้อมูลกับ M4
   ข้อความตอนโหลด `Loading Antigravity System…` (`src/app/editor/page.tsx:31`)
   และบรรทัดใต้ชื่อโมดูล `ANTIGRAVITY FULL SYSTEM` (`src/app/editor/page.tsx:77`)
 - ต้นเหตุ Cloudflare auto-deploy ยังไม่ได้แก้ ต้องเข้า Dashboard ตรวจ Git integration
+
+## 2026-08-01 (Update 3) — Phase 2
+
+### Tool
+
+- Claude Code (Opus 5)
+
+### Session Goal
+
+Phase 2: สร้าง Module 2 ใบแสดงความสามารถของเครื่องจักร · เปลี่ยนชื่อแอปเป็น
+"Machine-Chart Man-STD-Operation" · เอาคำว่า Antigravity ออกทุกจุด
+
+### Completed
+
+- **`src/lib/machine-capacity.ts` (ใหม่)**: สูตรมาตรฐาน TPS
+  - `netShiftSeconds` = (เวลาต่อกะ − เวลาพัก) × 60 · ค่าตั้งต้น 540 − 80 = 460 นาที = 27,600 วินาที
+  - `computeCapacityRow`: Completion = Manual + Auto ·
+    Tool change ต่อชิ้น = เวลาเปลี่ยน ÷ จำนวนชิ้นต่อครั้ง ·
+    **Capacity = เวลาทำงานสุทธิ ÷ (Completion + Tool change ต่อชิ้น)**
+  - `computeCapacitySummary`: หาคอขวด (ค่าต่ำสุด) · Takt Time = เวลาสุทธิ ÷ ยอดที่ต้องผลิต ·
+    % ภาระ · ธง shortfall เมื่อผลิตไม่ทัน
+  - `machineCapacityFromTimeStudy`: ดึงแถวเครื่องจักรจาก M1 มาเป็นกระบวนการ (Auto Time = ค่า Min)
+- **`Module2_MachineCapacity.tsx` (ใหม่)**: ตารางตามฟอร์ม Excel (หัวตาราง 2 ชั้น Basic Time /
+  Tool Change) · ตั้งค่าเวลากะและยอดที่ต้องผลิต · แถวคอขวดไฮไลต์แดง ·
+  Donut แสดง % ภาระ · Bottleneck Alert · ปุ่มดึงข้อมูลจาก M1
+- **`useChartStore.ts`**: เพิ่ม `updateMachineCapacity`, `importMachineCapacityFromTimeStudy`
+- **`types/index.ts`**: เพิ่ม `MachineCapacity`, `MachineCapacityRow` และ field `machineCapacity?`
+- **`editor/page.tsx`**: ต่อ M2 เข้าหน้าจอ (placeholder เหลือแค่ M3) และเอาบรรทัด
+  "Antigravity Full System" ใต้ชื่อโมดูลออก · เปลี่ยนข้อความตอนโหลดเป็น "กำลังโหลดระบบ…"
+- **`TopBar.tsx`**: ใส่ชื่อแอป **Machine-Chart Man-STD-Operation** ที่มุมซ้ายบน
+- **`tests/machine-capacity.test.cjs` (ใหม่)**: 15 เทสต์
+
+### Files Added / Changed
+
+- ใหม่: `src/lib/machine-capacity.ts`, `src/components/modules/Module2_MachineCapacity.tsx`,
+  `tests/machine-capacity.test.cjs`
+- แก้: `src/types/index.ts`, `src/store/useChartStore.ts`, `src/app/editor/page.tsx`,
+  `src/components/layout/TopBar.tsx`, `tests/store.test.cjs`,
+  `docs/Master_Plan.html` (v1.3), `CHANGELOG_AI.md`
+
+### Verification
+
+- `npm test` → **52/52 ผ่าน** (เดิม 37 + M2 15) · `npx tsc --noEmit` ไม่มี error · `npm run build` ผ่าน
+- `npx eslint` ไฟล์ใหม่/ที่แก้: ไม่มี error ใหม่
+- **ทดสอบบน dev server จริง**:
+  - ดึงจาก M1 → ได้ 2 เครื่อง Blow molding (Auto 46.99 = ค่า Min) และ Crusher (60.00)
+  - ใส่ Manual 4.13 → Completion **51.12** ถูกต้อง
+  - Tool change 300 วิ ต่อ 100 ชิ้น → **3.00** วิ/ชิ้น → Capacity **509.98** ชิ้น/กะ
+    (27,600 ÷ 54.12) ถูกต้อง
+  - Crusher Capacity **460.00** (27,600 ÷ 60) เป็นคอขวด ไฮไลต์แดงถูกต้อง
+  - ใส่ยอดที่ต้องผลิต 500 → Takt **55.20** วิ/ชิ้น และแจ้งเตือน "ขาดอีก 40 ชิ้น" ถูกต้อง
+  - console ไม่มี error
+- **Deploy ขึ้น production แล้ว** และเปิดเว็บจริงตรวจซ้ำ: ชื่อแอปใหม่ขึ้นแล้ว ·
+  ไม่มีคำว่า Antigravity เหลือ · M2 แสดงผลครบ · เวลาทำงานสุทธิ 460 นาที
+- ตรวจ `Master_Plan.html`: 0 unclosed, 0 mismatch, v1.3
+
+### Notes / Risks
+
+- **สูตร `=39*8.66` ในไฟล์ Excel ไม่ถูกนำมาใช้** — ให้ผล 337.74 ซึ่งไม่สอดคล้องกับ
+  Completion Time 50.67 วินาทีในแถวเดียวกันไม่ว่าจะแทนเวลากะแบบใด ผู้ใช้ยืนยันให้ใช้
+  สูตรมาตรฐาน TPS แทน
+- **ค่าตั้งต้นเวลาต่อกะ 540 นาที เป็นสมมติฐาน** ผู้ใช้ระบุแค่เวลาพัก 80 นาที
+  (เที่ยง 60 + ก่อน OT 20) ถ้ากะจริงไม่ใช่ 540 นาที แก้ได้ที่ช่อง "เวลาต่อกะ" ในหน้า M2
+- Manual Time ตอนดึงจาก M1 ตั้งเป็น 0 เสมอ เพราะตารางจับเวลาไม่ได้ระบุว่างานของคนคนไหน
+  ผูกกับเครื่องไหน — ต้องกรอกเอง

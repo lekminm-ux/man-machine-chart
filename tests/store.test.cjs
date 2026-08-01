@@ -28,7 +28,9 @@ function loadTypeScriptModule(relativePath, mocks = {}) {
       if (id === '@/types') return loadTypeScriptModule('src/types/index.ts');
       if (id === '@/lib/chart-utils') return loadTypeScriptModule('src/lib/chart-utils.ts');
       if (id === '@/lib/time-study') return loadTypeScriptModule('src/lib/time-study.ts');
+      if (id === '@/lib/machine-capacity') return loadTypeScriptModule('src/lib/machine-capacity.ts');
       if (id === './chart-utils') return loadTypeScriptModule('src/lib/chart-utils.ts');
+      if (id === './time-study') return loadTypeScriptModule('src/lib/time-study.ts');
       return require(id);
     },
     setTimeout,

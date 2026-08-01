@@ -9,6 +9,7 @@ import StepTable from '@/components/editor/StepTable';
 import SummaryTable from '@/components/editor/SummaryTable';
 import LayoutDiagram from '@/components/layout-diagram/LayoutDiagram';
 import Module1_TimeMeasurement from '@/components/modules/Module1_TimeMeasurement';
+import Module2_MachineCapacity from '@/components/modules/Module2_MachineCapacity';
 import Module5_YamazumiChart from '@/components/modules/Module5_YamazumiChart';
 
 export default function EditorPage() {
@@ -28,7 +29,7 @@ export default function EditorPage() {
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-600 font-semibold text-sm">Loading Antigravity System…</span>
+          <span className="text-slate-600 font-semibold text-sm">กำลังโหลดระบบ…</span>
         </div>
       </div>
     );
@@ -74,7 +75,6 @@ export default function EditorPage() {
                         {activeModule === 4 && 'MODULE 4: STANDARDIZED WORK CHART'}
                         {activeModule === 5 && 'MODULE 5: AUTO-YAMAZUMI CHART'}
                       </h1>
-                      <p className="text-blue-600 text-[10px] font-bold mt-1 tracking-wider uppercase">Antigravity Full System</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -107,9 +107,10 @@ export default function EditorPage() {
               )}
 
               {activeModule === 1 && <Module1_TimeMeasurement />}
+              {activeModule === 2 && <Module2_MachineCapacity />}
               {activeModule === 5 && <Module5_YamazumiChart />}
 
-              {(activeModule === 2 || activeModule === 3) && (
+              {activeModule === 3 && (
                 <div className="w-full h-64 bg-white rounded-xl shadow-sm border border-dashed border-slate-300 flex items-center justify-center">
                   <div className="text-center">
                     <span className="text-4xl block mb-2 opacity-50">🚧</span>
