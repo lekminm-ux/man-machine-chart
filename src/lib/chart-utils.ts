@@ -12,47 +12,46 @@ export interface CalculatedStep extends ChartStep {
 }
 
 /**
- * Calculate active start times and category durations on-the-fly.
- * In this model:
- * - Start Time is either manually entered or falls back to a chained start:
- *   an operator element continues from that operator's own previous end; an
- *   Auto M/C element continues from the operator element above it, because a
- *   person has to load the machine before it can run.
- * - The entered time (Manual, Machine, Walk, Idle) represents the STOP (END) time of the step.
- * - The actual duration of the step is: (Stop Time - Start Time)
+ * Work out where each step sits on the timeline.
+ *
+ * DURATION MODEL (adopted 2026-08-01 — "กรอกเท่าไร คิดเท่านั้น"):
+ * every number typed into Manual / Machine / Walk / Idle is the LENGTH of that
+ * element. Nothing is ever subtracted from it.
+ *
+ *   Count (operator row) = manual + walk + idle
+ *   Count (machine row)  = machine
+ *
+ * Start times chain automatically:
+ *   • an operator element begins when that operator's previous element ended;
+ *   • an Auto M/C element begins when the operator element ABOVE it ended,
+ *     because a person has to load the machine before it can run. Two machine
+ *     rows under the same load therefore start together (blueprint Rule 3).
+ * A non-zero `startTime` overrides the chained start — it only moves the bar,
+ * it is never subtracted from the entered times.
+ *
+ * Machine time typed on an operator's own row is kept as a parallel machine
+ * track: it does not lengthen that person's own work.
  */
 export function getCalculatedSteps(steps: ChartStep[]): CalculatedStep[] {
   const actorLastEnd: Record<string, number> = {};
-  // End of the most recent operator element. A machine is started by a person,
-  // so an Auto M/C row picks up from the operator who loaded it — the element
-  // above it — instead of queuing behind whatever machine ran last. Two machine
-  // rows after the same load therefore start together (blueprint Rule 3).
   let lastOperatorEnd = 0;
 
   return steps.map(step => {
     const actor = step.operator;
     const isMachine = actor === 'Auto M/C';
-    const chainStart = isMachine ? lastOperatorEnd : (actorLastEnd[actor] || 0);
 
-    // Start time is either explicit or the chained start
+    // The row's own length — exactly what was keyed in.
+    const duration = isMachine
+      ? step.machineTime
+      : step.manualTime + step.walkingTime + step.idleTime;
+
+    const chainStart = isMachine ? lastOperatorEnd : (actorLastEnd[actor] || 0);
     const start = step.startTime !== undefined && step.startTime !== null && step.startTime !== 0
       ? step.startTime
       : chainStart;
 
-    // Stop time is the maximum of the input categories
-    const stopVal = Math.max(step.manualTime, step.machineTime, step.walkingTime, step.idleTime);
-
-    // Duration is Stop - Start
-    let duration = 0;
-    if (stopVal > start) {
-      duration = stopVal - start;
-    } else if (stopVal > 0 && start === 0) {
-      duration = stopVal;
-    }
-
     const end = start + duration;
 
-    // Update the timeline tracking for this actor
     if (duration > 0) {
       actorLastEnd[actor] = end;
     }
@@ -60,26 +59,15 @@ export function getCalculatedSteps(steps: ChartStep[]): CalculatedStep[] {
       lastOperatorEnd = end;
     }
 
-    // Distribute duration back to the active category
-    let calcManual = 0;
-    let calcMachine = 0;
-    let calcWalk = 0;
-    let calcIdle = 0;
-
-    if (step.manualTime === stopVal) calcManual = duration;
-    else if (step.machineTime === stopVal) calcMachine = duration;
-    else if (step.walkingTime === stopVal) calcWalk = duration;
-    else if (step.idleTime === stopVal) calcIdle = duration;
-
     return {
       ...step,
       calcStart: start,
       calcEnd: end,
       calcDuration: duration,
-      calcManual,
-      calcMachine,
-      calcWalk,
-      calcIdle,
+      calcManual:  isMachine ? 0 : step.manualTime,
+      calcMachine: step.machineTime,
+      calcWalk:    isMachine ? 0 : step.walkingTime,
+      calcIdle:    isMachine ? 0 : step.idleTime,
     };
   });
 }
@@ -229,11 +217,13 @@ export function computeCycleDetail(steps: ChartStep[]): CycleDetail {
       machineEnd[tender] = Math.max(machineEnd[tender] ?? 0, s.calcEnd);
       continue;
     }
+    // Count for an operator row = manual + walk + idle.
     ownTime[s.operator] = (ownTime[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
     lastOperator = s.operator;
-    // Machine time logged under a person's own row stays on their track.
-    if (s.calcMachine > 0) {
-      machineEnd[s.operator] = Math.max(machineEnd[s.operator] ?? 0, s.calcEnd);
+    // Machine time typed on a person's own row runs in parallel from the same
+    // start, so it is charged to them without lengthening their own work.
+    if (s.machineTime > 0) {
+      machineEnd[s.operator] = Math.max(machineEnd[s.operator] ?? 0, s.calcStart + s.machineTime);
     }
   }
 

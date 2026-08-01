@@ -160,7 +160,7 @@ test('resizing the sheet keeps existing readings and pads with blanks', () => {
 // conversion down in both directions, because getting it wrong silently
 // corrupts every downstream number.
 
-test('importing from M4 converts stop times into per-element durations', () => {
+test('importing from M4 copies each element duration into the first reading', () => {
   const steps = [
     { id: 's1', no: 1, description: 'pick', operator: 'Worker A', manualTime: 5, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
     { id: 's2', no: 2, description: 'walk', operator: 'Worker A', manualTime: 0, machineTime: 0, walkingTime: 8, idleTime: 0, startTime: 0 },
@@ -171,11 +171,10 @@ test('importing from M4 converts stop times into per-element durations', () => {
   assert.equal(study.rows.length, 3);
   assert.equal(study.readingCount, 5);
 
-  // step 2's stop time is 8 but it starts when step 1 ends (5) → duration 3.
-  // The machine stops at 40 and starts when the operator finishes at 8 → 32.
+  // Both modules store durations now, so the numbers come across unchanged.
   assert.equal(study.rows[0].readings[0], 5);
-  assert.equal(study.rows[1].readings[0], 3);
-  assert.equal(study.rows[2].readings[0], 32);
+  assert.equal(study.rows[1].readings[0], 8);
+  assert.equal(study.rows[2].readings[0], 40);
 
   assert.equal(study.rows[0].kind, 'man');
   assert.equal(study.rows[1].kind, 'walk');
@@ -186,7 +185,7 @@ test('importing from M4 converts stop times into per-element durations', () => {
   assert.deepEqual(study.rows[0].readings.slice(1), [null, null, null, null]);
 });
 
-test('pushing to M4 converts durations back into stop times', () => {
+test('pushing to M4 writes the chosen reading straight into the matching column', () => {
   const study = {
     readingCount: 5,
     rows: [
@@ -199,11 +198,9 @@ test('pushing to M4 converts durations back into stop times', () => {
   const steps = timeStudy.stepsFromTimeStudy(study, 'min', nextId);
   assert.equal(steps.length, 3);
 
-  // Min basis: 5 then 3 → stop times 5 and 8 on Worker A's track. The machine
-  // is loaded at 8 and runs 40, so its stop reading is 48.
   assert.equal(steps[0].manualTime, 5);
-  assert.equal(steps[1].walkingTime, 8);
-  assert.equal(steps[2].machineTime, 48);
+  assert.equal(steps[1].walkingTime, 3);
+  assert.equal(steps[2].machineTime, 40);
   assert.equal(steps[2].operator, 'Auto M/C');
 
   // and the durations survive the round trip through the chart engine
@@ -211,6 +208,7 @@ test('pushing to M4 converts durations back into stop times', () => {
   assert.equal(calc[0].calcDuration, 5);
   assert.equal(calc[1].calcDuration, 3);
   assert.equal(calc[2].calcDuration, 40);
+  assert.equal(calc[2].calcStart, 8, 'the machine still starts after the operator loads it');
 });
 
 test('push basis switches between Min, Average and Max', () => {

@@ -174,10 +174,13 @@ Cloudflare binding:
 
 ## Business Rules สำคัญ
 
-- Step time fields (`manualTime`, `machineTime`, `walkingTime`, `idleTime`) are treated as stop/end readings, not raw durations.
-- Actual step duration = selected stop time - calculated start time.
+- **DURATION MODEL (adopted 2026-08-01, replaces the old stop-time model).** Every number typed into `manualTime` / `machineTime` / `walkingTime` / `idleTime` is the LENGTH of that element. Nothing is ever subtracted from it — "กรอกเท่าไร คิดเท่านั้น". Typing 100 gives a 100 s element, full stop.
+- `Count (s)` = the row's total time, and it is what feeds the cycle time:
+  - operator row: `manual + walk + idle` (they can be combined on one row, like the คน/เดิน columns of the `std.com table` sheet)
+  - machine row: `machine`
 - Start time is explicit `startTime` when provided and non-zero; otherwise it falls back to a chained start: an operator element continues from that operator's own previous end, while an **Auto M/C element continues from the operator element above it** — a person has to load a machine before it can run. Two machine rows after the same load therefore start together instead of queuing.
-- The active category is the category whose stop-time value is the maximum among manual/machine/walk/idle.
+- A non-zero `startTime` only MOVES the bar. It is never subtracted from the entered times.
+- Machine time typed on an operator's own row runs parallel to that person's work and does not lengthen it.
 - `computeTotalDuration(steps)` means timeline axis extent: maximum calculated end time across all steps.
 - `computeCycleTime(steps)` / `computeCycleDetail(steps)` means actual cycle time: **the longest operator loop** — how long it takes a person to get back to the start of their own sequence. For each operator: `loop = max(their own manual+walk+idle, the stop time of the machines THEY load)`. Line CT = the largest loop, and `computeCycleDetail` also reports which operator sets it plus their waiting time.
 - A machine's stop time is charged only to the person who loads it (the Auto M/C row sitting under their element). A machine nobody waits for — a scrap crusher, say — never sets the line's cycle no matter how late in the chart it runs.

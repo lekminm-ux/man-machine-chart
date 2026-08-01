@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แผนแก้ไข M4 — เปลี่ยนช่องเวลาเป็น "ระยะเวลา"</title>
+<style>
+:root{
+  --bg:#f6f8fb; --panel:#fff; --ink:#111827; --muted:#5b6675; --line:#e3e8ef;
+  --blue:#1d4ed8; --blue-soft:#eff4ff; --green:#047857; --green-soft:#ecfdf5;
+  --amber:#b45309; --amber-soft:#fffbeb; --red:#b91c1c; --red-soft:#fef2f2;
+  --slate-soft:#f1f5f9;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0f141b;--panel:#161d26;--ink:#e8edf4;--muted:#9aa7b8;--line:#27313d;
+  --blue:#7aa2ff;--blue-soft:#182238;--green:#4ade80;--green-soft:#12261d;
+  --amber:#fbbf24;--amber-soft:#2a2010;--red:#fca5a5;--red-soft:#2a1516;--slate-soft:#1b232e;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+ font-family:"Sarabun","Leelawadee UI","Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.7}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px 70px}
+header.top{background:linear-gradient(135deg,#7f1d1d,#b91c1c 55%,#c2410c);color:#fff;padding:34px 0 28px;margin-bottom:24px}
+header.top .wrap{padding-bottom:0}
+header.top h1{margin:0 0 6px;font-size:27px;letter-spacing:-.4px}
+header.top p{margin:0;opacity:.92}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.chips div{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 11px;font-size:12.5px}
+.chips b{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.75}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px}
+h2{margin:0 0 4px;font-size:19px;display:flex;align-items:center;gap:10px}
+h2 .n{background:var(--red);color:#fff;font-size:12px;font-weight:800;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex:none}
+h3{margin:22px 0 8px;font-size:15.5px;color:var(--blue)}
+.lead{color:var(--muted);margin:0 0 16px;font-size:14px}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:5px}
+code{background:var(--slate-soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:Consolas,monospace;font-size:12.5px}
+.tablewrap{overflow-x:auto;margin-bottom:14px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--slate-soft);font-weight:700;font-size:12.5px}
+td.num{text-align:right;font-family:Consolas,monospace}
+tr.hl td{background:var(--red-soft)}
+tr.ok td{background:var(--green-soft)}
+.note{border-left:4px solid var(--blue);background:var(--blue-soft);padding:12px 15px;border-radius:0 10px 10px 0;margin:14px 0}
+.warn{border-left:4px solid var(--amber);background:var(--amber-soft);padding:12px 15px;border-radius:0 10px 10px 0;margin:14px 0}
+.stop{border-left:4px solid var(--red);background:var(--red-soft);padding:12px 15px;border-radius:0 10px 10px 0;margin:14px 0}
+.ok{border-left:4px solid var(--green);background:var(--green-soft);padding:12px 15px;border-radius:0 10px 10px 0;margin:14px 0}
+.note p:last-child,.warn p:last-child,.stop p:last-child,.ok p:last-child{margin-bottom:0}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:16px 0}
+.box{border:2px solid var(--line);border-radius:12px;padding:14px}
+.box.bad{border-color:var(--red)}
+.box.good{border-color:var(--green)}
+.box h4{margin:0 0 8px;font-size:14px}
+.box.bad h4{color:var(--red)}
+.box.good h4{color:var(--green)}
+.formula{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px 16px;font-family:Consolas,monospace;font-size:13px;line-height:1.9;overflow-x:auto;margin:12px 0}
+.formula .k{color:#fbbf24}.formula .c{color:#64748b}
+.b{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:99px;white-space:nowrap;border:1px solid currentColor}
+.b-new{background:var(--green-soft);color:var(--green)}
+.b-chg{background:var(--amber-soft);color:var(--amber)}
+.b-del{background:var(--red-soft);color:var(--red)}
+.b-same{background:var(--slate-soft);color:var(--muted);border-color:var(--line)}
+svg.diagram{width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:14px 0}
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding:22px 0}
+@media print{body{background:#fff}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>แผนแก้ไข M4 — เปลี่ยนช่องเวลาเป็น “ระยะเวลา”</h1>
+    <p>เลิกใช้ระบบ “ค่าที่อ่านจากนาฬิกา” เปลี่ยนเป็นกรอกระยะเวลาของแต่ละขั้นตอนตรงๆ</p>
+    <div class="chips">
+      <div><b>สถานะ</b>รออนุมัติ · ยังไม่แตะโค้ด</div>
+      <div><b>ฉบับ</b>2 — แก้ตามที่พี่ชี้</div>
+      <div><b>วันที่</b>1 ส.ค. 2569</div>
+      <div><b>Commit ปัจจุบัน</b>bb6f749</div>
+      <div><b>ไฟล์ที่กระทบ</b>10 ไฟล์ · 2 ไฟล์ข้อมูลจริง</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">1</span> ปัญหาที่พี่เจอ — และทำไมถึงเกิด</h2>
+  <p class="lead">พี่กรอก Manual = 100 แต่ Count ขึ้น 95 — ถูกต้องตามสูตรที่เขียนไว้ แต่<b>สูตรนั้นผิดหลัก</b></p>
+
+  <h3>ระบบตอนนี้ตีความตัวเลขที่กรอกว่าเป็น “เวลาที่นาฬิกาเดินถึง” ไม่ใช่ “ระยะเวลา”</h3>
+  <div class="formula">
+<span class="c">// สูตรที่ใช้อยู่ตอนนี้ ใน src/lib/chart-utils.ts</span>
+stopVal  = max(manual, machine, walk, idle)   <span class="c">// ค่าที่กรอก = จุดที่นาฬิกาหยุด</span>
+<span class="k">duration = stopVal − start</span>                     <span class="c">// ระยะเวลาได้จากการ "ลบ"</span>
+  </div>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:28%">ขั้นตอน</th><th style="width:12%">กรอก</th><th style="width:11%">เริ่ม</th><th style="width:15%">ตอนนี้ได้</th><th style="width:15%">ต้องได้</th><th>ปัญหา</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>เดินไปหยิบชิ้นงาน</td><td class="num">Walk 5</td><td class="num">0</td><td class="num">5 s</td><td class="num">5 s</td><td>บังเอิญถูก เพราะเริ่มที่ 0</td></tr>
+      <tr class="hl"><td class="num">2</td><td>Work Unloading and Insert nut</td><td class="num"><b>100</b></td><td class="num">5</td><td class="num"><b>95 s</b></td><td class="num"><b>100 s</b></td><td>ถูกหักด้วย 5 ของแถวบน</td></tr>
+      <tr class="hl"><td class="num">3</td><td>Blow molding <span style="color:var(--muted)">(เครื่อง)</span></td><td class="num"><b>385</b></td><td class="num">70</td><td class="num"><b>315 s</b></td><td class="num"><b>385 s</b></td><td>ถูกหักด้วยเวลาเริ่ม 70</td></tr>
+      <tr class="hl"><td class="num">4</td><td>Cutting scrap</td><td class="num"><b>220</b></td><td class="num">100</td><td class="num"><b>120 s</b></td><td class="num"><b>220 s</b></td><td>ถูกหักด้วย 100 ของแถวบน</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="ok">
+    <p style="font-size:16px"><b>กฎข้อเดียวที่ต้องยึด: กรอกเท่าไร คิดเท่านั้น</b><br>
+       <span style="font-size:13.5px">ไม่มีการลบ ไม่มีการหักอะไรทั้งนั้น ตัวเลขที่กรอกคือระยะเวลาของขั้นตอนนั้นตรงๆ</span></p>
+  </div>
+
+  <div class="stop">
+    <p><b>รากของปัญหา:</b> ช่องเดียวกันถูกใช้แทน 2 ความหมายที่ขัดกัน</p>
+    <ul style="margin-top:8px;margin-bottom:0">
+      <li><b>M1 ตารางจับเวลา</b> เก็บ <b>ระยะเวลา</b> (กรอก 100 = ทำงาน 100 วินาที)</li>
+      <li><b>M4 Standard Work Sheet</b> เก็บ <b>ค่าที่นาฬิกาเดินถึง</b> (กรอก 100 = นาฬิกาเดินถึง 100)</li>
+    </ul>
+  </div>
+  <p>สองโมดูลนี้จึงพูดคนละภาษา ต้องมีตัวแปลงคั่นกลางตลอด และเวลาเกิดปัญหาก็หาต้นเหตุยาก
+     — อย่างที่เพิ่งเจอกับแถว Crusher</p>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">2</span> สิ่งที่จะเปลี่ยน</h2>
+  <p class="lead">ให้ M4 ใช้ “ระยะเวลา” เหมือน M1 — ทั้งระบบพูดภาษาเดียวกัน</p>
+
+  <div class="two">
+    <div class="box bad">
+      <h4>❌ แบบเดิม</h4>
+      <p style="font-size:13.5px;margin-bottom:6px">กรอก <b>ค่าที่นาฬิกาเดินถึง</b></p>
+      <table style="min-width:0;font-size:12.5px">
+        <tr><td>เดินไปหยิบ</td><td class="num">5</td><td class="num">= 5 s</td></tr>
+        <tr><td>Unloading</td><td class="num">100</td><td class="num">= 95 s</td></tr>
+        <tr><td>Cutting scrap</td><td class="num">220</td><td class="num">= 120 s</td></tr>
+        <tr><td>check part</td><td class="num">240</td><td class="num">= 20 s</td></tr>
+      </table>
+      <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0">ต้องบวกสะสมเองทุกแถว · แก้แถวเดียวพังทั้งแถวล่าง</p>
+    </div>
+    <div class="box good">
+      <h4>✅ แบบใหม่</h4>
+      <p style="font-size:13.5px;margin-bottom:6px">กรอก <b>ระยะเวลาของขั้นตอนนั้น</b></p>
+      <table style="min-width:0;font-size:12.5px">
+        <tr><td>เดินไปหยิบ</td><td class="num">5</td><td class="num">= 5 s</td></tr>
+        <tr><td>Unloading</td><td class="num">100</td><td class="num">= 100 s</td></tr>
+        <tr><td>Cutting scrap</td><td class="num">120</td><td class="num">= 120 s</td></tr>
+        <tr><td>check part</td><td class="num">20</td><td class="num">= 20 s</td></tr>
+      </table>
+      <p style="font-size:12.5px;color:var(--green);margin:8px 0 0"><b>กรอกเท่าไร ได้เท่านั้น</b> · แก้แถวไหนกระทบแค่แถวนั้น</p>
+    </div>
+  </div>
+
+  <h3>สูตรใหม่ทั้งหมด</h3>
+  <div class="formula">
+<span class="c">// ── ขั้นที่ 1: Count = เวลารวมของแถว (กรอกเท่าไร ได้เท่านั้น ไม่มีการลบ) ──</span>
+Count(แถวคน)     = manual + walk + idle
+Count(แถวเครื่อง) = machine
+
+<span class="c">// ── ขั้นที่ 2: หาว่าแท่งเริ่มตรงไหน ──</span>
+start(แถวคน)     = คนคนนั้นทำแถวก่อนหน้าเสร็จเมื่อไร
+start(แถวเครื่อง) = <span class="k">งานของคนที่อยู่เหนือมัน</span>เสร็จเมื่อไร   <span class="c">// คนต้องโหลดก่อนเครื่องถึงทำงานได้</span>
+end              = start + Count
+<span class="c">// ถ้ากรอกช่อง Start Time เอง ให้ใช้ค่านั้นแทน (แต่ไม่เอาไปลบ Count)</span>
+
+<span class="c">// ── ขั้นที่ 3: Cycle Time คำนวณจากคอลัมน์ Count ──</span>
+รอบของคน   = <span class="k">ผลรวม Count ของคนคนนั้น</span>
+รอบที่แท้จริง = max( รอบของคน , end ของเครื่องที่คนนั้นเป็นคนโหลด )
+<span class="k">Cycle Time  = รอบที่ยาวที่สุดในบรรดาคนทั้งหมด</span>
+  </div>
+
+  <div class="note">
+    <p><b>ตรวจกับข้อมูลของพี่:</b> Worker A จะได้ Count 5 + 100 + 220 + 240 + 270 + 361
+       ซึ่ง<b>ตัวเลข 4 แถวหลังยังเป็นยอดสะสมเดิมอยู่</b> — ดูหัวข้อ 4 เรื่องการแปลงข้อมูล</p>
+  </div>
+
+  <svg class="diagram" viewBox="0 0 940 250" xmlns="http://www.w3.org/2000/svg">
+    <text x="10" y="20" font-size="12" font-weight="700" fill="currentColor">ภาพเวลาแบบใหม่ (Worker A + Blow molding)</text>
+    <!-- axis -->
+    <line x1="120" y1="215" x2="900" y2="215" stroke="#94a3b8" stroke-width="1.5"/>
+    <g font-size="10" fill="#64748b" text-anchor="middle">
+      <text x="120" y="232">0</text><text x="255" y="232">100</text><text x="390" y="232">200</text>
+      <text x="525" y="232">300</text><text x="660" y="232">400</text><text x="795" y="232">500</text>
+    </g>
+    <!-- rows -->
+    <g font-size="11" fill="currentColor">
+      <text x="10" y="52">เดินไปหยิบ</text>
+      <text x="10" y="80">Unloading</text>
+      <text x="10" y="108">Blow molding</text>
+      <text x="10" y="136">Cutting scrap</text>
+      <text x="10" y="164">check + send + prepare</text>
+    </g>
+    <!-- bars: scale 1.35px per second -->
+    <rect x="120" y="42" width="7" height="12" rx="2" fill="#0891b2"/>
+    <text x="132" y="52" font-size="10" fill="#0891b2">5</text>
+
+    <rect x="127" y="70" width="135" height="12" rx="2" fill="#334155"/>
+    <text x="194" y="80" font-size="10" fill="#fff" text-anchor="middle">100</text>
+
+    <rect x="262" y="98" width="425" height="12" rx="2" fill="#2563eb" opacity=".85"/>
+    <text x="474" y="108" font-size="10" fill="#fff" text-anchor="middle">Blow molding 315</text>
+
+    <rect x="262" y="126" width="162" height="12" rx="2" fill="#334155"/>
+    <text x="343" y="136" font-size="10" fill="#fff" text-anchor="middle">120</text>
+
+    <rect x="424" y="154" width="190" height="12" rx="2" fill="#334155"/>
+    <text x="519" y="164" font-size="10" fill="#fff" text-anchor="middle">20+30+91</text>
+
+    <!-- wait -->
+    <rect x="614" y="154" width="73" height="12" rx="2" fill="#f59e0b" opacity=".5"/>
+    <text x="650" y="164" font-size="9" fill="#92400e" text-anchor="middle">รอเครื่อง</text>
+
+    <!-- cycle line -->
+    <line x1="687" y1="30" x2="687" y2="215" stroke="#ef4444" stroke-width="2.5"/>
+    <rect x="627" y="182" width="120" height="17" rx="8" fill="#ef4444"/>
+    <text x="687" y="194" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">CYCLE TIME</text>
+    <line x1="120" y1="205" x2="687" y2="205" stroke="#ef4444" stroke-width="2"/>
+  </svg>
+  <p style="font-size:13px;color:var(--muted);margin-top:-4px">
+    เครื่องเริ่มตอนคนโหลดเสร็จ · คนเดินไปทำงานอื่นขนานกันไป · พอทำงานตัวเองครบก็รอเครื่องจนหยุด แล้ววนกลับ = Cycle Time
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">3</span> คอลัมน์ในตารางจะเปลี่ยนไปอย่างไร</h2>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:16%">คอลัมน์</th><th style="width:13%">สถานะ</th><th>รายละเอียด</th></tr></thead>
+    <tbody>
+      <tr><td><b>Manual (s)</b></td><td><span class="b b-chg">เปลี่ยนความหมาย</span></td><td>จาก “นาฬิกาเดินถึง” → <b>ระยะเวลาที่คนทำงานในขั้นตอนนี้</b></td></tr>
+      <tr><td><b>Machine (s)</b></td><td><span class="b b-chg">เปลี่ยนความหมาย</span></td><td>→ <b>ระยะเวลาที่เครื่องทำงานเอง</b></td></tr>
+      <tr><td><b>Walk (s)</b></td><td><span class="b b-chg">เปลี่ยนความหมาย</span></td><td>→ <b>ระยะเวลาเดิน</b> · รวมกับ Manual ในแถวเดียวกันได้</td></tr>
+      <tr><td><b>Idle (s)</b></td><td><span class="b b-chg">เปลี่ยนความหมาย</span></td><td>→ <b>ระยะเวลารอ</b></td></tr>
+      <tr class="ok"><td><b>Count (s)</b></td><td><span class="b b-same">เก็บไว้</span></td><td><b>ช่องคำนวณ Cycle Time</b> = เวลารวมของแถวนั้น<br>
+        <code>แถวคน: manual + walk + idle</code> · <code>แถวเครื่อง: machine</code><br>
+        <span style="color:var(--muted)">แถวที่กรอกช่องเดียว Count จะเท่ากับตัวเลขที่กรอก · แถวที่กรอกหลายช่อง เช่น ทำงาน 40 + เดิน 8 จะได้ Count 48</span></td></tr>
+      <tr><td><b>Start Time (s)</b></td><td><span class="b b-same">เหมือนเดิม</span></td><td>เว้นว่าง = ต่อกันอัตโนมัติ · กรอกเอง = กำหนดจุดเริ่มทับ<br>
+        <span style="color:var(--muted)"><b>สำคัญ:</b> Start Time จะไม่ถูกเอาไป “ลบ” ออกจากเวลาที่กรอกอีกต่อไป มันแค่บอกว่าแท่งเริ่มวาดตรงไหน</span></td></tr>
+      <tr class="ok"><td><b>Start → End</b></td><td><span class="b b-new">คอลัมน์ใหม่</span></td><td>บอกว่าขั้นตอนนี้อยู่ช่วงไหนบนไทม์ไลน์ เช่น <code>5 → 105</code> (เพิ่มเข้ามา ไม่ได้แทนที่ Count)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>แสดงตัวเลขบนกราฟ (ตามที่ขอ)</h3>
+  <ul>
+    <li>เขียน <b>ระยะเวลา</b> กำกับกลางแท่งทุกแท่ง</li>
+    <li>เขียน <b>เวลาเริ่ม–จบ</b> ที่หัวและท้ายแท่ง เมื่อแท่งกว้างพอ</li>
+    <li>แท่งของเครื่องมีป้าย <code>เริ่มเมื่อ &lt;ชื่อคน&gt; โหลดเสร็จ</code> เพื่อให้เห็นว่าตัวเลขมาจากไหน</li>
+    <li>ช่วงที่คนรอเครื่องแสดงเป็นแถบสีเหลืองพร้อมตัวเลขวินาทีที่รอ</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">4</span> ข้อมูลเดิมจะเอาอย่างไร <span style="font-size:13px;color:var(--red)">← ต้องให้พี่เลือก</span></h2>
+  <p class="lead">ตัวเลขที่เก็บอยู่ตอนนี้ถูกกรอกไว้แบบ “ยอดสะสม” พอเปลี่ยนกฎเป็น “กรอกเท่าไรได้เท่านั้น” ตัวเลขเดิมจะมีความหมายใหม่ทันที</p>
+
+  <div class="two">
+    <div class="box good">
+      <h4>ทางเลือก A — แปลงให้อัตโนมัติ</h4>
+      <p style="font-size:13.5px">เปลี่ยนค่าที่เก็บไว้ให้เท่ากับตัวเลขที่คอลัมน์ Count แสดงอยู่ตอนนี้</p>
+      <table style="min-width:0;font-size:12.5px">
+        <tr><th>ขั้นตอน</th><th>เดิม</th><th>หลังแปลง</th></tr>
+        <tr><td>Unloading</td><td class="num">100</td><td class="num">95</td></tr>
+        <tr><td>Blow molding</td><td class="num">385</td><td class="num">315</td></tr>
+        <tr><td>Cutting scrap</td><td class="num">220</td><td class="num">120</td></tr>
+        <tr><td>check part</td><td class="num">240</td><td class="num">20</td></tr>
+      </table>
+      <p style="font-size:12.5px;margin:10px 0 0"><b>ผล:</b> กราฟหน้าตาเหมือนเดิมเป๊ะ · Worker A รวม 361 s เท่าเดิม<br>
+      <b>แต่:</b> ต้องกลับไปแก้ 2 แถวเอง (Unloading 95→100, Crusher)</p>
+    </div>
+    <div class="box bad">
+      <h4>ทางเลือก B — ไม่แปลง ใช้ค่าเดิมเป็นระยะเวลาเลย</h4>
+      <p style="font-size:13.5px">ตัวเลขที่เห็นในช่องคือระยะเวลาทันที ตามหลัก “กรอกเท่าไรได้เท่านั้น”</p>
+      <table style="min-width:0;font-size:12.5px">
+        <tr><th>ขั้นตอน</th><th>เดิม</th><th>กลายเป็น</th></tr>
+        <tr><td>Unloading</td><td class="num">100</td><td class="num">100</td></tr>
+        <tr><td>Blow molding</td><td class="num">385</td><td class="num">385</td></tr>
+        <tr><td>Cutting scrap</td><td class="num">220</td><td class="num">220</td></tr>
+        <tr><td>check part</td><td class="num">240</td><td class="num">240</td></tr>
+      </table>
+      <p style="font-size:12.5px;margin:10px 0 0"><b>ผล:</b> ตรงตามกฎใหม่ทุกแถว<br>
+      <b>แต่:</b> Worker A รวมจาก 361 s พุ่งเป็น <b>1,196 s</b> เพราะ 4 แถวหลังยังเป็นยอดสะสม —
+      ต้อง<b>ไล่แก้เองเกือบทุกแถว</b> (หรือกด “ดึงข้อมูลจาก M1” มาทับ)</p>
+    </div>
+  </div>
+
+  <div class="warn">
+    <p><b>คำแนะนำของผม: เลือก A</b> เพราะรักษาเวลาที่พี่วัดมาจริงไว้ครบ (Cutting scrap ใช้เวลา 120 วิ ไม่ใช่ 220 วิ)
+       แล้วค่อยแก้แค่ 2 แถวที่รู้อยู่แล้วว่าผิด · ถ้าเลือก B ต้องกรอกใหม่ประมาณ 15 แถว</p>
+    <p style="margin-top:8px">ไม่ว่าเลือกทางไหน <b>กฎ “กรอกเท่าไรได้เท่านั้น” จะมีผลกับทุกอย่างที่กรอกหลังจากนี้เหมือนกัน</b>
+       ต่างกันแค่จะทำอย่างไรกับตัวเลขที่กรอกไว้ก่อนหน้า</p>
+  </div>
+
+  <h3>ตาราง A ฉบับเต็ม — ไฟล์ BYDSidestep Rev.01 (ดึงจากฐานข้อมูลจริง)</h3>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:32%">ขั้นตอน</th><th style="width:12%">ผู้ทำ</th><th style="width:16%">ค่าเดิมในไฟล์</th><th style="width:16%">ค่าใหม่หลังแปลง</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>เดินไปหยิบชิ้นงาน</td><td>Worker A</td><td class="num">walk 5</td><td class="num">walk 5</td><td>ไม่เปลี่ยน</td></tr>
+      <tr class="hl"><td class="num">2</td><td>Work Unloading and Insert nut</td><td>Worker A</td><td class="num">manual 100</td><td class="num">manual 95</td><td><b>ต้องแก้เป็น 100 เองหลังแปลง</b></td></tr>
+      <tr><td class="num">3</td><td>Blow molding</td><td>Auto M/C</td><td class="num">machine 385</td><td class="num">machine 315</td><td>เครื่องทำงานจริง 315 s</td></tr>
+      <tr><td class="num">4</td><td>Cutting scrap</td><td>Worker A</td><td class="num">manual 220</td><td class="num">manual 120</td><td>ตรงกับ Count เดิม</td></tr>
+      <tr><td class="num">5</td><td>check part Weight &amp; nut</td><td>Worker A</td><td class="num">manual 240</td><td class="num">manual 20</td><td></td></tr>
+      <tr><td class="num">6</td><td>Send part</td><td>Worker A</td><td class="num">manual 270</td><td class="num">manual 30</td><td></td></tr>
+      <tr><td class="num">7</td><td>Prepare insert nut</td><td>Worker A</td><td class="num">manual 361</td><td class="num">manual 91</td><td></td></tr>
+      <tr><td class="num">8</td><td>Finishing Bari on part</td><td>Worker B</td><td class="num">manual 235</td><td class="num">manual 235</td><td>แถวแรกของคน ไม่เปลี่ยน</td></tr>
+      <tr><td class="num">9-11</td><td>Quality check / Scan / Send</td><td>Worker B</td><td class="num">255 / 270 / 285</td><td class="num">20 / 15 / 15</td><td></td></tr>
+      <tr><td class="num">12-15</td><td>งานของ Worker C</td><td>Worker C</td><td class="num">236 / 256 / 271 / 286</td><td class="num">236 / 20 / 15 / 15</td><td></td></tr>
+      <tr><td class="num">16-17</td><td>เข็นรถ / Scrap Cutting</td><td>Worker D</td><td class="num">70 / 135</td><td class="num">70 / 65</td><td></td></tr>
+      <tr class="hl"><td class="num">18</td><td>Crusher</td><td>Auto M/C</td><td class="num">machine 445</td><td class="num">machine 310</td><td><b>ค่าค้างเดิม — ต้องแก้เป็น 60</b></td></tr>
+      <tr><td class="num">19</td><td>ตักเศษบดใส่ Bigbag</td><td>Worker D</td><td class="num">manual 255</td><td class="num">manual 120</td><td></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="warn">
+    <p><b>2 แถวที่ต้องแก้ด้วยมือหลังแปลง</b> (ระบบแปลงให้ตรงกับที่กราฟแสดงอยู่ตอนนี้เท่านั้น ไม่เดาเจตนา):</p>
+    <ul style="margin:8px 0 0">
+      <li>แถว 2 <b>Work Unloading</b> → แก้จาก 95 เป็น <b>100</b> ตามที่พี่ตั้งใจ</li>
+      <li>แถว 18 <b>Crusher</b> → แก้จาก 310 เป็น <b>60</b> (ค่าค้างจากตอนที่ระบบต่อคิวเครื่องผิด)</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <p><b>ไฟล์อื่น:</b> ตรวจแล้วมีแค่ 2 ไฟล์ที่มีข้อมูล — Rev.01 (19 แถว) และ Rev.00 (14 แถว)
+       ส่วน Coverouter581D, Inner LH, Inner RH, 5F00_Facestep <b>ยังว่างเปล่า</b> จึงไม่ได้รับผลกระทบ</p>
+  </div>
+
+  <div class="ok">
+    <p><b>กันข้อมูลหาย:</b> ก่อนแปลง ผมจะสำรองไฟล์ทั้งหมดเป็น JSON เก็บไว้ในเครื่องก่อน
+       และการแปลงจะเกิดในหน่วยความจำเท่านั้น <b>จะยังไม่เขียนทับฐานข้อมูลจนกว่าพี่จะกดปุ่ม Save เอง</b></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">5</span> ไฟล์ที่ต้องแก้</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:34%">ไฟล์</th><th style="width:14%">ระดับ</th><th>ทำอะไร</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/lib/chart-utils.ts</code></td><td><span class="b b-chg">หัวใจ</span></td><td>เปลี่ยน <code>getCalculatedSteps</code> ให้ค่าที่กรอก = ระยะเวลา และไล่เวลาเริ่มต่อกัน</td></tr>
+      <tr><td><code>src/lib/step-migration.ts</code></td><td><span class="b b-new">ไฟล์ใหม่</span></td><td>ตัวแปลงข้อมูลเก่า + ธง <code>stepsModel</code> กันแปลงซ้ำ</td></tr>
+      <tr><td><code>src/types/index.ts</code></td><td><span class="b b-chg">แก้</span></td><td>เพิ่มฟิลด์ <code>stepsModel?: 'duration'</code> ใน ChartFile</td></tr>
+      <tr><td><code>src/lib/storage.ts</code> · <code>useChartStore.ts</code></td><td><span class="b b-chg">แก้</span></td><td>เรียกตัวแปลงตอนโหลดไฟล์ที่ยังไม่มีธง</td></tr>
+      <tr><td><code>src/components/editor/StepTable.tsx</code></td><td><span class="b b-chg">แก้</span></td><td><b>เก็บคอลัมน์ Count ไว้</b> (เปลี่ยนที่มาของตัวเลข) · เพิ่ม Start → End · เขียนตัวเลขบนแท่งกราฟ · แถบรอเครื่อง</td></tr>
+      <tr><td><code>src/lib/time-study.ts</code></td><td><span class="b b-chg">ง่ายลง</span></td><td>สะพาน M1 ↔ M4 ไม่ต้องแปลงหน่วยอีกต่อไป เพราะเป็นระยะเวลาทั้งคู่</td></tr>
+      <tr><td><code>src/lib/combination-table.ts</code> (M3)</td><td><span class="b b-same">แทบไม่แตะ</span></td><td>ใช้ระยะเวลาอยู่แล้ว แค่ตรวจว่ายังตรงกับ M4</td></tr>
+      <tr><td><code>SummaryTable.tsx</code> · <code>Module5</code></td><td><span class="b b-same">ไม่แตะ</span></td><td>อ่านค่าจาก <code>calc*</code> อยู่แล้ว จึงได้ค่าที่ถูกโดยอัตโนมัติ</td></tr>
+      <tr><td><code>src/lib/seed-data.ts</code></td><td><span class="b b-chg">แก้</span></td><td>ข้อมูลตัวอย่างต้องเขียนใหม่เป็นระยะเวลา</td></tr>
+      <tr><td>ชุดเทสต์ 4 ไฟล์</td><td><span class="b b-chg">แก้</span></td><td>ปรับ fixture ทั้งหมด + เพิ่มเทสต์ตัวแปลงข้อมูล</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">6</span> ลำดับการทำงานและการตรวจสอบ</h2>
+  <ol>
+    <li><b>สำรองข้อมูล</b> — ดึงทุกไฟล์จาก D1 เก็บเป็น JSON ไว้ก่อน</li>
+    <li>เขียนตัวแปลง + เทสต์ ให้ผ่านก่อนแตะสูตรหลัก</li>
+    <li>เปลี่ยน <code>getCalculatedSteps</code> เป็นโมเดลระยะเวลา</li>
+    <li>ไล่แก้เทสต์ทุกไฟล์ (ตอนนี้ 73 ข้อ) ให้ผ่านครบ</li>
+    <li>ปรับหน้าตาตาราง + ตัวเลขบนกราฟ</li>
+    <li><b>ทดสอบด้วยข้อมูลจริงทั้ง 2 ไฟล์</b> เทียบตัวเลขทีละแถวก่อน–หลัง ให้พี่ดู</li>
+    <li>Deploy แล้วเปิดเว็บจริงตรวจซ้ำ</li>
+    <li>อัปเดต Master Plan + CHANGELOG แล้ว commit + push</li>
+  </ol>
+
+  <div class="stop">
+    <p><b>สิ่งที่ผมจะไม่ทำโดยไม่ถาม:</b> ไม่เขียนทับข้อมูลบนฐานข้อมูลจริงเอง ·
+       ไม่แก้ตัวเลขที่พี่กรอกไว้ (แถว 2 กับ 18) ให้เอง · ถ้าเจอความกำกวมระหว่างทางจะหยุดถามก่อน</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<section>
+  <h2><span class="n">7</span> ข้อดี–ข้อเสียที่ต้องรู้ก่อนตัดสินใจ</h2>
+  <div class="two">
+    <div class="box good">
+      <h4>ข้อดี</h4>
+      <ul style="margin-bottom:0">
+        <li>กรอกเท่าไร ได้เท่านั้น — ตรงสัญชาตญาณ</li>
+        <li>แก้แถวเดียวไม่กระทบแถวอื่น (เดิมต้องไล่แก้ยอดสะสมทั้งคอลัมน์)</li>
+        <li>M1 กับ M4 พูดภาษาเดียวกัน สะพานเชื่อมง่ายลงมาก</li>
+        <li>ตรงกับฟอร์ม Excel ที่ใช้จริง (คอลัมน์ คน/เครื่อง/เดิน เป็นระยะเวลา)</li>
+        <li>บั๊กแบบที่เจอ 3 รอบที่ผ่านมาจะไม่เกิดอีก เพราะไม่มีการ “ลบ” ให้พลาด</li>
+      </ul>
+    </div>
+    <div class="box bad">
+      <h4>ข้อเสีย / ความเสี่ยง</h4>
+      <ul style="margin-bottom:0">
+        <li>ข้อมูลเดิมต้องแปลง — ถ้าแปลงซ้ำจะเพี้ยน (กันด้วยธงในไฟล์)</li>
+        <li>ถ้าเคยชินกับการกรอกยอดสะสม ต้องปรับวิธีกรอกใหม่</li>
+        <li>ต้องแก้เทสต์ทั้งชุด 73 ข้อ ใช้เวลาพอสมควร</li>
+        <li>ไฟล์ที่เปิดค้างบนเครื่องอื่นตอนแปลง อาจเขียนทับกันได้ — ควรปิดไฟล์บนเครื่องอื่นก่อน</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  แผนนี้ยังไม่ได้ลงมือ — รออนุมัติจากพี่ก่อน<br>
+  Machine-Chart Man-STD-Operation · 1 ส.ค. 2569
+</footer>
+
+</div>
+</body>
+</html>

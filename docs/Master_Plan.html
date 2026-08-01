@@ -144,11 +144,11 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.6</div>
+      <div><b>Version</b>1.7</div>
       <div><b>Updated</b>1 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>3ca27e2</div>
-      <div><b>Status</b>Phase 1-3 เสร็จ + Cycle Time = รอบของคน · ถัดไป Phase 4</div>
+      <div><b>Baseline commit</b>bb6f749</div>
+      <div><b>Status</b>Phase 1-3 เสร็จ + M4 ใช้โมเดลระยะเวลา · ถัดไป Phase 4</div>
     </div>
   </div>
 </header>
@@ -438,6 +438,23 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <li>Rule 2: Cycle &lt; Takt → แสดงลูกศรรอ พร้อมตัวเลขวินาทีที่ต้องรอ</li>
     <li>Rule 3: เครื่อง 2 เครื่องเริ่มพร้อมกัน → วาดเส้นคู่ขนาน ไม่ให้ทับกัน</li>
   </ul>
+
+  <h3>โมเดลเวลาของ M4 — “กรอกเท่าไร คิดเท่านั้น” (เปลี่ยน 1 ส.ค. 2569)</h3>
+  <div class="ok">
+    <p style="font-size:16px"><b>ตัวเลขที่กรอกในช่อง Manual / Machine / Walk / Idle คือระยะเวลาของขั้นตอนนั้นตรงๆ</b><br>
+       <span style="font-size:13.5px">ไม่มีการลบด้วยเวลาเริ่มหรือแถวก่อนหน้าอีกแล้ว · ช่อง Start Time แค่เลื่อนตำแหน่งแท่ง ไม่ไปหักเวลา</span></p>
+  </div>
+  <ul>
+    <li><b>Count (s)</b> = เวลารวมของแถว และเป็นตัวที่ใช้คำนวณ Cycle Time<br>
+        <code>แถวคน = manual + walk + idle</code> · <code>แถวเครื่อง = machine</code></li>
+    <li>เพิ่มคอลัมน์ <b>Start → End</b> บอกว่าขั้นตอนนั้นอยู่ช่วงไหนบนไทม์ไลน์</li>
+    <li>บนกราฟมีตัวเลขกำกับทุกแท่ง (ระยะเวลากลางแท่ง · เวลาเริ่ม-จบที่หัวท้าย)</li>
+  </ul>
+  <div class="warn">
+    <p><b>ตัวเลขเดิมไม่ถูกแปลง</b> (ผู้ใช้เลือกทางเลือก B เพื่อให้ทีมงานเข้าใจง่าย) —
+       ค่าที่กรอกไว้แบบยอดสะสมจึงกลายเป็นระยะเวลาทันที ต้องไล่กรอกใหม่ให้ตรงกับเวลาจริง
+       หรือกด “ดึงข้อมูลจาก M1” มาทับ</p>
+  </div>
 
   <h3>Cycle Time — นิยามที่ถูกต้อง (แก้ไข 1 ส.ค. 2569)</h3>
   <p><b>Cycle Time = รอบของคนที่ยาวที่สุด</b> คือเวลาที่คนคนหนึ่งใช้กว่าจะวนกลับมาเริ่มงานแรกของตัวเองใหม่
@@ -751,6 +768,18 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.7</b></td><td>1 ส.ค. 2569</td><td><code>bb6f749</code> →</td>
+        <td>
+          <b>M4 เปลี่ยนเป็นโมเดลระยะเวลา — “กรอกเท่าไร คิดเท่านั้น”</b><br>
+          เลิกตีความตัวเลขที่กรอกว่าเป็นยอดสะสม · Count = manual+walk+idle (แถวคน) หรือ machine (แถวเครื่อง)
+          และเป็นตัวคำนวณ Cycle Time · เพิ่มคอลัมน์ Start → End · เขียนตัวเลขกำกับทุกแท่งบนกราฟ<br>
+          M1 กับ M4 พูดภาษาเดียวกันแล้ว สะพานเชื่อมไม่ต้องแปลงหน่วยอีก<br>
+          <b>ทดสอบ:</b> 83/83 ผ่าน (เขียน fixture ใหม่ทั้งชุด) · <code>tsc</code> clean · build ผ่าน ·
+          ทดสอบด้วยข้อมูล Rev.01 จริง: กรอก 100 → 100s · 385 → 385s · 220 → 220s ถูกต้อง ·
+          deploy แล้วเปิดเว็บจริงยืนยัน
+        </td>
+      </tr>
       <tr>
         <td><b>1.6</b></td><td>1 ส.ค. 2569</td><td><code>3ca27e2</code> →</td>
         <td>

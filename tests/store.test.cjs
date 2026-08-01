@@ -77,7 +77,7 @@ test('activeFile() returns a stable reference (no re-render loop)', async () => 
   assert.equal(a, b, 'consecutive calls must return the same object reference');
 });
 
-test('cycle time follows the stop-time model when steps change', async () => {
+test('cycle time follows the duration model when steps change', async () => {
   const store = freshStore();
   await store.getState().createFolder('Test', 'custom');
   const folderId = store.getState().folders[0].id;
@@ -89,13 +89,13 @@ test('cycle time follows the stop-time model when steps change', async () => {
   store.getState().updateStep(step1.id, { manualTime: 10 });
   assert.equal(store.getState().activeFile().header.cycleTime, 10);
 
-  // Machine is loaded at t=5 and runs until t=40, so it is busy for 35 s but
-  // only frees up at 40. Nobody can unload it — or start the next cycle —
-  // before then, so the cycle time is the machine's END time.
+  // The machine is loaded at t=5 and runs for 40 s, so it stops at 45. Nobody
+  // can unload it — or start the next cycle — before then, so the cycle time
+  // is the machine's END time, charged to the operator who loaded it.
   store.getState().addStep();
   const step2 = store.getState().activeFile().steps[1];
   store.getState().updateStep(step2.id, { operator: 'Auto M/C', machineTime: 40, startTime: 5 });
-  assert.equal(store.getState().activeFile().header.cycleTime, 40);
+  assert.equal(store.getState().activeFile().header.cycleTime, 45);
 
   // Deleting the machine step drops the cycle time back to 10
   store.getState().deleteStep(step2.id);

@@ -205,7 +205,8 @@ export default function StepTable() {
                   ))}
                 </>
               )}
-              <th className="px-2 py-1 text-center text-slate-900 font-bold">Count (s)</th>
+              <th className="px-2 py-1 text-center text-slate-900 font-bold" title="เวลารวมของแถวนี้ — ใช้คำนวณ Cycle Time">Count (s)</th>
+              <th className="px-2 py-1 text-center text-slate-500 font-bold whitespace-nowrap" title="ช่วงเวลาที่ขั้นตอนนี้อยู่บนไทม์ไลน์">Start → End</th>
               {/* Timeline Header (Axis Ticks) */}
               <th className="p-0 text-center border-l border-slate-200 select-none" style={{ width: timelineWidth }}>
                 <div className="h-full flex flex-col justify-end py-1">
@@ -364,10 +365,17 @@ export default function StepTable() {
                     </>
                   )}
 
-                  {/* Calculated Count (Duration) Column */}
+                  {/* Count = the row's total time; feeds the cycle time */}
                   <td className="px-2 py-1.5 text-center">
                     <span className="font-mono text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                       {step.calcDuration > 0 ? `${step.calcDuration}s` : '—'}
+                    </span>
+                  </td>
+
+                  {/* Where the bar sits on the timeline */}
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    <span className="font-mono text-[11px] text-slate-500">
+                      {step.calcDuration > 0 ? `${step.calcStart} → ${step.calcEnd}` : '—'}
                     </span>
                   </td>
 
@@ -425,6 +433,7 @@ export default function StepTable() {
                               chartWidth={timelineWidth}
                               rowY={rowY}
                               noLabel
+                              showTimes
                             />
                           );
                         })}
@@ -461,6 +470,8 @@ export default function StepTable() {
                     <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-700">
                       {totalCalcDuration}s
                     </td>
+                    <td />
+
                   </>
                 ) : (
                   <>
@@ -475,6 +486,7 @@ export default function StepTable() {
                     <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
                       {totalCalcDuration}s
                     </td>
+                    <td />
                   </>
                 )}
 

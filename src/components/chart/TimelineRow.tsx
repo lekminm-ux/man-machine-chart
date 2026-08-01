@@ -17,6 +17,8 @@ interface Props {
   chartWidth:    number; // full SVG width (including label)
   rowY:          number;
   noLabel?:      boolean;
+  /** Print the duration on the bar and the start/end at its ends. */
+  showTimes?:    boolean;
 }
 
 
@@ -41,11 +43,43 @@ function walkPath(x1: number, x2: number, cy: number): string {
   return d + ` L${x2} ${cy}`;
 }
 
-export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel }: Props) {
+export function TimelineRow({ segments, totalDuration, chartWidth, rowY, noLabel, showTimes }: Props) {
   const cy = rowY + ROW_HEIGHT / 2;
 
   return (
     <g>
+      {/* Where the numbers come from: duration on the bar, start/end at its ends */}
+      {showTimes && segments.map((seg, i) => {
+        if (seg.type === 'empty' || seg.duration <= 0) return null;
+        const x1 = tX(seg.start, totalDuration, chartWidth, noLabel);
+        const x2 = tX(seg.start + seg.duration, totalDuration, chartWidth, noLabel);
+        const w = x2 - x1;
+        const colour = seg.type === 'machine' ? '#1d4ed8'
+          : seg.type === 'walk' ? '#065f46'
+          : seg.type === 'idle' ? '#991b1b' : '#0f172a';
+        return (
+          <g key={`t${i}`} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+            {w > 30 && (
+              <text x={(x1 + x2) / 2} y={cy + 20} textAnchor="middle"
+                fontSize={10.5} fontWeight="800" fill={colour} fontFamily="Consolas,monospace">
+                {seg.duration}s
+              </text>
+            )}
+            {w > 64 && (
+              <>
+                <text x={x1 + 1} y={cy + 20} textAnchor="start"
+                  fontSize={9} fill="#94a3b8" fontFamily="Consolas,monospace">
+                  {seg.start}
+                </text>
+                <text x={x2 - 1} y={cy + 20} textAnchor="end"
+                  fontSize={9} fill="#94a3b8" fontFamily="Consolas,monospace">
+                  {seg.start + seg.duration}
+                </text>
+              </>
+            )}
+          </g>
+        );
+      })}
       {segments.map((seg, i) => {
         const x1 = tX(seg.start,              totalDuration, chartWidth, noLabel);
         const x2 = tX(seg.start + seg.duration, totalDuration, chartWidth, noLabel);

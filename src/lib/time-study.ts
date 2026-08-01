@@ -217,45 +217,30 @@ export type PushBasis = 'min' | 'average' | 'max';
 /**
  * Turn the sheet back into Module 4 steps.
  *
- * Durations are converted to the stop-time model Module 4 expects by walking
- * each operator's rows in order and accumulating: a row's stop time is the
- * operator's running end time plus that row's duration. `startTime` is left at
- * 0 so `getCalculatedSteps` chains the rows exactly as it does for hand-typed
- * data.
+ * Both modules store durations now, so the chosen reading drops straight into
+ * the matching column. `startTime` is left at 0 so `getCalculatedSteps` chains
+ * the rows exactly as it does for hand-typed data.
  */
 export function stepsFromTimeStudy(
   study: TimeStudy,
   basis: PushBasis = 'min',
   makeId: () => string = () => Math.random().toString(36).slice(2)
 ): ChartStep[] {
-  const runningEnd: Record<string, number> = {};
-  // Machines chain from the operator element above them, so stop readings have
-  // to be built the same way or the durations shift on the way back.
-  let lastOperatorEnd = 0;
-
   return study.rows.map((row, i) => {
     const stats = computeRowStats(row);
     const duration = basis === 'max' ? stats.max : basis === 'average' ? stats.average : stats.min;
 
     const machine = isMachineRow(row);
-    const actor = machine ? 'Auto M/C' : row.operator;
-    const start = machine ? lastOperatorEnd : (runningEnd[actor] ?? 0);
-    const stop = round2(start + duration);
-    if (!machine) {
-      if (duration > 0) runningEnd[actor] = stop;
-      lastOperatorEnd = stop;
-    }
-
-    const kind = isMachineRow(row) ? 'machine' : row.kind;
+    const kind = machine ? 'machine' : row.kind;
     return {
       id: makeId(),
       no: i + 1,
       description: row.jobElement,
-      operator: actor as OperatorType,
-      manualTime: kind === 'man' ? stop : 0,
-      machineTime: kind === 'machine' ? stop : 0,
-      walkingTime: kind === 'walk' ? stop : 0,
-      idleTime: kind === 'idle' ? stop : 0,
+      operator: (machine ? 'Auto M/C' : row.operator) as OperatorType,
+      manualTime: kind === 'man' ? duration : 0,
+      machineTime: kind === 'machine' ? duration : 0,
+      walkingTime: kind === 'walk' ? duration : 0,
+      idleTime: kind === 'idle' ? duration : 0,
       startTime: 0,
     };
   });
