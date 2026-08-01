@@ -176,14 +176,13 @@ Cloudflare binding:
 
 - Step time fields (`manualTime`, `machineTime`, `walkingTime`, `idleTime`) are treated as stop/end readings, not raw durations.
 - Actual step duration = selected stop time - calculated start time.
-- Start time is explicit `startTime` when provided and non-zero; otherwise it falls back to the previous end time for the same actor.
+- Start time is explicit `startTime` when provided and non-zero; otherwise it falls back to a chained start: an operator element continues from that operator's own previous end, while an **Auto M/C element continues from the operator element above it** — a person has to load a machine before it can run. Two machine rows after the same load therefore start together instead of queuing.
 - The active category is the category whose stop-time value is the maximum among manual/machine/walk/idle.
 - `computeTotalDuration(steps)` means timeline axis extent: maximum calculated end time across all steps.
-- `computeCycleTime(steps)` means actual cycle time: the earliest moment the next cycle can begin. It compares two kinds of track and takes the largest:
-  - **operator tracks** = the sum of that person's manual + walk + idle. Their own busy time, NOT their end time.
-  - **machine tracks** = the auto-run's END time (load time + run time). A machine cannot be unloaded before it stops, and the operator who unloads it cannot restart until then, so the loading time in front of the run counts.
-- Corrected 2026-08-01 (BYD Side Step): Worker A loads for 65 s, Blow molding runs 385 s and ends at 450. Worker A's own elements total 356 s and fit inside the run. CT = **450**, the machine's end — counting only the 385 s run was wrong.
-- Do not replace cycle time with timeline end either. A step given a late explicit `startTime` stretches the chart axis without making anyone busier.
+- `computeCycleTime(steps)` / `computeCycleDetail(steps)` means actual cycle time: **the longest operator loop** — how long it takes a person to get back to the start of their own sequence. For each operator: `loop = max(their own manual+walk+idle, the stop time of the machines THEY load)`. Line CT = the largest loop, and `computeCycleDetail` also reports which operator sets it plus their waiting time.
+- A machine's stop time is charged only to the person who loads it (the Auto M/C row sitting under their element). A machine nobody waits for — a scrap crusher, say — never sets the line's cycle no matter how late in the chart it runs.
+- An operator's own time is a SUM, never their end time, so a late explicit `startTime` stretches the chart axis without inflating the cycle.
+- Verified 2026-08-01 against the real BYD Side Step Rev.00: Worker A is busy 347 s, blow molding stops at 450, Worker A waits 103 s → **CT = 450, set by Worker A**.
 - Auto M/C is included in `OperatorType` but excluded from `ALL_WORKERS`.
 - Worker summary includes manual + walk as line total; idle is displayed separately in the summary table.
 - Duplicating a file must clone step IDs, layout element IDs, and remap connector IDs.

@@ -83,10 +83,10 @@ test('a machine starts when the element before it finishes and runs in parallel'
   assert.equal(r.cycleTime, 50);                       // gated by the machine
 });
 
-test('a machine gates the cycle at its END time, loading time included', () => {
-  // Worker A loads for 65 s, the machine then runs 385 s and stops at 450.
-  // Worker A's own work only adds up to 356 s and fits inside that run, but the
-  // next cycle cannot start until the machine is unloaded at 450.
+test('the machine a worker tends extends THAT worker loop', () => {
+  // Worker A loads for 65 s, blow molding then runs 385 s and stops at 450.
+  // Worker A's own work totals 356 s and fits inside the run, but Worker A
+  // cannot unload — and so cannot restart — before 450.
   const r = ct.buildCombinationTable(study([
     row('load', 'Worker A', 'man', 65),
     row('Blow molding', 'Auto M/C', 'machine', 385),
@@ -96,23 +96,47 @@ test('a machine gates the cycle at its END time, loading time included', () => {
     row('prepare nut', 'Worker A', 'man', 91),
   ]), 0);
 
-  const worker = r.actors.find(a => a.operator === 'Worker A');
-  const machine = r.actors.find(a => a.isMachine);
-  assert.equal(worker.cycle, 356);      // 65 + 150 + 20 + 30 + 91
-  assert.equal(machine.cycle, 450);     // 65 loading + 385 running
-  assert.equal(r.cycleTime, 450);       // not 385
+  assert.equal(r.rows[1].start, 65, 'the machine starts when loading ends');
+  assert.equal(r.rows[1].end, 450);
+  assert.equal(r.actors.find(a => a.operator === 'Worker A').cycle, 450);
+  assert.equal(r.cycleTime, 450);
 });
 
-test('machine rows are pooled under Auto M/C and the last one to finish wins', () => {
+test('a machine nobody waits for does not set the cycle', () => {
+  // Worker A runs the main machine; Worker D feeds a scrap crusher that
+  // finishes long before Worker D does. The crusher must not gate the line.
+  const r = ct.buildCombinationTable(study([
+    row('A load', 'Worker A', 'man', 65),
+    row('Blow molding', 'Auto M/C', 'machine', 320),   // ends at 385
+    row('A work', 'Worker A', 'man', 200),
+    row('D push cart', 'Worker D', 'man', 70),
+    row('D cut scrap', 'Worker D', 'man', 65),         // D is at 135
+    row('Crusher', 'Auto M/C', 'machine', 60),         // 135 -> 195
+    row('D bag it', 'Worker D', 'man', 120),           // D own total 255
+  ]), 0);
+
+  const a = r.actors.find(x => x.operator === 'Worker A');
+  const d = r.actors.find(x => x.operator === 'Worker D');
+  assert.equal(r.rows[5].start, 135, 'the crusher starts after D finishes cutting');
+  assert.equal(r.rows[5].end, 195);
+  assert.equal(a.cycle, 385);   // waits for the blow moulder
+  assert.equal(d.cycle, 255);   // own work; the crusher ended at 195
+  assert.equal(r.cycleTime, 385);
+});
+
+test('two machines started by the same person run in parallel, not queued', () => {
   const r = ct.buildCombinationTable(study([
     row('load', 'Worker A', 'man', 5),
     row('m1', 'Auto M/C', 'machine', 40),
     row('m2', 'Auto M/C', 'machine', 60),
   ]), 0);
 
-  const machine = r.actors.find(a => a.isMachine);
-  assert.equal(machine.cycle, 105);     // m1 ends at 45, m2 chains to 105
-  assert.equal(r.cycleTime, 105);
+  assert.equal(r.rows[1].start, 5);
+  assert.equal(r.rows[2].start, 5, 'both start when the operator finishes loading');
+  assert.equal(r.rows[1].end, 45);
+  assert.equal(r.rows[2].end, 65);
+  assert.equal(r.actors.find(a => a.operator === 'Worker A').cycle, 65);
+  assert.equal(r.cycleTime, 65);
 });
 
 test('a row assigned to Auto M/C counts as a machine even if typed man', () => {

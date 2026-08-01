@@ -11,24 +11,33 @@ export interface CalculatedStep extends ChartStep {
   calcIdle: number;
 }
 
-/** 
+/**
  * Calculate active start times and category durations on-the-fly.
  * In this model:
- * - Start Time is either manually entered or falls back to the previous step's end time for that operator.
+ * - Start Time is either manually entered or falls back to a chained start:
+ *   an operator element continues from that operator's own previous end; an
+ *   Auto M/C element continues from the operator element above it, because a
+ *   person has to load the machine before it can run.
  * - The entered time (Manual, Machine, Walk, Idle) represents the STOP (END) time of the step.
  * - The actual duration of the step is: (Stop Time - Start Time)
  */
 export function getCalculatedSteps(steps: ChartStep[]): CalculatedStep[] {
   const actorLastEnd: Record<string, number> = {};
+  // End of the most recent operator element. A machine is started by a person,
+  // so an Auto M/C row picks up from the operator who loaded it — the element
+  // above it — instead of queuing behind whatever machine ran last. Two machine
+  // rows after the same load therefore start together (blueprint Rule 3).
+  let lastOperatorEnd = 0;
 
   return steps.map(step => {
     const actor = step.operator;
-    const lastEnd = actorLastEnd[actor] || 0;
+    const isMachine = actor === 'Auto M/C';
+    const chainStart = isMachine ? lastOperatorEnd : (actorLastEnd[actor] || 0);
 
-    // Start time is either explicit or sequential lastEnd
+    // Start time is either explicit or the chained start
     const start = step.startTime !== undefined && step.startTime !== null && step.startTime !== 0
       ? step.startTime
-      : lastEnd;
+      : chainStart;
 
     // Stop time is the maximum of the input categories
     const stopVal = Math.max(step.manualTime, step.machineTime, step.walkingTime, step.idleTime);
@@ -46,6 +55,9 @@ export function getCalculatedSteps(steps: ChartStep[]): CalculatedStep[] {
     // Update the timeline tracking for this actor
     if (duration > 0) {
       actorLastEnd[actor] = end;
+    }
+    if (!isMachine) {
+      lastOperatorEnd = end;
     }
 
     // Distribute duration back to the active category
@@ -160,35 +172,93 @@ export function computeTotalDuration(steps: ChartStep[]): number {
   return Math.max(...endTimes, 0);
 }
 
+/** One operator's loop: their own work plus any wait for the machine they tend. */
+export interface CycleLoop {
+  operator: OperatorType;
+  /** Σ manual + walk + idle — the person's own busy time. */
+  ownTime: number;
+  /** Latest stop time of the machines this person loads. 0 if they tend none. */
+  machineEnd: number;
+  /** The loop length: max(ownTime, machineEnd). */
+  loop: number;
+  /** Time spent waiting for their machine to finish. */
+  waitForMachine: number;
+}
+
+export interface CycleDetail {
+  cycleTime: number;
+  /** The operator whose loop sets the cycle. */
+  driver: OperatorType | null;
+  loops: CycleLoop[];
+}
+
 /**
- * Cycle Time = the earliest moment the next cycle can start.
+ * Cycle Time = the longest OPERATOR LOOP — how long it takes a person to get
+ * back to the start of their own sequence.
  *
- * Two kinds of track are compared and the longest one wins:
+ * For each operator:
  *
- *   • Operator tracks — Σ (manual + walk + idle). A person's own busy time.
- *     Deliberately NOT their end time: entering steps with late explicit start
- *     times pushes the chart axis out without making anyone busier.
+ *   loop = max( their own work time , when the machine they load stops )
  *
- *   • Machine tracks — the auto-run's END time, i.e. when it was loaded plus
- *     how long it runs. A machine cannot be unloaded before it finishes, and
- *     the operator who unloads it cannot begin the next cycle until then, so
- *     the loading time in front of the run is part of the cycle.
+ * The machine term only applies to machines that person actually tends (the
+ * Auto M/C rows sitting directly under their element). A machine nobody has to
+ * wait for — the scrap crusher, say — never sets the line's cycle, no matter
+ * how late in the chart it runs. And an operator's own time is a SUM, not an
+ * end time, so entering a late explicit startTime stretches the axis without
+ * inflating the cycle.
  *
- * Worked example (BYD Side Step, corrected 2026-08-01): Worker A loads for 65 s,
- * Blow molding then runs 385 s and ends at 450. Worker A's own elements only add
- * up to 356 s and fit inside that run. The cycle is 450 s — the machine's end —
- * because Worker A cannot unload before it. Counting only the 385 s run gave the
- * wrong answer.
+ * Worked example (BYD Side Step, corrected 2026-08-01): Worker A walks 5 s,
+ * unloads and inserts nuts for 65 s, then blow molding runs while Worker A cuts
+ * scrap, checks, sends and prepares nuts — 361 s of their own work. The machine
+ * stops at 385, so Worker A waits 24 s and restarts at 385. Worker D's crusher
+ * finishes long before Worker D does, so it never enters the picture. CT = 385,
+ * set by Worker A.
  */
-export function computeCycleTime(steps: ChartStep[]): number {
-  if (steps.length === 0) return 0;
-  const operatorBusy: Record<string, number> = {};
-  let machineEnd = 0;
+export function computeCycleDetail(steps: ChartStep[]): CycleDetail {
+  if (steps.length === 0) return { cycleTime: 0, driver: null, loops: [] };
+
+  const ownTime: Record<string, number> = {};
+  const machineEnd: Record<string, number> = {};
+  let lastOperator: OperatorType | null = null;
+
   for (const s of getCalculatedSteps(steps)) {
-    operatorBusy[s.operator] = (operatorBusy[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
-    if (s.calcMachine > 0) machineEnd = Math.max(machineEnd, s.calcEnd);
+    if (s.operator === 'Auto M/C') {
+      // Charged to whoever loaded it; a machine with no operator above it
+      // stands on its own.
+      const tender = lastOperator ?? 'Auto M/C';
+      machineEnd[tender] = Math.max(machineEnd[tender] ?? 0, s.calcEnd);
+      continue;
+    }
+    ownTime[s.operator] = (ownTime[s.operator] ?? 0) + s.calcManual + s.calcWalk + s.calcIdle;
+    lastOperator = s.operator;
+    // Machine time logged under a person's own row stays on their track.
+    if (s.calcMachine > 0) {
+      machineEnd[s.operator] = Math.max(machineEnd[s.operator] ?? 0, s.calcEnd);
+    }
   }
-  return Math.max(0, machineEnd, ...Object.values(operatorBusy));
+
+  const operators = [...new Set([...Object.keys(ownTime), ...Object.keys(machineEnd)])] as OperatorType[];
+  const loops: CycleLoop[] = operators.map(operator => {
+    const own = ownTime[operator] ?? 0;
+    const mEnd = machineEnd[operator] ?? 0;
+    const loop = Math.max(own, mEnd);
+    return { operator, ownTime: own, machineEnd: mEnd, loop, waitForMachine: Math.max(0, mEnd - own) };
+  });
+
+  let driver: OperatorType | null = null;
+  let cycleTime = 0;
+  for (const l of loops) {
+    if (l.loop > cycleTime) {
+      cycleTime = l.loop;
+      driver = l.operator;
+    }
+  }
+  return { cycleTime, driver, loops };
+}
+
+/** Cycle Time only. See computeCycleDetail for the reasoning and the breakdown. */
+export function computeCycleTime(steps: ChartStep[]): number {
+  return computeCycleDetail(steps).cycleTime;
 }
 
 export function formatSeconds(s: number): string {

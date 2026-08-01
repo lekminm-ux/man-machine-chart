@@ -171,10 +171,11 @@ test('importing from M4 converts stop times into per-element durations', () => {
   assert.equal(study.rows.length, 3);
   assert.equal(study.readingCount, 5);
 
-  // step 2's stop time is 8 but it starts when step 1 ends (5) → duration 3
+  // step 2's stop time is 8 but it starts when step 1 ends (5) → duration 3.
+  // The machine stops at 40 and starts when the operator finishes at 8 → 32.
   assert.equal(study.rows[0].readings[0], 5);
   assert.equal(study.rows[1].readings[0], 3);
-  assert.equal(study.rows[2].readings[0], 40);
+  assert.equal(study.rows[2].readings[0], 32);
 
   assert.equal(study.rows[0].kind, 'man');
   assert.equal(study.rows[1].kind, 'walk');
@@ -198,10 +199,11 @@ test('pushing to M4 converts durations back into stop times', () => {
   const steps = timeStudy.stepsFromTimeStudy(study, 'min', nextId);
   assert.equal(steps.length, 3);
 
-  // Min basis: 5 then 3 → stop times 5 and 8 on Worker A's track
+  // Min basis: 5 then 3 → stop times 5 and 8 on Worker A's track. The machine
+  // is loaded at 8 and runs 40, so its stop reading is 48.
   assert.equal(steps[0].manualTime, 5);
   assert.equal(steps[1].walkingTime, 8);
-  assert.equal(steps[2].machineTime, 40);
+  assert.equal(steps[2].machineTime, 48);
   assert.equal(steps[2].operator, 'Auto M/C');
 
   // and the durations survive the round trip through the chart engine

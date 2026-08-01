@@ -86,20 +86,29 @@ function segmentsFor(start: number, end: number, takt: number): CombinationSegme
  */
 export function buildCombinationTable(study: TimeStudy, taktTime: number): CombinationResult {
   const operatorClock: Record<string, number> = {};
-  let previousEnd = 0;
+  let lastOperatorEnd = 0;
+  let lastOperator: OperatorType | null = null;
+  /** Which person loads each machine row — used to charge its end time. */
+  const tenderOf = new Map<string, OperatorType>();
 
   const rows: CombinationRow[] = study.rows.map((row, i) => {
     const duration = computeRowStats(row).min;
     const machine = isMachineRow(row);
     const actor: OperatorType = machine ? 'Auto M/C' : row.operator;
 
-    // A machine picks up from whatever finished immediately before it (the load
-    // step); a worker picks up from their own clock.
-    const start = machine ? previousEnd : (operatorClock[actor] ?? 0);
+    // A machine is started by a person, so it picks up from the operator
+    // element above it. Two machines after the same load therefore start
+    // together rather than queuing (blueprint Rule 3).
+    const start = machine ? lastOperatorEnd : (operatorClock[actor] ?? 0);
     const end = round2(start + duration);
 
-    if (!machine) operatorClock[actor] = end;
-    previousEnd = end;
+    if (machine) {
+      if (lastOperator) tenderOf.set(row.id, lastOperator);
+    } else {
+      operatorClock[actor] = end;
+      lastOperatorEnd = end;
+      lastOperator = actor;
+    }
 
     return {
       id: row.id,
@@ -115,7 +124,8 @@ export function buildCombinationTable(study: TimeStudy, taktTime: number): Combi
     };
   });
 
-  // One track per actor. Machines are pooled under Auto M/C, matching M1 and M5.
+  // One track per actor. Machines are pooled under Auto M/C for display, but
+  // their end time is charged to the person who loads them (see below).
   const byActor = new Map<OperatorType, CombinationRow[]>();
   for (const row of rows) {
     const list = byActor.get(row.operator);
@@ -123,22 +133,32 @@ export function buildCombinationTable(study: TimeStudy, taktTime: number): Combi
     else byActor.set(row.operator, [row]);
   }
 
+  // Latest stop time of the machines each person tends.
+  const machineEndByTender = new Map<OperatorType, number>();
+  for (const row of rows) {
+    if (row.kind !== 'machine') continue;
+    const tender = tenderOf.get(row.id);
+    if (!tender) continue;
+    machineEndByTender.set(tender, Math.max(machineEndByTender.get(tender) ?? 0, row.end));
+  }
+
   const actors: CombinationActor[] = [...byActor.entries()].map(([operator, list]) => {
     const isMachine = operator === 'Auto M/C';
-    // A worker's cycle is the sum of their own elements — a late start pushes
-    // the axis out but does not make them busier.
-    //
-    // A machine's cycle is its END time: it cannot be unloaded before it stops,
-    // and the operator who unloads it cannot begin the next cycle until then,
-    // so the loading time in front of the run belongs to the cycle.
+    // Machines are shown with their own run length; the cycle they impose is
+    // charged to their tender instead, so a machine nobody waits for (a scrap
+    // crusher, say) never sets the line's cycle.
     const cycle = isMachine
-      ? round2(Math.max(0, ...list.map(r => r.end)))
-      : round2(list.reduce((a, r) => a + r.duration, 0));
+      ? round2(Math.max(0, ...list.map(r => r.duration)))
+      : round2(Math.max(
+          list.reduce((a, r) => a + r.duration, 0),
+          machineEndByTender.get(operator) ?? 0
+        ));
     const wait = taktTime > 0 && cycle < taktTime ? round2(taktTime - cycle) : 0;
     return { operator, isMachine, cycle, wait, overTakt: taktTime > 0 && cycle > taktTime };
   });
 
-  const cycleTime = round2(Math.max(0, ...actors.map(a => a.cycle)));
+  // The cycle is the longest OPERATOR loop; a machine alone never sets it.
+  const cycleTime = round2(Math.max(0, ...actors.filter(a => !a.isMachine).map(a => a.cycle)));
   const axisMax = round2(Math.max(cycleTime, taktTime, ...rows.map(r => r.end), 1));
 
   return { rows, actors, cycleTime, taktTime, axisMax };

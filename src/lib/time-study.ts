@@ -229,15 +229,22 @@ export function stepsFromTimeStudy(
   makeId: () => string = () => Math.random().toString(36).slice(2)
 ): ChartStep[] {
   const runningEnd: Record<string, number> = {};
+  // Machines chain from the operator element above them, so stop readings have
+  // to be built the same way or the durations shift on the way back.
+  let lastOperatorEnd = 0;
 
   return study.rows.map((row, i) => {
     const stats = computeRowStats(row);
     const duration = basis === 'max' ? stats.max : basis === 'average' ? stats.average : stats.min;
 
-    const actor = isMachineRow(row) ? 'Auto M/C' : row.operator;
-    const start = runningEnd[actor] ?? 0;
+    const machine = isMachineRow(row);
+    const actor = machine ? 'Auto M/C' : row.operator;
+    const start = machine ? lastOperatorEnd : (runningEnd[actor] ?? 0);
     const stop = round2(start + duration);
-    if (duration > 0) runningEnd[actor] = stop;
+    if (!machine) {
+      if (duration > 0) runningEnd[actor] = stop;
+      lastOperatorEnd = stop;
+    }
 
     const kind = isMachineRow(row) ? 'machine' : row.kind;
     return {

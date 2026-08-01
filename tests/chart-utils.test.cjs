@@ -160,7 +160,9 @@ test('builds worker and machine summaries from calculated durations', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(chartUtils.buildSummary(steps))), [
     { operator: 'Worker A', manTime: 9, walkTime: 5, lineTotal: 14 },
   ]);
-  assert.equal(chartUtils.getMachineTime(steps), 25);
+  // The machine is loaded when Worker A finishes at 14 and stops at 25, so it
+  // runs for 11 s — not 25, which would assume it started before anyone loaded it.
+  assert.equal(chartUtils.getMachineTime(steps), 11);
 });
 
 test('a stop reading earlier than the start yields a zero-length step', () => {
@@ -202,32 +204,66 @@ test('a late-starting operator stretches the axis but not the cycle', () => {
   assert.equal(chartUtils.computeTotalDuration(steps), 826, 'timeline end stays 826 for the axis');
 });
 
-test('BYD Side Step: the cycle is the machine end (450), not its run time (385)', () => {
-  // Reported 2026-08-01. Worker A loads for 65 s, Blow molding then runs 385 s
-  // and stops at 450. Worker A's own elements total 356 s and fit inside the
-  // run, but Worker A cannot unload — and so cannot restart — before 450.
-  const w = (id, stop, start) => ({
-    id, no: 0, description: id, operator: 'Worker A',
-    manualTime: stop, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: start,
-  });
+test('a machine starts when the operator above it finishes loading', () => {
+  // Real BYD Side Step Rev.00 data. Blow molding has no explicit start time; it
+  // must pick up from Worker A's unloading step, not from zero.
   const steps = [
-    w('unload+insert', 65, 0),
+    { id: 'u', no: 1, description: 'Work Unloading and Insert nut', operator: 'Worker A',
+      manualTime: 62, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
     { id: 'blow', no: 2, description: 'Blow molding', operator: 'Auto M/C',
-      manualTime: 0, machineTime: 450, walkingTime: 0, idleTime: 0, startTime: 65 },
-    w('cutting scrap', 215, 65),
-    w('check weight', 235, 215),
-    w('send part', 265, 235),
-    w('prepare nut', 356, 265),
+      manualTime: 0, machineTime: 450, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'c', no: 3, description: 'Cutting scrap', operator: 'Worker A',
+      manualTime: 213, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 63 },
+    { id: 'k', no: 4, description: 'check', operator: 'Worker A',
+      manualTime: 244, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 214 },
+    { id: 's', no: 5, description: 'send', operator: 'Worker A',
+      manualTime: 265, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 245 },
+    { id: 'p', no: 6, description: 'prepare nut', operator: 'Worker A',
+      manualTime: 351, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 266 },
   ];
 
   const calc = chartUtils.getCalculatedSteps(steps);
-  assert.equal(calc[1].calcDuration, 385, 'the machine runs for 385 s');
-  assert.equal(calc[1].calcEnd, 450, 'and stops at 450');
+  assert.equal(calc[1].calcStart, 62, 'the machine starts when loading ends');
+  assert.equal(calc[1].calcDuration, 388);
+  assert.equal(calc[1].calcEnd, 450);
 
-  const summary = chartUtils.buildSummary(steps);
-  assert.equal(summary.find(s => s.operator === 'Worker A').lineTotal, 356);
+  const detail = chartUtils.computeCycleDetail(steps);
+  assert.equal(detail.cycleTime, 450);
+  assert.equal(detail.driver, 'Worker A');
+  const a = detail.loops.find(l => l.operator === 'Worker A');
+  assert.equal(a.ownTime, 347, 'Worker A is only busy for 347 s');
+  assert.equal(a.machineEnd, 450);
+  assert.equal(a.waitForMachine, 103, 'and waits 103 s for the machine');
+});
 
-  assert.equal(chartUtils.computeCycleTime(steps), 450);
+test('a scrap crusher nobody waits for never sets the cycle', () => {
+  // Worker D feeds a crusher that finishes well before Worker D does. The main
+  // line is Worker A on the blow moulder, so Worker A must set the cycle.
+  const steps = [
+    { id: 'a1', no: 1, description: 'load', operator: 'Worker A',
+      manualTime: 65, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'blow', no: 2, description: 'Blow molding', operator: 'Auto M/C',
+      manualTime: 0, machineTime: 385, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'a2', no: 3, description: 'rest of A', operator: 'Worker A',
+      manualTime: 361, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'd1', no: 4, description: 'push cart', operator: 'Worker D',
+      manualTime: 70, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'd2', no: 5, description: 'cut scrap', operator: 'Worker D',
+      manualTime: 135, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'cru', no: 6, description: 'Crusher', operator: 'Auto M/C',
+      manualTime: 0, machineTime: 195, walkingTime: 0, idleTime: 0, startTime: 0 },
+    { id: 'd3', no: 7, description: 'bag it', operator: 'Worker D',
+      manualTime: 255, machineTime: 0, walkingTime: 0, idleTime: 0, startTime: 0 },
+  ];
+
+  const calc = chartUtils.getCalculatedSteps(steps);
+  assert.equal(calc[5].calcStart, 135, 'the crusher follows Worker D, not the blow moulder');
+  assert.equal(calc[5].calcEnd, 195);
+
+  const detail = chartUtils.computeCycleDetail(steps);
+  assert.equal(detail.driver, 'Worker A');
+  assert.equal(detail.cycleTime, 385);
+  assert.equal(detail.loops.find(l => l.operator === 'Worker D').loop, 255);
 });
 
 test('computeCycleTime sums multiple steps per actor and includes idle', () => {

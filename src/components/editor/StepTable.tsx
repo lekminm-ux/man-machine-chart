@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration, computeCycleTime } from '@/lib/chart-utils';
+import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration, computeCycleDetail } from '@/lib/chart-utils';
 import { TimelineRow } from '../chart/TimelineRow';
 import type { ChartStep } from '@/types';
 import { ALL_WORKERS } from '@/types';
@@ -66,9 +66,11 @@ export default function StepTable() {
   const totalCalcDuration = calcSteps.reduce((a, s) => a + s.calcDuration, 0);
   const rawDur = computeTotalDuration(steps);
   const totalDur = Math.max(rawDur, 10);
-  // Cycle Time = busiest actor's total (max of Worker/Auto M/C sums),
-  // not the timeline end — a late-starting step must not inflate it.
-  const cycleTime = computeCycleTime(steps);
+  // Cycle Time = the longest operator loop: their own work, or the wait for the
+  // machine they load, whichever is longer. Never the timeline end.
+  const cycleDetail = computeCycleDetail(steps);
+  const cycleTime = cycleDetail.cycleTime;
+  const cycleDriver = cycleDetail.loops.find(l => l.operator === cycleDetail.driver);
 
   // Timeline width expands when inputs are hidden to use available space
   const timelineWidth = hideInputs ? 1200 : 600;
@@ -492,7 +494,13 @@ export default function StepTable() {
                       {(() => {
                         const xEnd = tX(Math.min(cycleTime, totalDur));
                         const y = 28;
-                        const label = `CYCLE TIME  ${cycleTime}s`;
+                        const label = cycleDetail.driver
+                          ? `CYCLE TIME  ${cycleTime}s  ·  ${cycleDetail.driver}${
+                              cycleDriver && cycleDriver.waitForMachine > 0
+                                ? ` (งาน ${cycleDriver.ownTime}s + รอเครื่อง ${cycleDriver.waitForMachine}s)`
+                                : ''
+                            }`
+                          : `CYCLE TIME  ${cycleTime}s`;
                         const labelW = Math.max(120, label.length * 7.4);
                         const labelX = Math.min(Math.max((tX(0) + xEnd) / 2, labelW / 2 + 2), timelineWidth - labelW / 2 - 2);
                         return (
