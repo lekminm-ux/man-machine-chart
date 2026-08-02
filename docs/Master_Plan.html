@@ -148,8 +148,8 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <div><b>Updated</b>2 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
       <div><b>Baseline commit</b>4c7dacf</div>
-      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · active-user and save-to-cloud persistence gates added</div>
-      <div><b>Status</b>Master Plan v1.14 · Production D1/schema remain protected · approved release remains usable while future changes are developed · Save-to-Cloud persistence remains a release gate</div>
+      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · Phase 0C Save-to-Cloud Persistence plan ready</div>
+      <div><b>Status</b>Master Plan v1.14 · Production D1/schema remain protected · approved release remains usable while future changes are developed · Phase 0C awaits implementation and live persistence evidence</div>
     </div>
   </div>
 </header>
@@ -165,6 +165,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <a href="#security-capacity-gate">Security / Data Safety</a>
   <a href="#data-safety-roadmap">Data Safety Plan</a>
   <a href="#data-safety-runtime-guards">Phase 0B Runtime Guards</a>
+  <a href="#save-to-cloud-persistence">Save-to-Cloud Persistence</a>
   <a href="#formula">สูตรมาตรฐาน</a>
   <a href="#kaizen">Kaizen &amp; Before-After</a>
   <a href="#roadmap">Roadmap</a>
@@ -689,6 +690,25 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 </section>
 
+<section id="save-to-cloud-persistence">
+  <h2>Phase 0C · Save-to-Cloud Persistence and Active-User Safety — GPT plan</h2>
+  <div class="callout">
+    <p><b>Status:</b> GPT plan ready for the user's approved six-step workflow. Claude may implement only the approved scope below; no schema migration, Production repair, or multi-user safety claim is included in this phase.</p>
+    <p><b>Problem to solve:</b> the current client reports <code>Saved to Cloud</code> after a successful PUT response, but the API does not return the canonical saved row or verify affected rows, and hydration can prefer stale/local-only content. Therefore Save-to-Cloud persistence is not yet proven.</p>
+    <p><b>Objective:</b> after a user saves, the deployed API must confirm the exact chart write, a fresh Cloud read must match the complete chart payload, and a refresh/reopen must load the same data from Cloud. A failed or ambiguous save must remain visibly unconfirmed and must never overwrite Cloud data with empty or stale local state.</p>
+    <p><b>Allowed implementation files:</b> <code>src/lib/storage.ts</code>, <code>src/store/useChartStore.ts</code>, <code>functions/api/files.js</code>, the minimum related UI state in <code>src/components/layout/TopBar.tsx</code> and any necessary cloud/local status UI, plus focused tests under <code>tests/</code>. If another file, API contract, schema, or migration is required, stop with <code>PLAN_CHANGE_REQUIRED</code> and return to GPT.</p>
+    <p><b>Source-of-truth rule:</b> after a successful Cloud hydration, Cloud rows are authoritative. Local drafts or IDs missing from Cloud must be explicitly marked as local/unconfirmed and must not be merged into a state labelled <code>cloudReady</code> or sent as an update to a missing Cloud row.</p>
+    <p><b>Save contract:</b> the API must validate the target and complete payload, detect a zero-row update, and return an explicit success response containing the exact chart identity plus the canonical server version/timestamp or canonical stored row. The client must set <code>saved</code> only after the write response and a fresh GET/read-back compare all header, step, layout, and persisted metadata fields.</p>
+    <p><b>Failure contract:</b> keep the user's draft available for retry, mark it dirty/unconfirmed, show a clear error, and block any unsafe overwrite. A timeout, response mismatch, missing row, or unverified read is not success. Do not silently discard the draft and do not let it replace Cloud during the next hydration.</p>
+    <p><b>Reopen contract:</b> a hard refresh or new tab/session must fetch the selected chart from the deployed API. The test must use a uniquely identifiable marker, compare the complete payload, and record the URL, chart ID, response, server version/timestamp, API read-back, reopen result, and timestamp.</p>
+    <p><b>Concurrency boundary:</b> Phase 0C must not claim safe concurrent editing. Authentication, authorization, audit identity, optimistic version checks, and conflict/retry handling remain a separate GPT-reviewed architecture/security phase. If a real version column is required, stop for a separate schema plan.</p>
+    <p><b>Test plan:</b> add focused tests for explicit save acknowledgement, canonical read-back, complete-payload comparison, zero-row PUT, local-only/missing ID, failed or ambiguous save, stale local cache, refresh/reopen, and no empty fallback overwrite. Run <code>pnpm test</code>, <code>pnpm run lint</code>, and <code>pnpm run build</code>; report pre-existing lint findings separately.</p>
+    <p><b>Data-safety plan:</b> use mocks/in-memory fixtures for implementation tests. Before any authorized live write test, verify the external Production recovery export and select one reversible, uniquely identifiable test change. Compare the pre/post folder count, roots, maximum depth, complete parent-child tree, chart count, representative IDs, and content checksums. Never reset, reseed, bulk-repair, or use <code>schema.sql</code> against Production.</p>
+    <p><b>Definition of Done:</b> GPT review confirms the diff is narrow; tests/build pass; the rendered Save status distinguishes syncing/saved/unconfirmed/error; the real Production tree and representative chart remain intact; the live Save → deployed API read-back → hard refresh/reopen sequence is evidenced; and the previous deployment remains the rollback target.</p>
+    <p><b>Stop conditions:</b> missing recovery export, unclear target environment, zero-row or mismatched save, stale local data treated as Cloud, any schema/API scope expansion, any authentication/concurrency implementation hidden inside this patch, or any unexpected Production row/tree decrease.</p>
+  </div>
+</section>
+
 <section id="tps4m">
   <h2><span class="num">8</span> แผนอนาคต — Web TPS Activity ครบ 4M</h2>
   <p class="lead">ต่อยอดจากฐานงานมาตรฐาน ขยายเป็นศูนย์กลางกิจกรรมปรับปรุงของทั้งสายการผลิต</p>
@@ -820,7 +840,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="changelog">
-  <div class="callout"><b>Version 1.14 — 2 Aug 2026:</b> Added the Save-to-Cloud Persistence Gate. A save is not successful until the deployed API confirms the exact chart write, a Cloud read-back matches the complete payload, and a refresh/reopen still shows the data. Ambiguous saves must fail closed without overwriting Cloud data; active-user, compatibility, rollback, and authentication/concurrency gates remain mandatory.</div>
+  <div class="callout"><b>Version 1.14 — 2 Aug 2026:</b> Added the Save-to-Cloud Persistence Gate and the Phase 0C GPT implementation plan. A save is not successful until the deployed API confirms the exact chart write, a Cloud read-back matches the complete payload, and a refresh/reopen still shows the data. Ambiguous saves must fail closed without overwriting Cloud data; active-user, compatibility, rollback, and authentication/concurrency gates remain mandatory.</div>
   <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
   <div class="tablewrap">
   <table>

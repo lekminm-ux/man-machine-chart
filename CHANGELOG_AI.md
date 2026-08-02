@@ -64,6 +64,29 @@ This file is the shared AI work log for Codex, Claude Code, Antigravity, and any
   persistence changes until GPT approves the save contract, Cloud/local
   reconciliation, recovery-export method, and verification test plan.
 
+## 2026-08-02 (Phase 0C Save-to-Cloud Master Plan)
+
+### Tool
+
+- Codex/GPT
+
+### Plan decision
+
+- Approved the narrow Phase 0C scope: explicit API save acknowledgement,
+  affected-row validation, canonical read-back, Cloud-authoritative hydration,
+  explicit unconfirmed/dirty handling, and refresh/reopen verification.
+- Kept schema migration, Production repair, authentication, authorization,
+  audit identity, and concurrent-edit conflict handling outside this phase.
+- Defined the Claude allowed-file boundary, stop conditions, test cases, live
+  verification evidence, and rollback requirements in `docs/Master_Plan.html`.
+
+### Authorization
+
+- The user authorized the six-step workflow, including implementation after this
+  GPT plan, review, retest, commit/push, deploy, and live persistence verification.
+- Claude must still follow the approved file boundary and return
+  `PLAN_CHANGE_REQUIRED` if the save contract requires schema/API expansion.
+
 ## 2026-08-02 (Release Gate — Phase 0B PASS and Continuous Usability)
 
 ### Tool
