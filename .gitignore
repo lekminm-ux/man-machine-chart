@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# Cloudflare Pages Dev / local D1 runtime state (never commit or use as Production source)
+/.wrangler/
+
 # production
 /build
 

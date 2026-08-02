@@ -2,6 +2,85 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-02 (Release Gate — Phase 0B PASS and Continuous Usability)
+
+### Tool
+
+- Codex
+
+### Decision
+
+- GPT/Codex reviewed Claude's final Phase 0B fix round and returned `PASS`.
+- Verified `106/106` tests, clean TypeScript/build output, no new lint errors,
+  and the reported local visual smoke test with zero browser console errors.
+- The user explicitly authorized commit, push, and deployment of the approved
+  application version to `man-machine-chart.pages.dev`.
+
+### Release rule added
+
+- Local development and Production remain separate for data safety, but the
+  deployed WebApp must remain usable while improvements continue.
+- A safety guard may block only the unsafe operation; existing chart viewing and
+  normal chart work must remain available.
+- Deployment is pending the final release verification in this session. No D1
+  migration, reset, seed, delete, or Production data write is authorized.
+
+## 2026-08-02 (Phase 0A/0B Data Safety Plan)
+
+### Tool
+
+- Codex
+
+### Session Goal
+
+Review Claude's read-only Production preflight, record the verified baseline,
+and authorize a narrow runtime data-safety guard phase without touching
+Production D1 or the live schema.
+
+### Evidence Reviewed
+
+- Status: `DATA_SAFE_READ_ONLY_COMPLETE`.
+- External recovery directory:
+  `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-08-02_082002\`.
+- Verified 5 folder rows, 3 root folders, 6 chart-file rows, maximum folder
+  nesting depth 3, zero database writes, readable JSON, and matching content
+  checksums.
+- Recorded live schema drift: Production `folders.parentId` exists but is not
+  protected by the self-referencing foreign key declared in `schema.sql`.
+
+### Approved Phase 0B Scope
+
+- Fail-closed cloud hydration and an explicit cloud-unavailable state.
+- No optimistic local delete/move/rename before server success; preserve local
+  state on failed requests.
+- Server-side folder parent existence, self-parent, and descendant-cycle checks.
+- Refuse deletion of folders that still contain child folders or chart files;
+  do not recursively delete or repair the live schema.
+- Deny privileged structural/destructive actions until a real server-side
+  account/session/approval design is separately approved. The browser Admin PIN
+  is not security and must not be used as one.
+
+### Files Added / Changed
+
+- `docs/Master_Plan.html` → v1.10, Phase 0A result and Phase 0B scope.
+- `PROJECT_CONTEXT.md` → verified data-safety baseline and phase boundary.
+- `docs/AI_PROMPTS/README.md` → Phase 0B prompt order.
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_02A_DATA_SAFETY_RUNTIME_GUARDS.md` → exact
+  Claude implementation and verification instructions.
+
+### Explicit Non-Goals
+
+- No `schema.sql` change or Production migration.
+- No Production write, reset, seed, delete, recovery restore, deployment, or
+  push.
+- No authentication/session/audit implementation in this phase.
+
+### Next Gate
+
+Claude may use Prompt 02A only for the allowed local/runtime guard files. The
+handoff must return to GPT/Codex for code review before any phase closure or
+normal feature implementation.
+
 ## Standing Rules For Every AI Session
 
 - Read `PROJECT_CONTEXT.md` and `CHANGELOG_AI.md` before starting edits.
@@ -12,6 +91,434 @@ This file is the shared AI work log for Codex, Claude Code, Antigravity, and any
 - If a conflict copy appears, stop and compare before continuing.
 - After every work session, update `CHANGELOG_AI.md`.
 - If architecture, schema, deployment, workflow, or important rules change, update `PROJECT_CONTEXT.md`.
+
+## 2026-08-02 (Update 3 — Prompt 04 fix round on GPT's Phase 0B review)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Fix the 3 findings from GPT's `APPROVED_FOR_CLAUDE_FIX` review of the Phase 0B
+handoff, per `docs/AI_PROMPTS/PROMPT_CLAUDE_04_FIX_RETEST.md`. Targeted fixes only —
+no redesign, no schema/Production/auth/deployment changes.
+
+### GPT findings addressed
+
+1. **`toggleFolder` was not cloudReady-gated.** It called `updateFolderCloud`
+   unconditionally and swallowed any failure as "non-critical", so it could attempt
+   a Production write while the cloud wasn't confirmed ready, and a failed write
+   left the locally-toggled `expanded` state standing uncorrected.
+   - Fix: while `cloudReady` is false, the toggle is now local-only (no
+     `updateFolderCloud` call at all) — allowed, since expand/collapse against
+     cached data is harmless for review. While `cloudReady` is true, it now goes
+     through the same `mutateWithRollback` snapshot/restore path as the other
+     structural actions, so a failed cloud update rolls the `expanded` flag back.
+2. **`openFile`/`loadFileFromCloud` could get stuck in `syncing` forever.**
+   `loadFileFromCloud` caught its own errors internally and returned `null` — the
+   same bug class already fixed in `loadDatabaseFromCloud` during Phase 0B, just in
+   a sibling function that phase didn't touch. `openFile`'s `try/catch` around it
+   could therefore never see a real failure; on a failed load, `full` was `null`,
+   the success branch was skipped, and `syncStatus` simply stayed `'syncing'`.
+   - Fix: `loadFileFromCloud` now returns the same explicit `{ok:true,file}` /
+     `{ok:false,error}` shape as `loadDatabaseFromCloud` (`FileLoadResult`).
+     `openFile` now has a real failure branch: sets `syncStatus:'error'`, and
+     deliberately leaves `files` untouched — `_loaded` stays `false` and no blank
+     content is substituted, so `saveActiveFile`'s existing `_loaded===false` guard
+     keeps blocking a save until a real load succeeds.
+3. **No regression test proving `saveActiveFile` behaves correctly on failure.**
+   The Phase 0B behavior (gate on `cloudReady`, never claim `saved` on a failed
+   `saveFileCloud`) was implemented but untested.
+   - Added a test creating a folder/file, editing draft content, forcing
+     `saveFileCloud` to reject, and asserting `syncStatus:'error'` plus that the
+     draft edits are still exactly present afterward (not reverted, not lost).
+
+### Files Read
+
+`PROJECT_CONTEXT.md`, `CHANGELOG_AI.md`, `docs/Master_Plan.html`, `package.json`,
+`docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md`, plus the exact current content of
+`src/store/useChartStore.ts` and `src/lib/storage.ts` (its only caller, confirmed by
+grep — no other file uses `loadFileFromCloud`).
+
+### Files Changed
+
+- `src/lib/storage.ts` — `loadFileFromCloud` return type.
+- `src/store/useChartStore.ts` — `toggleFolder`, `openFile`.
+- `tests/store.test.cjs` — 5 new tests (2 for `toggleFolder`, 2 for `openFile`
+  success/failure, 1 for `saveActiveFile` failure).
+- `CHANGELOG_AI.md`.
+- No other file touched.
+
+### Commands / Results
+
+- `npx tsc --noEmit` → clean.
+- `npm.cmd test` → **106/106 pass** (101 from Phase 0B + 5 new).
+- `npm.cmd run lint` → 5 errors / 7 warnings, byte-for-byte the same pre-existing
+  set as the Phase 0B baseline (`StepTable.tsx`, `Sidebar.tsx:385` Module Switcher,
+  `TopBar.tsx`, plus `.wrangler/tmp/**` build scratch noise) — nothing from the 3
+  files this round touched appears in the list.
+- `npm.cmd run build` → compiles clean, 5/5 pages prerendered.
+- **Local smoke test** on `next dev` (still no Functions API there, so this is a
+  real cloud-unavailable run, not a simulation): seeded one folder + one chart into
+  `localStorage`, clicked the folder's expand/collapse arrow — toggled and persisted
+  locally (`expanded: false` confirmed directly in `localStorage`), UI updated
+  (▾ → ▸, children hidden), re-expanded successfully, opened the chart (renders
+  fully — Module 4, step table, layout diagram). `read_console_messages`
+  (errors only) was clean through every step. Cleared the seeded `localStorage`
+  afterward.
+
+### Pre-existing vs new failures
+
+No new test/lint/build failures. The 12 lint problems present before this round are
+identical after it, confirmed by direct comparison.
+
+### Scope change discovered
+
+None. All 3 fixes stayed within `src/lib/storage.ts`, `src/store/useChartStore.ts`,
+and `tests/store.test.cjs` — the same file set Phase 0B already touched.
+
+### Database Safety Gate
+
+No database command was run this session (no `wrangler d1`/`wrangler pages`
+invocation at all). `.wrangler/state` mtime is unchanged from before this task.
+No Production write, schema change, deploy, or push.
+
+### Notes / Risks
+
+- Same remaining risks as Phase 0B: no real server-side authentication yet, and
+  Production's `folders.parentId` FK drift is unresolved (compensated for at the
+  API layer only). Neither is in scope for this fix round.
+- Not committed or pushed. Recommend returning to GPT for another review pass
+  before any phase closure.
+
+## 2026-08-02 (Update 2 — Phase 0B Runtime Data-Safety Guards)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Implement `docs/Master_Plan.html` "Phase 0B · Runtime Data-Safety Guards — approved
+scope" per `docs/AI_PROMPTS/PROMPT_CLAUDE_02A_DATA_SAFETY_RUNTIME_GUARDS.md`: make the
+runtime fail safely when cloud persistence is unavailable or a structural operation
+could damage the folder/chart hierarchy. No Production writes, schema change, or
+deployment — implementation only, handoff returns to GPT for review.
+
+### Completed
+
+- **`src/lib/storage.ts`**: `loadDatabaseFromCloud()` now returns an explicit
+  `CloudLoadResult` (`{ok:true, db}` or `{ok:false, error, fallback}`) instead of
+  silently catching its own failure and returning a local database indistinguishable
+  from a real cloud read. Also dropped an `any` cast this touched directly (now
+  `ChartFile & {_loaded?: boolean}`).
+- **`src/store/useChartStore.ts`**:
+  - New `cloudReady: boolean` state, true only after a confirmed cloud hydration.
+    `hydrated` still flips true on failure too (so the loading spinner clears and
+    cached data can be reviewed), but `cloudReady` stays false and `syncStatus`
+    becomes `'error'` instead of the previous `'idle'`.
+  - New `mutateWithRollback()` helper: snapshots folders/files/activeFileId before a
+    structural change, applies it optimistically, and restores the exact
+    pre-mutation snapshot if the paired cloud call rejects — instead of leaving an
+    unconfirmed local-only change standing in for what the user believes was saved.
+    Applied to `createFolder`, `renameFolder`, `moveFolder`, `deleteFolder`,
+    `createFile`, `renameFile`, `moveFile`, `deleteFile`, `duplicateFile` — all 9
+    now also refuse to run at all while `cloudReady` is false.
+  - `saveActiveFile()` gated the same way; also fixed the pre-existing bug where the
+    idle-status timeout fired even after a failed save, silently clearing the error.
+  - Dropped the `useChartStore.ts:387` `any` cast this touched directly.
+- **`functions/api/folders.js`**:
+  - `GET`: removed the hidden self-healing `ALTER TABLE ... ADD COLUMN parentId` —
+    a GET handler must not perform a schema write. Now selects named columns (not
+    `SELECT *`), so a database missing the column fails loudly with a clear
+    `409 schema-unavailable` response instead of silently omitting the field or
+    self-healing.
+  - `POST`/`PUT`: `parentId` must be `null` or reference an existing folder row.
+    `PUT` additionally rejects a folder becoming its own parent and rejects moving a
+    folder into its own descendant, via a new bounded (max 100 hops) parent-chain
+    walk — bounded so a corrupt/cyclic chain already in the database can't hang the
+    request.
+  - `DELETE`: now refuses to delete a folder that still has child folders or chart
+    files (`409`, zero rows deleted), because live Production has no
+    self-referencing FK on `folders.parentId` (confirmed via the Phase 0A preflight)
+    — nothing at the database level would stop a delete from silently orphaning
+    everything underneath. No recursive delete or cascade repair added.
+- **`functions/api/files.js`**: found and fixed a real pre-existing bug while
+  implementing this: `moveFile` in the store has always sent `folderId` in the `PUT`
+  body, but the handler destructured only `{id, name, updatedAt, content}` and
+  silently dropped it — every "move chart to another folder" action was reporting
+  `success: true` without ever actually persisting the move. `folderId` is now
+  accepted and applied via the same `COALESCE` pattern as the other fields, and
+  validated to reference an existing folder (`POST` too).
+- **`src/components/layout/Sidebar.tsx`**: removed `ADMIN_PIN` / `requireAdminPin` —
+  a client-side `window.prompt()` compared to a value shipped in the JS bundle
+  looked like security but never was one. Delete (folder + chart) and move
+  (folder + chart) now show a clear "not available until server-side authorization
+  ships" message and perform no mutation; the underlying `moveFolder`/`moveFile`/
+  `deleteFolder`/`deleteFile` store actions are no longer imported here since
+  nothing in this component calls them anymore. Added a small amber banner at the
+  top of the folder tree when `cloudReady` is false. Create and rename remain
+  available (protected by the new cloudReady gate + rollback, not additionally
+  denied — they're not destructive or a hierarchy change).
+
+### Files Added / Changed
+
+- `src/lib/storage.ts`, `src/store/useChartStore.ts`
+- `functions/api/folders.js`, `functions/api/files.js`
+- `src/components/layout/Sidebar.tsx`
+- `tests/store.test.cjs` (extended), `tests/data-safety.test.cjs` (new)
+- `CHANGELOG_AI.md`
+- No other file touched. No Production writes, no schema/migration, no deploy, no push.
+
+### Verification
+
+- `npx tsc --noEmit` → clean.
+- `npm test` → **101/101 pass** (baseline 83 + 5 new store-level tests + 13 new
+  `tests/data-safety.test.cjs` tests covering: cloud-failure state, blocked actions
+  while not ready, failed-delete/failed-move rollback, a synthetic multi-level tree
+  surviving hydration, folder parent/self-parent/descendant-cycle rejection
+  (including a corrupt-cycle-in-the-database case, to prove the walk is bounded),
+  non-empty-folder deletion refusal (child-folder case and chart-file case, each
+  independently), a genuinely-empty folder still deletes, the `GET` schema-unavailable
+  path, and the `files.js` `folderId` move-regression fix). All new tests use an
+  in-memory mock D1 / mock storage module — no Production D1, local Pages Dev D1, or
+  the external recovery export was used as a fixture.
+- `npx eslint .` → 5 errors / 7 warnings, all **pre-existing and unrelated**
+  (`StepTable.tsx` hooks-order + unescaped entities, `Sidebar.tsx:385`
+  `setActiveModule(m as any)` in the unrelated Module Switcher, `TopBar.tsx`
+  hooks-order/immutability) — confirmed by re-running lint before any edit in this
+  session. The `storage.ts:51` and `useChartStore.ts:387` `any` casts flagged in the
+  2026-08-01 read-only audit are now gone, as a direct side effect of typing the
+  exact lines this session's rewrite touched. `.wrangler/tmp/**` also shows up in a
+  whole-project lint pass (pre-existing build scratch files, not source, not touched).
+- `npm run build` → compiles clean, 5/5 pages prerendered.
+- **Local smoke test** on `next dev` (port 3456, no Cloudflare Functions there — this
+  naturally exercises the cloud-unavailable path without needing to break anything):
+  seeded one folder + one chart into `localStorage` only, reloaded, and confirmed in
+  the real rendered DOM: the amber "⚠ Cloud unavailable" banner appears in the
+  sidebar; the existing `TopBar` already shows "⚠ Sync Error" from `syncStatus`
+  without any `TopBar.tsx` change; clicking "Delete folder" shows the denial message
+  and `localStorage` still has 1 folder afterward; attempting "New Root Folder"
+  silently does not add a folder (blocked by `cloudReady`) with no console error;
+  opening the existing chart still fully renders (Module 4, step table, layout
+  diagram) — "the chart can still be reviewed" holds. `read_console_messages`
+  (errors only) was clean through every step. Cleared the seeded `localStorage`
+  afterward. Did not touch `.wrangler/` or local D1 state at any point (confirmed:
+  `.wrangler/state` mtime unchanged from before this session).
+
+### Notes / Risks
+
+- **Confirmed no Production writes, no schema/migration, no deploy, no push** —
+  this session only ran read-only `git status`/`rg --files` against the repo and
+  local `node --test`/`eslint`/`next build`/`next dev`; no `wrangler d1`/`wrangler
+  pages` command was run at all in this task.
+- Pre-existing lint errors in `StepTable.tsx`, `Sidebar.tsx` (Module Switcher), and
+  `TopBar.tsx` were left untouched — out of the approved Phase 0B file list.
+- **Remaining risk — authentication**: delete/move are now honestly *denied*, not
+  fake-secured, but there is still no real account/session/approval system. That is
+  explicitly out of scope for Phase 0B per the Master Plan and needs its own
+  GPT-reviewed plan before implementation.
+- **Remaining risk — live schema drift**: Production `folders.parentId` still has no
+  self-referencing foreign key (confirmed live via the Phase 0A `sqlite_master`
+  export). The new folder DELETE guard compensates for this at the API layer, but
+  the underlying drift between `schema.sql` and the real Production schema is
+  unresolved and untouched, per the explicit non-goal in this phase.
+- Did not add a per-action error toast for the "create blocked while cloud isn't
+  ready" case beyond the top-of-sidebar banner — kept to "minimum related UI state"
+  per the allowed-files note; happy to add one if GPT/the user wants louder
+  per-action feedback.
+- Not committed or pushed. Recommend returning this to GPT/Codex for review
+  (`PROMPT_GPT_03_REVIEW_CLAUDE_HANDOFF.md`) before the phase is marked closed in
+  `docs/Master_Plan.html`.
+
+## 2026-08-02 (Data Safety Gate)
+
+### Tool
+
+- Codex
+
+### Session Goal
+
+Prevent a repeat of the Local D1 confusion where the local `.wrangler/` database
+was recreated with one sample folder/chart while the real Production D1 still
+contained the user's existing four-level folder tree.
+
+### Completed
+
+- Added the canonical `docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md`.
+- Added `PROMPT_CLAUDE_01A_DATABASE_SAFETY_PREFLIGHT_READ_ONLY.md` for the next
+  Claude session: identify environments, inventory Production read-only, create
+  and verify an external recovery export, and stop before any code/database write.
+- Updated `PROJECT_CONTEXT.md`, `docs/Master_Plan.html` v1.9,
+  `docs/Deployment_Checklist.md`, `.gitignore`, and all workflow prompts with:
+  - Production D1 as the real source of truth;
+  - Local Pages Dev, localhost/localStorage, and `.wrangler/` as separate test/cache state;
+  - preservation of every folder `parentId` relationship, the existing four-level tree,
+    chart files, and chart content;
+  - no reset/seed/delete/migration/remote write without explicit authorization and a
+    verified recovery export outside the repository;
+  - pre/post counts, tree, IDs, and content checksums as a release gate;
+  - fail-closed behavior when cloud loading fails.
+- User verified that the real Production tree and existing data are still present.
+
+### Files Changed
+
+- `PROJECT_CONTEXT.md`
+- `CHANGELOG_AI.md`
+- `.gitignore`
+- `docs/Master_Plan.html`
+- `docs/Deployment_Checklist.md`
+- `docs/AI_PROMPTS/README.md`
+- `docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_00_START_HERE_READ_ONLY.md`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_01A_DATABASE_SAFETY_PREFLIGHT_READ_ONLY.md`
+- `docs/AI_PROMPTS/PROMPT_GPT_01_PROJECT_AUDIT_AND_MASTER_PLAN.md`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_02_IMPLEMENT_APPROVED_PLAN.md`
+- `docs/AI_PROMPTS/PROMPT_GPT_03_REVIEW_CLAUDE_HANDOFF.md`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_04_FIX_RETEST.md`
+
+### Verification
+
+- `npm.cmd test` → **83/83 passed**.
+- `npm.cmd run build` → compiled successfully; all 5 static pages generated.
+- `Master_Plan.html` tag-balance check → **PASS**.
+- `git diff --check` for the documentation/config changes → no errors. The
+  existing `StepTable.tsx` CRLF/trailing-whitespace warnings remain from the
+  prior Claude implementation and were not touched in this documentation task.
+
+### Notes / Risks
+
+- No application source code or database was changed in this session.
+- The external recovery export has not yet been created; it is the next
+  read-only Claude preflight and must be verified before data-related coding.
+- `.wrangler/` remains local-only and must not be committed.
+
+## 2026-08-02
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Implement the "Chart readability requirement" GPT/Codex approved in `docs/Master_Plan.html` v1.8
+(section `#security-capacity-gate`): the Start → End column was eating space until it pushed the
+Timeline Visualization graph out of view, so the step table and the graph could not be used
+together. Scope authorized via `docs/AI_PROMPTS/PROMPT_CLAUDE_02_IMPLEMENT_APPROVED_PLAN.md`,
+limited to that layout problem only — no other module touched.
+
+### Completed
+
+- **`src/components/editor/StepTable.tsx`**:
+  - **Start → End column is now collapsible**, off by default (`showStartEnd` state) — its numbers
+    already print on the bar ends via `TimelineRow`'s `showTimes`, so hiding it by default frees
+    the space instead of duplicating information. New toolbar button `🕐 Show/Hide Start→End`.
+  - Fixed a real colgroup bug: the column had no `<col>` entry at all (auto-sized, unbounded,
+    header/body count mismatched the `<colgroup>`). It now has an explicit `w-24` (96px) `<col>`
+    in both table modes, only rendered when shown, with header/body/footer/empty-state cell counts
+    kept in sync (verified by hand for all 4 combinations of `hideInputs` × `showStartEnd`).
+  - **Timeline width is now computed from actual available space** instead of the old hardcoded
+    `600` / `1200`. Measured via `containerRef` + `useLayoutEffect` (synchronous
+    `getBoundingClientRect` read on mount, so the graph is sized correctly on first paint) with a
+    `ResizeObserver` layered on top for live updates on later resizes/sidebar toggles. Clamped to
+    `[480, 1800]px` so the graph never shrinks below readable or grows absurdly wide.
+  - The `<table>` needed an **explicit pixel width** (`fixedColsWidth + timelineWidth`) for
+    `table-layout: fixed` to actually honour every `<col>`'s declared width — found this the hard
+    way in verification (see Notes/Risks): removing the old `w-full` class without replacing it
+    let the browser shrink columns toward content instead, silently invalidating the whole
+    available-space calculation.
+
+### Files Added / Changed
+
+- `src/components/editor/StepTable.tsx`
+- `CHANGELOG_AI.md`
+- No other module, business-rule, schema, API, or dependency file touched.
+
+### Verification
+
+- `npx tsc --noEmit` → clean.
+- `npx eslint src/components/editor/StepTable.tsx` → 3 problems, all **pre-existing** (unchanged
+  from the read-only audit dated 2026-08-01: 2× `react/no-unescaped-entities` on the "No steps yet"
+  string, 1× `react-hooks/rules-of-hooks` on `handleChange`'s `useCallback` sitting after the
+  `if (!activeFile) return null` guard). New hooks added this session were placed before that guard
+  and introduced zero new lint errors.
+- `npm test` → 83/83 pass, no regressions.
+- `npm run build` → compiles clean, 5/5 pages prerendered.
+- **Manual verification on the real dev server** (port 3456) with seed data matching the project's
+  standard BYD Side Step fixture (10 steps, Worker A + Auto M/C), measured via DOM/computed-width
+  inspection rather than a pixel screenshot (the screenshot tool could not composite a frame in
+  this session — see Notes/Risks):
+  - 1920px viewport, compact mode (`hideInputs=true`), Start→End hidden: timeline computed to
+    918px, table 1524px inside a 1545px container → **`needsHorizontalScroll: false`** — table and
+    graph fit together with no scrolling, the actual goal of this task.
+  - Same width, Start→End toggled on: column renders at exactly 96px, timeline reflows to 822px,
+    **still `needsHorizontalScroll: false`**.
+  - 1440px and 1024px viewports: fixed columns alone (1170px in expanded / 604px in compact mode)
+    can exceed the available container width; timeline correctly clamps to the 480px floor and the
+    existing `overflow-x-auto` scroll takes over — expected, graceful degradation, not a regression
+    (the approved requirement is specifically about the Start→End area, not a guarantee that the
+    full 13-column input view never scrolls).
+  - Empty-file state (`0` steps) renders "No steps yet…" with the corrected `colSpan` in all 4
+    `hideInputs`×`showStartEnd` combinations, no console warnings.
+  - `read_console_messages` (errors only) clean across every reload/resize/toggle in this session.
+  - Cleared the seeded `mm_chart_db_v2` localStorage test data afterward.
+
+### Notes / Risks
+
+- **Tooling limitation, not a code defect**: `computer{action:"screenshot"}` failed every attempt
+  this session ("the Browser pane is not displayed, so the page is not compositing frames"). While
+  debugging why the timeline stayed at its static fallback width, a manually-created
+  `ResizeObserver` on the same element also never delivered even its guaranteed *initial* callback
+  — strong evidence that this specific preview pane suspends rendering-pipeline-tied callbacks when
+  not visually composited. `window.innerWidth` and `getBoundingClientRect()` (pure layout, not
+  paint) worked fine throughout, which is why the fix uses a synchronous `useLayoutEffect` read for
+  the value that matters on first paint, with `ResizeObserver` purely as a live-update layer on top.
+  **The live-resize path (dragging the window, or toggling the sidebar without a reload) could not
+  be empirically exercised in this session** — verified instead by reloading at each target width,
+  which re-runs the synchronous measurement. `ResizeObserver` is a standard, widely-supported API;
+  there is no reason to expect it to misbehave for a real user in a normally-rendering browser tab,
+  but this specific code path does not have direct proof from this session the way the others do.
+- Did not touch the 3 pre-existing ESLint errors (unescaped entities, hooks-order) — flagged in the
+  2026-08-01 read-only audit, out of scope for this task per the authorized scope.
+- Did not update `docs/Master_Plan.html`. Per
+  `docs/AI_PROMPTS/README.md`'s role split, GPT/Codex owns that document; this session only had
+  user + in-prompt authorization to implement the already-approved chart-readability item, not to
+  close the phase. Recommend routing this CHANGELOG entry back through the GPT review step
+  (`PROMPT_GPT_03_REVIEW_CLAUDE_HANDOFF.md`) before `docs/Master_Plan.html` is updated.
+- Not committed or pushed — the user's authorization this session covered implementation only.
+
+## 2026-08-01
+
+### Tool
+
+- Codex
+
+### Session Goal
+
+Convert the Claude read-only onboarding report into the next Master Plan gate.
+
+### Completed
+
+- Reviewed `docs/AI_PROMPTS/REPORT_CLAUDE_00_READ_ONLY_ONBOARDING_2026-08-01.md`.
+- Updated `docs/Master_Plan.html` to version 1.8 with the approved planning inputs:
+  - two shifts; 720 gross minutes per shift, minus 60 lunch and 20 pre-OT = 640 net minutes per shift;
+  - 1,280 net minutes / 76,800 seconds for two shifts per day;
+  - in-app account authentication and server-side authorization, independent of company IT;
+  - approval and audit requirements for destructive or structural changes;
+  - Combination Table wrap boundary `max(Cycle Time, Takt Time)`.
+  - chart readability requirement: Start -> End must remain compact/collapsible and must not hide the timeline graph; Claude must perform real visual smoke testing before handoff.
+
+### Files Changed
+
+- `docs/Master_Plan.html`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_02_IMPLEMENT_APPROVED_PLAN.md`
+- `CHANGELOG_AI.md`
+
+### Notes / Risks
+
+- No application source, schema, API, dependency, or deployment files were changed.
+- Coding remains blocked until the security bootstrap/admin design and the revised Master Plan are explicitly approved by the user.
 
 ## 2026-07-08
 

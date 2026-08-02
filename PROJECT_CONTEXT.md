@@ -1,6 +1,6 @@
 ﻿# PROJECT_CONTEXT
 
-Last updated: 2026-07-31
+Last updated: 2026-08-02
 
 ## Project Name
 
@@ -50,6 +50,7 @@ Project memory / documentation:
 - `docs/Master_Plan.html`: **แผนแม่บท** — vision, TPS module mapping, roadmap, decision log, open questions. Read this before starting any module work.
 - `docs/User_Manual.html`: user-facing manual/reference.
 - `docs/Deployment_Checklist.md`: deployment steps and pre-deploy checks.
+- `docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md`: mandatory database environment, backup, hierarchy-preservation, and no-data-loss rules.
 - `docs/Codex_Multi_Device_Blueprint.md`: older multi-device guidance; appears mojibake/encoding-corrupted, so use `PROJECT_CONTEXT.md` as the current clean source of truth.
 - `Docs_StandardWork_Reference/`: non-code reference material for standard work (pptx / xlsx / pdf). Not used by the app at runtime.
 
@@ -110,7 +111,7 @@ folders stay at the root; every human-readable document lives under `docs/` (pro
 ```
 
 Generated / local-only, never committed (all git-ignored): `.next/`, `out/`, `node_modules/`,
-`tsconfig.tsbuildinfo`, `next-env.d.ts`, `_Backup_scratch_OneDriveMigration_20260719/`.
+`.wrangler/`, `tsconfig.tsbuildinfo`, `next-env.d.ts`, `_Backup_scratch_OneDriveMigration_20260719/`.
 
 ## Current Features / หน้าจอหรือ Workflow หลัก
 
@@ -171,6 +172,67 @@ Cloudflare binding:
 - D1 binding name: `DB`
 - Database name: `mm-chart-db`
 - Database id is in `wrangler.toml`.
+
+### Database Safety and Data Preservation (mandatory)
+
+The complete rule set is in `docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md`. The
+Production D1 database behind `https://man-machine-chart.pages.dev` is the
+canonical source of truth for real folders and charts. Local Pages Dev at
+`127.0.0.1:8788`, Next dev at `localhost:3456`, browser `localStorage`, and
+`.wrangler/` are separate test/cache environments and must never be presented as
+a restored copy of Production.
+
+- Identify the exact environment, binding, database, URL, and local/remote mode
+  before every database command.
+- Never delete or recreate `.wrangler/` or local D1 state to solve a test problem
+  without first recording the loss and receiving explicit approval.
+- Never run a Production write, migration, reset, seed, delete, or bulk update
+  without explicit user authorization and a verified timestamped export outside
+  the repository. Recovery exports are evidence only, never Source of Truth.
+- Preserve every folder row and its `parentId` chain, including the existing
+  four-level tree, and every chart-file row/content. The schema supports nested
+  folders; it does not authorize flattening or regenerating them.
+- If a cloud read fails, fail closed and block save/destructive actions. Never
+  silently replace a non-empty cloud state with an empty local fallback.
+- Before and after persistence/schema/API/deployment work, compare folder count,
+  root count, hierarchy depth/parent-child mapping, chart count, and known chart
+  IDs/names. Any unexpected decrease is a STOP condition.
+- A passing test, lint, build, or deploy command is not proof of data safety;
+  reopen the real Production tree and representative existing charts.
+
+Verified Production data-safety baseline (2026-08-02): the read-only preflight
+completed with `DATA_SAFE_READ_ONLY_COMPLETE`. The external recovery export is
+at `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-08-02_082002\` and
+verified 5 folder rows, 3 roots, 6 chart-file rows, maximum folder nesting
+depth 3, zero database writes, readable chart JSON, and matching content
+checksums. The live `folders` table has `parentId` appended without the
+self-referencing foreign key declared in `schema.sql`; this schema drift is a
+known risk and must not be repaired by running `schema.sql` or an ad-hoc
+`ALTER TABLE` against Production.
+
+Phase 0B runtime data-safety guards passed GPT review on 2026-08-02 after
+106/106 tests, a clean build, and local visual smoke verification. The next
+implementation phase is the separately planned app-managed authentication,
+server-side authorization, approval, and audit design. Schema normalization and
+Production D1 writes remain separate protected gates; application deployment is
+allowed only after the Continuous Usability gate and explicit user approval.
+
+### Continuous Usability / No-Downtime Gate (mandatory)
+
+The WebApp must remain usable while improvements are being developed. Local
+development and Production are separate environments for safety, not separate
+user workflows: after GPT review and explicit user authorization, the approved
+application version must be committed, deployed, and verified at
+`https://man-machine-chart.pages.dev`.
+
+- Keep the currently deployed application usable until the replacement passes
+  tests, build, visual smoke checks, console checks, and Production-tree checks.
+- A safety guard may block only the unsafe operation. It must not unnecessarily
+  block viewing existing charts or normal chart work.
+- If Cloud is unavailable, show cached data for review and fail closed for
+  writes that could overwrite or delete Production data.
+- A local `127.0.0.1` or `localhost` URL is for testing only; it is not the
+  user's deployed application and must not be reported as the final release.
 
 ## Business Rules สำคัญ
 

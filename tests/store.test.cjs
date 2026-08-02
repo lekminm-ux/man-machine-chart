@@ -42,11 +42,15 @@ function loadTypeScriptModule(relativePath, mocks = {}) {
 }
 
 // ── In-memory storage mock (no localStorage / fetch in node) ────────────────
-function makeStorageMock() {
+// `loadDatabaseFromCloud` mirrors the real ok/not-ok CloudLoadResult contract
+// (src/lib/storage.ts) so hydrate() exercises the exact shape it handles in
+// production — a plain `{folders,...}` object here would silently pass
+// `result.ok` as undefined and mask a real contract mismatch.
+function makeStorageMock(overrides = {}) {
   return {
     loadLocalDatabase: () => ({ folders: [], files: [], activeFileId: null }),
     saveLocalDatabase: () => {},
-    loadDatabaseFromCloud: async () => ({ folders: [], files: [], activeFileId: null }),
+    loadDatabaseFromCloud: async () => ({ ok: true, db: { folders: [], files: [], activeFileId: null } }),
     loadFileFromCloud: async () => null,
     createFolderCloud: async () => {},
     updateFolderCloud: async () => {},
@@ -54,19 +58,31 @@ function makeStorageMock() {
     createFileCloud: async () => {},
     saveFileCloud: async () => {},
     deleteFileCloud: async () => {},
+    ...overrides,
   };
 }
 
-function freshStore() {
+function freshStore(overrides = {}) {
   const { useChartStore } = loadTypeScriptModule('src/store/useChartStore.ts', {
-    '@/lib/storage': makeStorageMock(),
+    '@/lib/storage': makeStorageMock(overrides),
     '@/lib/seed-data': loadTypeScriptModule('src/lib/seed-data.ts'),
   });
   return useChartStore;
 }
 
+// Most tests care about behavior *after* a successful cloud hydration, not
+// about hydration itself — this runs the real hydrate() flow (not a
+// shortcut straight to cloudReady: true) so every test still exercises the
+// actual gate that create/rename/move/delete/save now depend on.
+async function freshReadyStore(overrides = {}) {
+  const store = freshStore(overrides);
+  await store.getState().hydrate();
+  assert.equal(store.getState().cloudReady, true, 'test setup expected hydrate() to succeed');
+  return store;
+}
+
 test('activeFile() returns a stable reference (no re-render loop)', async () => {
-  const store = freshStore();
+  const store = await freshReadyStore();
   await store.getState().createFolder('Test', 'custom');
   const folderId = store.getState().folders[0].id;
   await store.getState().createFile(folderId, 'Chart 1');
@@ -78,7 +94,7 @@ test('activeFile() returns a stable reference (no re-render loop)', async () => 
 });
 
 test('cycle time follows the duration model when steps change', async () => {
-  const store = freshStore();
+  const store = await freshReadyStore();
   await store.getState().createFolder('Test', 'custom');
   const folderId = store.getState().folders[0].id;
   await store.getState().createFile(folderId, 'Chart 1');
@@ -103,7 +119,7 @@ test('cycle time follows the duration model when steps change', async () => {
 });
 
 test('insertStep places the new step and renumbers', async () => {
-  const store = freshStore();
+  const store = await freshReadyStore();
   await store.getState().createFolder('Test', 'custom');
   const folderId = store.getState().folders[0].id;
   await store.getState().createFile(folderId, 'Chart 1');
@@ -123,7 +139,7 @@ test('insertStep places the new step and renumbers', async () => {
 });
 
 test('duplicateFile deep-copies steps and remaps layout connections', async () => {
-  const store = freshStore();
+  const store = await freshReadyStore();
   await store.getState().createFolder('Test', 'custom');
   const folderId = store.getState().folders[0].id;
   await store.getState().createFile(folderId, 'Original');
@@ -148,4 +164,204 @@ test('duplicateFile deep-copies steps and remaps layout connections', async () =
   const conn = copy.layoutDiagram.connections[0];
   assert.equal(conn.fromId, copyA.id, 'connection must point at the copied elements');
   assert.equal(conn.toId, copyB.id);
+});
+
+// ── Phase 0B: runtime data-safety guards ─────────────────────────────────────
+
+test('cloud load failure produces an unsafe/unavailable state, not a silent success', async () => {
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: false,
+      error: 'network unreachable',
+      fallback: { folders: [], files: [], activeFileId: null },
+    }),
+  });
+  await store.getState().hydrate();
+  assert.equal(store.getState().cloudReady, false, 'a failed cloud read must never be treated as confirmed');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().hydrated, true, 'hydration still completes so cached data can be reviewed and the spinner clears');
+});
+
+test('structural and save actions are blocked while cloud is not ready', async () => {
+  const store = freshStore(); // never hydrated — cloudReady stays false
+  await store.getState().createFolder('Should not persist', 'custom');
+  // .length, not deepEqual against a literal [] — the store's array comes out
+  // of a separate vm realm, so deepStrictEqual would flag it as a mismatched
+  // prototype even when both are empty.
+  assert.equal(store.getState().folders.length, 0, 'a blocked create must not add a local-only record either');
+  assert.equal(store.getState().syncStatus, 'error');
+
+  await store.getState().saveActiveFile();
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('a failed delete leaves the local folder/file state unchanged (rollback, not partial apply)', async () => {
+  const store = await freshReadyStore({
+    deleteFolderCloud: async () => { throw new Error('server rejected the delete'); },
+  });
+  await store.getState().createFolder('Keep me', 'custom');
+  const before = store.getState().folders;
+  assert.equal(before.length, 1);
+
+  await store.getState().deleteFolder(before[0].id);
+
+  assert.equal(store.getState().folders, before, 'a failed delete must restore the exact pre-mutation folders array');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('a failed move leaves the local file state unchanged (rollback, not partial apply)', async () => {
+  const store = await freshReadyStore({
+    saveFileCloud: async () => { throw new Error('server rejected the move'); },
+  });
+  await store.getState().createFolder('Folder A', 'custom');
+  const folderA = store.getState().folders[0].id;
+  await store.getState().createFolder('Folder B', 'custom');
+  const folderB = store.getState().folders[1].id;
+  await store.getState().createFile(folderA, 'Chart 1');
+  const fileId = store.getState().activeFileId;
+
+  const beforeFiles = store.getState().files;
+  await store.getState().moveFile(fileId, folderB);
+
+  assert.equal(store.getState().files, beforeFiles, 'a failed move must restore the exact pre-mutation files array');
+  assert.equal(store.getState().files.find(f => f.id === fileId).folderId, folderA, 'the file must still belong to its original folder');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('a synthetic multi-level folder tree hydrates intact, matching every id and parentId', async () => {
+  const root1 = { id: 'root-1', parentId: null,     name: 'Root One', processType: 'custom',       expanded: true, createdAt: '2026-01-01T00:00:00.000Z' };
+  const root2 = { id: 'root-2', parentId: null,     name: 'Root Two', processType: 'blow_molding',  expanded: true, createdAt: '2026-01-01T00:00:00.000Z' };
+  const mid   = { id: 'mid-1',  parentId: 'root-2', name: 'Mid',      processType: 'blow_molding',  expanded: true, createdAt: '2026-01-01T00:00:00.000Z' };
+  const leaf  = { id: 'leaf-1', parentId: 'mid-1',  name: 'Leaf',     processType: 'blow_molding',  expanded: true, createdAt: '2026-01-01T00:00:00.000Z' };
+  const synthFolders = [root1, root2, mid, leaf];
+  const synthFile = { id: 'file-1', name: 'Synthetic Chart', folderId: 'leaf-1', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: synthFolders, files: [synthFile], activeFileId: null },
+    }),
+  });
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().cloudReady, true);
+  assert.equal(store.getState().folders.length, 4);
+  assert.equal(store.getState().files.length, 1);
+  for (const f of synthFolders) {
+    const got = store.getState().folders.find(x => x.id === f.id);
+    assert.ok(got, `folder ${f.id} must survive hydration`);
+    assert.equal(got.parentId, f.parentId);
+  }
+  assert.equal(store.getState().files[0].folderId, 'leaf-1');
+});
+
+// ── Prompt 04 fix round: GPT review findings ─────────────────────────────────
+
+test('toggleFolder makes no cloud call while cloudReady is false, but still toggles locally for review', async () => {
+  let calls = 0;
+  const store = freshStore({ updateFolderCloud: async () => { calls++; } }); // never hydrated — cloudReady stays false
+  const folder = { id: 'f1', parentId: null, name: 'F', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z' };
+  // Seed a folder directly into state without going through createFolder
+  // (which itself requires cloudReady) — this test is about toggleFolder
+  // specifically, on a folder that's only present for cached review.
+  store.setState({ folders: [folder] });
+
+  await store.getState().toggleFolder('f1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted while cloudReady is false');
+  assert.equal(store.getState().folders.find(f => f.id === 'f1').expanded, false, 'the local toggle itself must still work for reviewing the cached tree');
+});
+
+test('toggleFolder rolls back the expanded flag when the cloud call fails', async () => {
+  const store = await freshReadyStore({
+    updateFolderCloud: async () => { throw new Error('server rejected the update'); },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const before = store.getState().folders;
+  assert.equal(before[0].expanded, true);
+
+  await store.getState().toggleFolder(before[0].id);
+
+  assert.equal(store.getState().folders, before, 'a failed toggle must restore the exact pre-mutation folders array');
+  assert.equal(store.getState().folders[0].expanded, true, 'expanded must roll back to its pre-toggle value');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('a failed openFile cloud load never gets stuck in syncing, sets error, and keeps _loaded false', async () => {
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: { processName: '', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: {
+        folders: [{ id: 'folder-1', parentId: null, name: 'F', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z' }],
+        files: [placeholderFile],
+        activeFileId: null,
+      },
+    }),
+    loadFileFromCloud: async () => ({ ok: false, error: 'network unreachable' }),
+  });
+  await store.getState().hydrate();
+  assert.equal(store.getState().cloudReady, true);
+
+  await store.getState().openFile('file-1');
+
+  assert.equal(store.getState().syncStatus, 'error', 'a failed file load must never remain stuck in syncing');
+  const file = store.getState().files.find(f => f.id === 'file-1');
+  assert.equal(file._loaded, false, '_loaded must stay false — flipping it true with blank content would let a later save wipe the real cloud content');
+  assert.equal(file.steps.length, 0, 'no blank content should have been substituted for the still-unloaded placeholder');
+});
+
+test('a successful openFile cloud load marks the file loaded and sets idle', async () => {
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: { processName: '', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  const fullFile = { ...placeholderFile, steps: [{ id: 's1', no: 1, description: 'Real step', operator: 'Worker A', manualTime: 10, machineTime: 0, walkingTime: 0, idleTime: 0 }] };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: {
+        folders: [{ id: 'folder-1', parentId: null, name: 'F', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z' }],
+        files: [placeholderFile],
+        activeFileId: null,
+      },
+    }),
+    loadFileFromCloud: async () => ({ ok: true, file: fullFile }),
+  });
+  await store.getState().hydrate();
+
+  await store.getState().openFile('file-1');
+
+  assert.equal(store.getState().syncStatus, 'idle');
+  const file = store.getState().files.find(f => f.id === 'file-1');
+  assert.equal(file._loaded, true);
+  assert.equal(file.steps.length, 1);
+});
+
+test('a failed saveActiveFile never reports saved and preserves the draft content', async () => {
+  const store = await freshReadyStore({
+    saveFileCloud: async () => { throw new Error('server rejected the save'); },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  store.getState().addStep();
+  const step = store.getState().activeFile().steps[0];
+  store.getState().updateStep(step.id, { description: 'draft in progress', manualTime: 42 });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'error', 'a failed save must never report saved');
+  const file = store.getState().activeFile();
+  assert.equal(file.steps[0].description, 'draft in progress', "the user's draft edits must survive a failed save");
+  assert.equal(file.steps[0].manualTime, 42);
 });

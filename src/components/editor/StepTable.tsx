@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { getCalculatedSteps, buildSingleStepSegments, computeTotalDuration, computeCycleDetail } from '@/lib/chart-utils';
 import { TimelineRow } from '../chart/TimelineRow';
@@ -16,6 +16,17 @@ const TIME_COLS = [
   { key: 'walkingTime', label: 'Walk (s)',     color: 'text-emerald-800', calcKey: 'calcWalk' },
   { key: 'idleTime',    label: 'Idle (s)',     color: 'text-red-800',    calcKey: 'calcIdle' },
 ] as const;
+
+// The timeline column fills whatever width is left over after the other
+// columns, so the graph stays beside the table instead of being scrolled
+// out of view. These sums must mirror the <col> widths declared in the two
+// colgroups below, or the estimate drifts from what's actually rendered.
+const FIXED_COLS_WIDTH_EXPANDED = 40 + 64 + 64 + 48 + 250 + 128 + 96 + 80 * 5 + 80; // # Insert Move Del Description Operator Position StartTime+4xTime Count
+const FIXED_COLS_WIDTH_COMPACT  = 300 + 128 + 96 + 80; // Description Operator Position Count
+const START_END_COL_WIDTH = 96;
+const MIN_TIMELINE_WIDTH = 480;
+const MAX_TIMELINE_WIDTH = 1800;
+const TIMELINE_SAFETY_MARGIN = 24;
 
 function getWorkerBorder(operator: string) {
   if (operator === 'Worker A') return 'border-l-4 border-orange-500';
@@ -46,6 +57,27 @@ export default function StepTable() {
 
   // Toggle state to hide/show yellow highlighted inputs
   const [hideInputs, setHideInputs] = useState(false);
+  // Start → End is off by default: the same numbers already print on the
+  // bar ends via TimelineRow's showTimes, so collapsing it by default
+  // leaves more room for the graph.
+  const [showStartEnd, setShowStartEnd] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Measure synchronously first so the graph is sized correctly on the
+    // very first paint, instead of waiting on ResizeObserver's async callback.
+    setContainerWidth(el.getBoundingClientRect().width);
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setContainerWidth(width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   if (!activeFile) return null;
   const { steps, header } = activeFile;
@@ -72,8 +104,21 @@ export default function StepTable() {
   const cycleTime = cycleDetail.cycleTime;
   const cycleDriver = cycleDetail.loops.find(l => l.operator === cycleDetail.driver);
 
-  // Timeline width expands when inputs are hidden to use available space
-  const timelineWidth = hideInputs ? 1200 : 600;
+  // Timeline width fills whatever space is left after the visible columns.
+  // Falls back to the old fixed defaults for the one frame before the
+  // ResizeObserver reports a real measurement.
+  const fixedColsWidth = (hideInputs ? FIXED_COLS_WIDTH_COMPACT : FIXED_COLS_WIDTH_EXPANDED)
+    + (showStartEnd ? START_END_COL_WIDTH : 0);
+  const timelineWidth = containerWidth === 0
+    ? (hideInputs ? 1200 : 600)
+    : Math.round(Math.min(
+        MAX_TIMELINE_WIDTH,
+        Math.max(MIN_TIMELINE_WIDTH, containerWidth - fixedColsWidth - TIMELINE_SAFETY_MARGIN)
+      ));
+  // table-layout:fixed only honours each <col>'s exact pixel width when the
+  // <table> itself has an explicit width equal to their sum — leaving it
+  // "auto" lets the browser shrink columns toward their content instead.
+  const tableWidth = fixedColsWidth + timelineWidth;
 
   // Time ticks calculation
   const tickInterval = totalDur > 100 ? 50 : totalDur > 50 ? 20 : totalDur > 20 ? 10 : 5;
@@ -123,7 +168,7 @@ export default function StepTable() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+    <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
       {/* ── Table Toolbar ─────────────────────────────── */}
       <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -136,6 +181,13 @@ export default function StepTable() {
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {/* Start → End Column Toggle Button */}
+          <button
+            onClick={() => setShowStartEnd(!showStartEnd)}
+            className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold rounded shadow-sm transition-colors"
+          >
+            {showStartEnd ? '🕐 Hide Start→End' : '🕐 Show Start→End'}
+          </button>
           {/* Hide/Show Inputs Toggle Button */}
           <button
             onClick={() => setHideInputs(!hideInputs)}
@@ -153,7 +205,7 @@ export default function StepTable() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className={`w-full text-sm table-fixed ${hideInputs ? 'min-w-[1550px]' : 'min-w-[1600px]'}`}>
+        <table className="text-sm table-fixed" style={{ width: tableWidth }}>
           {/* No inline whitespace inside <colgroup> — a stray text node there
               triggers a React hydration error. */}
           {hideInputs ? (
@@ -162,6 +214,7 @@ export default function StepTable() {
               <col className="w-32" />{/* Operator / Machine */}
               <col className="w-24" />{/* Position */}
               <col className="w-20" />{/* Count */}
+              {showStartEnd && <col className="w-24" />}{/* Start → End */}
               <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           ) : (
@@ -179,6 +232,7 @@ export default function StepTable() {
               <col className="w-20" />{/* Walk */}
               <col className="w-20" />{/* Idle */}
               <col className="w-20" />{/* Count */}
+              {showStartEnd && <col className="w-24" />}{/* Start → End */}
               <col style={{ width: timelineWidth }} />{/* Timeline Visualization */}
             </colgroup>
           )}
@@ -206,7 +260,9 @@ export default function StepTable() {
                 </>
               )}
               <th className="px-2 py-1 text-center text-slate-900 font-bold" title="เวลารวมของแถวนี้ — ใช้คำนวณ Cycle Time">Count (s)</th>
-              <th className="px-2 py-1 text-center text-slate-500 font-bold whitespace-nowrap" title="ช่วงเวลาที่ขั้นตอนนี้อยู่บนไทม์ไลน์">Start → End</th>
+              {showStartEnd && (
+                <th className="px-2 py-1 text-center text-slate-500 font-bold whitespace-nowrap" title="ช่วงเวลาที่ขั้นตอนนี้อยู่บนไทม์ไลน์">Start → End</th>
+              )}
               {/* Timeline Header (Axis Ticks) */}
               <th className="p-0 text-center border-l border-slate-200 select-none" style={{ width: timelineWidth }}>
                 <div className="h-full flex flex-col justify-end py-1">
@@ -232,7 +288,7 @@ export default function StepTable() {
           <tbody>
             {calcSteps.length === 0 && (
               <tr>
-                <td colSpan={hideInputs ? 5 : 14} className="py-8 text-center text-slate-500 italic font-semibold">
+                <td colSpan={hideInputs ? (showStartEnd ? 5 : 4) : (showStartEnd ? 14 : 13)} className="py-8 text-center text-slate-500 italic font-semibold">
                   No steps yet — click "Add Step" to begin
                 </td>
               </tr>
@@ -373,11 +429,13 @@ export default function StepTable() {
                   </td>
 
                   {/* Where the bar sits on the timeline */}
-                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                    <span className="font-mono text-[11px] text-slate-500">
-                      {step.calcDuration > 0 ? `${step.calcStart} → ${step.calcEnd}` : '—'}
-                    </span>
-                  </td>
+                  {showStartEnd && (
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                      <span className="font-mono text-[11px] text-slate-500">
+                        {step.calcDuration > 0 ? `${step.calcStart} → ${step.calcEnd}` : '—'}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Spanning cell: single timeline SVG for all rows (rendered on first row only) */}
                   {i === 0 && (
@@ -470,8 +528,7 @@ export default function StepTable() {
                     <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-700">
                       {totalCalcDuration}s
                     </td>
-                    <td />
-
+                    {showStartEnd && <td />}
                   </>
                 ) : (
                   <>
@@ -486,7 +543,7 @@ export default function StepTable() {
                     <td className="px-2 py-1.5 text-center font-mono font-bold text-amber-400">
                       {totalCalcDuration}s
                     </td>
-                    <td />
+                    {showStartEnd && <td />}
                   </>
                 )}
 

@@ -25,6 +25,15 @@ export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
 
 interface ChartState extends AppDatabase {
   hydrated: boolean;
+  /**
+   * True only after a cloud read has actually confirmed a Production
+   * snapshot. `hydrated` alone just means "hydration was attempted" — a
+   * failed cloud load still sets `hydrated: true` (so the loading spinner
+   * clears and cached data can be reviewed) but leaves `cloudReady: false`,
+   * which blocks every structural/save action from writing over Production
+   * with a state it never actually confirmed.
+   */
+  cloudReady: boolean;
   syncStatus: SyncStatus;
   activeModule: 1 | 2 | 3 | 4 | 5;
 
@@ -109,6 +118,34 @@ function persistLocal(state: AppDatabase) {
   saveLocalDatabase({ folders: state.folders, files: state.files, activeFileId: state.activeFileId });
 }
 
+// ── Helper: structural folder/file mutation with rollback-on-failure ────────
+// Applies the local change immediately for responsiveness, but only keeps it
+// once the paired cloud call actually confirms. Refuses to run at all while
+// the cloud isn't confirmed ready (`cloudReady === false`), and restores the
+// pre-mutation snapshot if the cloud call rejects — so a failed delete/move/
+// rename/create never leaves an unconfirmed, orphaned local-only change
+// standing in for what the user believes was saved to Production.
+type Setter = (partial: Partial<ChartState>) => void;
+async function mutateWithRollback(
+  set: Setter,
+  snapshot: AppDatabase,
+  next: AppDatabase,
+  cloudCall: () => Promise<void>,
+): Promise<void> {
+  set(next);
+  persistLocal(next);
+  set({ syncStatus: 'syncing' });
+  try {
+    await cloudCall();
+    set({ syncStatus: 'saved' });
+    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+  } catch {
+    set(snapshot);
+    persistLocal(snapshot);
+    set({ syncStatus: 'error' });
+  }
+}
+
 // ── Helper: recalculate cycle time from steps ───────────────────────────────
 // Cycle Time = the busiest actor's total time (max of each Worker's and the
 // Auto M/C's summed durations) — not the timeline end, so a step that starts
@@ -124,6 +161,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   files: [],
   activeFileId: null,
   hydrated: false,
+  cloudReady: false,
   syncStatus: 'idle',
   activeModule: 4,
 
@@ -134,14 +172,16 @@ export const useChartStore = create<ChartState>((set, get) => ({
     if (get().hydrated) return;
     // Load local immediately for instant render
     const local = loadLocalDatabase();
-    set({ ...local, hydrated: true, syncStatus: 'syncing' });
-    // Then fetch cloud data
-    try {
-      const db = await loadDatabaseFromCloud();
-      set({ ...db, hydrated: true, syncStatus: 'idle' });
-      persistLocal(db);
-    } catch {
-      set({ syncStatus: 'error' });
+    set({ ...local, hydrated: true, cloudReady: false, syncStatus: 'syncing' });
+    // Then fetch cloud data. `loadDatabaseFromCloud` never throws — it always
+    // resolves to an explicit ok/not-ok result instead of silently standing
+    // a local fallback in for a confirmed cloud read.
+    const result = await loadDatabaseFromCloud();
+    if (result.ok) {
+      set({ ...result.db, hydrated: true, cloudReady: true, syncStatus: 'idle' });
+    } else {
+      console.warn('Cloud hydration unavailable, showing cached data only:', result.error);
+      set({ ...result.fallback, hydrated: true, cloudReady: false, syncStatus: 'error' });
     }
   },
 
@@ -168,98 +208,90 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const existing = get().files.find(f => f.id === id);
     if (!existing || (existing as ChartFile & { _loaded?: boolean })._loaded === false) {
       set({ syncStatus: 'syncing' });
-      try {
-        const full = await loadFileFromCloud(id);
-        if (full) {
-          set(s => ({
-            files: s.files.map(f => f.id === id ? { ...full, _loaded: true } as ChartFile : f),
-            syncStatus: 'idle',
-          }));
-          persistLocal(get());
-        }
-      } catch {
+      // loadFileFromCloud never throws — it always resolves to an explicit
+      // ok/not-ok result, so this can never fall through without setting a
+      // final status the way the old try/catch around a swallowed-error
+      // `null` return used to (that left syncStatus stuck on 'syncing').
+      const result = await loadFileFromCloud(id);
+      if (result.ok) {
+        set(s => ({
+          files: s.files.map(f => f.id === id ? { ...result.file, _loaded: true } as ChartFile : f),
+          syncStatus: 'idle',
+        }));
+        persistLocal(get());
+      } else {
+        console.warn('openFile: cloud load failed, leaving cached content as-is:', result.error);
         set({ syncStatus: 'error' });
+        // Deliberately untouched: `files` stays exactly as it was, so a
+        // failed load never flips `_loaded` to true, never persists blank
+        // content over what's cached, and saveActiveFile's `_loaded===false`
+        // guard keeps blocking a save until a real load actually succeeds.
       }
     }
   },
 
   // ── Folders ─────────────────────────────────────────────────────────────────
   async createFolder(name, processType, parentId = null) {
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const folder: ChartFolder = {
       id: uuidv4(), parentId, name, processType, expanded: true,
       createdAt: new Date().toISOString(),
     };
-    set(s => {
-      const next = { ...s, folders: [...s.folders, folder] };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await createFolderCloud(folder);
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    const next: AppDatabase = { ...snapshot, folders: [...s.folders, folder] };
+    await mutateWithRollback(set, snapshot, next, () => createFolderCloud(folder));
   },
 
   async renameFolder(id, name) {
-    set(s => {
-      const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, name } : f) };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await updateFolderCloud(id, { name });
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, name } : f) };
+    await mutateWithRollback(set, snapshot, next, () => updateFolderCloud(id, { name }));
   },
 
   async moveFolder(id, newParentId) {
-    set(s => {
-      const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, parentId: newParentId } : f) };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await updateFolderCloud(id, { parentId: newParentId });
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, parentId: newParentId } : f) };
+    await mutateWithRollback(set, snapshot, next, () => updateFolderCloud(id, { parentId: newParentId }));
   },
 
   async deleteFolder(id) {
-    set(s => {
-      const files = s.files.filter(f => f.folderId !== id);
-      const activeFileId = files.find(f => f.id === s.activeFileId) ? s.activeFileId : (files[0]?.id ?? null);
-      const next = { ...s, folders: s.folders.filter(f => f.id !== id), files, activeFileId };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await deleteFolderCloud(id);
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const files = s.files.filter(f => f.folderId !== id);
+    const activeFileId = files.find(f => f.id === s.activeFileId) ? s.activeFileId : (files[0]?.id ?? null);
+    const next: AppDatabase = { folders: s.folders.filter(f => f.id !== id), files, activeFileId };
+    await mutateWithRollback(set, snapshot, next, () => deleteFolderCloud(id));
   },
 
   async toggleFolder(id) {
-    set(s => {
-      const next = { ...s, folders: s.folders.map(f => f.id === id ? { ...f, expanded: !f.expanded } : f) };
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, expanded: !f.expanded } : f) };
+
+    if (!s.cloudReady) {
+      // Expand/collapse is harmless against a cached tree shown for review —
+      // allowed locally, but no cloud write is attempted while the cloud
+      // isn't confirmed ready.
+      set(next);
       persistLocal(next);
-      return next;
-    });
-    try {
-      const folder = get().folders.find(f => f.id === id);
-      if (folder) await updateFolderCloud(id, { expanded: folder.expanded });
-    } catch { /* non-critical */ }
+      return;
+    }
+
+    const folder = next.folders.find(f => f.id === id);
+    await mutateWithRollback(set, snapshot, next, () => updateFolderCloud(id, { expanded: !!folder?.expanded }));
   },
 
   // ── Files ────────────────────────────────────────────────────────────────────
   async createFile(folderId, name) {
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const file: ChartFile = {
       id: uuidv4(), name, folderId,
       createdAt: new Date().toISOString(),
@@ -268,68 +300,48 @@ export const useChartStore = create<ChartState>((set, get) => ({
       steps: [],
       layoutDiagram: { elements: [], connections: [] },
     };
-    set(s => {
-      const next = { ...s, files: [...s.files, file], activeFileId: file.id };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await createFileCloud(file);
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    const next: AppDatabase = { ...snapshot, files: [...s.files, file], activeFileId: file.id };
+    await mutateWithRollback(set, snapshot, next, () => createFileCloud(file));
   },
 
   async renameFile(id, name) {
-    set(s => {
-      const next = { ...s, files: s.files.map(f => f.id === id ? { ...f, name, updatedAt: new Date().toISOString() } : f) };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      const file = get().files.find(f => f.id === id);
-      if (file) await saveFileCloud({ ...file, name });
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const updatedAt = new Date().toISOString();
+    const next: AppDatabase = { ...snapshot, files: s.files.map(f => f.id === id ? { ...f, name, updatedAt } : f) };
+    const updatedFile = next.files.find(f => f.id === id);
+    if (!updatedFile) return;
+    await mutateWithRollback(set, snapshot, next, () => saveFileCloud(updatedFile));
   },
 
   async moveFile(id, newFolderId) {
-    set(s => {
-      const next = { ...s, files: s.files.map(f => f.id === id ? { ...f, folderId: newFolderId, updatedAt: new Date().toISOString() } : f) };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      const file = get().files.find(f => f.id === id);
-      if (file) await saveFileCloud({ ...file, folderId: newFolderId });
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const updatedAt = new Date().toISOString();
+    const next: AppDatabase = { ...snapshot, files: s.files.map(f => f.id === id ? { ...f, folderId: newFolderId, updatedAt } : f) };
+    const updatedFile = next.files.find(f => f.id === id);
+    if (!updatedFile) return;
+    await mutateWithRollback(set, snapshot, next, () => saveFileCloud(updatedFile));
   },
 
   async deleteFile(id) {
-    set(s => {
-      const files = s.files.filter(f => f.id !== id);
-      const activeFileId = id === s.activeFileId ? (files[0]?.id ?? null) : s.activeFileId;
-      const next = { ...s, files, activeFileId };
-      persistLocal(next);
-      return next;
-    });
-    set({ syncStatus: 'syncing' });
-    try {
-      await deleteFileCloud(id);
-      set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s = get();
+    const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
+    const files = s.files.filter(f => f.id !== id);
+    const activeFileId = id === s.activeFileId ? (files[0]?.id ?? null) : s.activeFileId;
+    const next: AppDatabase = { folders: s.folders, files, activeFileId };
+    await mutateWithRollback(set, snapshot, next, () => deleteFileCloud(id));
   },
 
   async duplicateFile(id) {
-    const file = get().files.find(f => f.id === id);
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const s0 = get();
+    const file = s0.files.find(f => f.id === id);
     if (!file) return;
+    const snapshot: AppDatabase = { folders: s0.folders, files: s0.files, activeFileId: s0.activeFileId };
 
     // Clone steps with new UUIDs
     const newSteps = file.steps.map(step => ({
@@ -364,27 +376,20 @@ export const useChartStore = create<ChartState>((set, get) => ({
       },
     };
 
-    set(s => {
-      const next = { ...s, files: [...s.files, duplicatedFile], activeFileId: duplicatedFile.id };
-      persistLocal(next);
-      return next;
-    });
-
-    set({ syncStatus: 'syncing' });
-    try {
-      await createFileCloud(duplicatedFile);
-      set({ syncStatus: 'saved' });
-    } catch {
-      set({ syncStatus: 'error' });
-    }
-    setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    const next: AppDatabase = { ...snapshot, files: [...s0.files, duplicatedFile], activeFileId: duplicatedFile.id };
+    await mutateWithRollback(set, snapshot, next, () => createFileCloud(duplicatedFile));
   },
 
   async saveActiveFile() {
+    if (!get().cloudReady) {
+      set({ syncStatus: 'error' });
+      console.warn('Save blocked: cloud is not confirmed ready.');
+      return;
+    }
     const file = get().activeFile();
     if (!file) return;
     // Prevent saving if the file content has not loaded yet (prevents empty steps overwrite)
-    if ((file as any)._loaded === false) {
+    if ((file as ChartFile & { _loaded?: boolean })._loaded === false) {
       console.warn('Save blocked: File content has not finished loading from the cloud.');
       return;
     }
@@ -398,8 +403,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
     try {
       await saveFileCloud(updated);
       set({ syncStatus: 'saved' });
-    } catch { set({ syncStatus: 'error' }); }
-    setTimeout(() => set({ syncStatus: 'idle' }), 3000);
+      setTimeout(() => set({ syncStatus: 'idle' }), 3000);
+    } catch {
+      set({ syncStatus: 'error' });
+    }
   },
 
   // ── Header (local only — auto-saved on saveActiveFile) ───────────────────────

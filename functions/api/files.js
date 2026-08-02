@@ -38,6 +38,8 @@ export async function onRequestPost(context) {
     const file = await request.json();
     const { id, name, folderId, createdAt, updatedAt, content } = file;
     if (!id || !name || !folderId) return badRequest('id, name, folderId required');
+    const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(folderId).first();
+    if (!folder) return badRequest('folderId does not reference an existing folder');
     await env.DB.prepare(
       'INSERT INTO chart_files (id, name, folderId, createdAt, updatedAt, content) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(
@@ -56,14 +58,22 @@ export async function onRequestPut(context) {
   const { env, request } = context;
   try {
     const file = await request.json();
-    const { id, name, updatedAt, content } = file;
+    const { id, name, folderId, updatedAt, content } = file;
     if (!id) return badRequest('id required');
+    if (folderId != null) {
+      const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(folderId).first();
+      if (!folder) return badRequest('folderId does not reference an existing folder');
+    }
     // COALESCE keeps the stored value when a field is omitted, so a
     // rename-only request can't blank out the chart content (and vice versa).
+    // folderId was previously accepted by the client (moveFile sends it) but
+    // silently dropped here — a move looked successful without ever being
+    // persisted. It's now applied the same COALESCE way as the other fields.
     await env.DB.prepare(
-      'UPDATE chart_files SET name = COALESCE(?, name), updatedAt = ?, content = COALESCE(?, content) WHERE id = ?'
+      'UPDATE chart_files SET name = COALESCE(?, name), folderId = COALESCE(?, folderId), updatedAt = ?, content = COALESCE(?, content) WHERE id = ?'
     ).bind(
       name ?? null,
+      folderId ?? null,
       updatedAt ?? new Date().toISOString(),
       content !== undefined ? JSON.stringify(content) : null,
       id

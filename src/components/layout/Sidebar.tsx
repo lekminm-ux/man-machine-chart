@@ -16,32 +16,30 @@ function getLevelColor(level: number) {
 
 type ContextTarget = { type: 'folder'; id: string } | { type: 'file'; id: string } | null;
 
-const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || '1234';
-
-function requireAdminPin(actionName: string): boolean {
-  const pin = window.prompt(`Admin PIN required to ${actionName}:`);
-  if (pin === ADMIN_PIN) return true;
-  if (pin !== null) alert('Incorrect PIN.');
-  return false;
+// The previous Admin PIN prompt looked like security but never was one — a
+// client-side window.prompt() compared to a value shipped in the JS bundle
+// is fully visible and bypassable from devtools. Phase 0B removes that false
+// impression rather than keep it: until real server-side authorization
+// ships, destructive/hierarchy-changing actions stay off instead of behind
+// fake security. No PIN, password, or token is checked or sent anywhere.
+function denyDestructiveAction(actionName: string): void {
+  alert(`${actionName} is not available yet — it requires server-side authorization, which has not shipped. This is a safety gate, not an error.`);
 }
 
 export default function Sidebar() {
   const folders      = useChartStore(s => s.folders);
   const files        = useChartStore(s => s.files);
   const activeFileId = useChartStore(s => s.activeFileId);
+  const cloudReady   = useChartStore(s => s.cloudReady);
 
   const createFolder = useChartStore(s => s.createFolder);
   const renameFolder = useChartStore(s => s.renameFolder);
-  const deleteFolder = useChartStore(s => s.deleteFolder);
   const toggleFolder = useChartStore(s => s.toggleFolder);
-  const moveFolder   = useChartStore(s => s.moveFolder);
 
   const createFile    = useChartStore(s => s.createFile);
   const openFile      = useChartStore(s => s.openFile);
   const renameFile    = useChartStore(s => s.renameFile);
-  const deleteFile    = useChartStore(s => s.deleteFile);
   const duplicateFile = useChartStore(s => s.duplicateFile);
-  const moveFile      = useChartStore(s => s.moveFile);
   const setActiveModule = useChartStore(s => s.setActiveModule);
   const activeModule = useChartStore(s => s.activeModule);
 
@@ -94,33 +92,13 @@ export default function Sidebar() {
     setRenaming(null);
   };
 
-  const submitMove = (targetFolderId: string | null) => {
+  const submitMove = () => {
     if (!movingTarget) return;
-    
-    // Moving a folder to another folder (or to root)
-    if (movingTarget.type === 'folder') {
-      if (targetFolderId === movingTarget.id) return alert('Cannot move a folder into itself.');
-      
-      // Prevent circular moves (moving a parent into its own child)
-      if (targetFolderId) {
-        let currentParent = folders.find(f => f.id === targetFolderId)?.parentId;
-        while (currentParent) {
-          if (currentParent === movingTarget.id) return alert('Cannot move a folder into its own sub-folder.');
-          currentParent = folders.find(f => f.id === currentParent)?.parentId;
-        }
-      }
-
-      if (requireAdminPin('move this folder')) {
-        moveFolder(movingTarget.id, targetFolderId);
-      }
-    } 
-    // Moving a file to another folder
-    else if (movingTarget.type === 'file') {
-      if (targetFolderId === null) return alert('Files must be placed inside a folder.');
-      if (requireAdminPin('move this file')) {
-        moveFile(movingTarget.id, targetFolderId);
-      }
-    }
+    // Moving is a hierarchy change — denied until server-side authorization
+    // ships (Phase 0B). The cycle/self-parent checks this used to run
+    // client-side now live server-side in functions/api/folders.js, which is
+    // the authoritative check regardless of what the UI allows.
+    denyDestructiveAction(movingTarget.type === 'folder' ? 'Moving folders' : 'Moving charts');
     setMovingTarget(null);
   };
 
@@ -167,7 +145,7 @@ export default function Sidebar() {
           {/* Action buttons */}
           {isMovingHere ? (
             <button
-              onClick={e => { e.stopPropagation(); submitMove(folder.id); }}
+              onClick={e => { e.stopPropagation(); submitMove(); }}
               className="text-green-400 hover:text-green-300 bg-green-900/30 hover:bg-green-800/50 text-[10px] px-2 py-0.5 rounded border border-green-700/50 transition-colors"
             >
               Move Here
@@ -195,14 +173,12 @@ export default function Sidebar() {
                 title="Rename"
               >✏️</button>
               <button
-                onClick={e => { 
-                  e.stopPropagation(); 
-                  if (requireAdminPin('delete this folder')) {
-                    if (confirm(`Delete folder "${folder.name}"? This will delete all sub-folders and charts.`)) deleteFolder(folder.id); 
-                  }
+                onClick={e => {
+                  e.stopPropagation();
+                  denyDestructiveAction('Deleting folders');
                 }}
                 className="text-slate-500 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                title="Delete folder"
+                title="Delete folder — disabled until server-side authorization ships"
               >🗑️</button>
             </div>
           )}
@@ -282,14 +258,12 @@ export default function Sidebar() {
                     title="Rename"
                   >✏️</button>
                   <button
-                    onClick={e => { 
-                      e.stopPropagation(); 
-                      if (requireAdminPin('delete this chart')) {
-                        if (confirm(`Delete "${file.name}"?`)) deleteFile(file.id); 
-                      }
+                    onClick={e => {
+                      e.stopPropagation();
+                      denyDestructiveAction('Deleting charts');
                     }}
                     className="text-slate-400 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Delete"
+                    title="Delete — disabled until server-side authorization ships"
                   >🗑️</button>
                 </div>
               </div>
@@ -316,7 +290,7 @@ export default function Sidebar() {
         <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Project Files</h2>
         {movingTarget?.type === 'folder' && (
           <button 
-            onClick={() => submitMove(null)} 
+            onClick={() => submitMove()}
             className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700/50 hover:bg-green-800/50"
           >
             Move to Root
@@ -331,6 +305,13 @@ export default function Sidebar() {
           </button>
         )}
       </div>
+
+      {/* Cloud-unavailable state — data safety gate (Phase 0B) */}
+      {!cloudReady && (
+        <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] leading-snug">
+          <b>⚠ Cloud unavailable.</b> Showing cached data — new folders/charts and renames can&apos;t be saved until reconnected. Delete and move stay off either way, pending server-side authorization.
+        </div>
+      )}
 
       {/* Folder tree */}
       <div className="flex-1 overflow-y-auto py-2" onScroll={hideNameTip}>

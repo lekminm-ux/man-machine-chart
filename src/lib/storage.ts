@@ -33,7 +33,15 @@ async function apiFetch(path: string, options?: RequestInit) {
 }
 
 // ── Load entire database from cloud ───────────────────────────────────────
-export async function loadDatabaseFromCloud(): Promise<AppDatabase> {
+// A cloud load either confirms a hydrated Production state (`ok: true`) or it
+// doesn't — `ok: false` carries the local/cached data separately, as a
+// `fallback` for display/review only, so a caller can never mistake "the
+// cloud read failed, here's what's cached" for "the cloud is confirmed synced".
+export type CloudLoadResult =
+  | { ok: true; db: AppDatabase }
+  | { ok: false; error: string; fallback: AppDatabase };
+
+export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
   try {
     const [folders, files]: [ChartFolder[], Omit<ChartFile, 'header' | 'steps' | 'layoutDiagram'>[]] =
       await Promise.all([
@@ -47,8 +55,8 @@ export async function loadDatabaseFromCloud(): Promise<AppDatabase> {
     // We have metadata for files; load full content lazily when file is opened
     // Merge cloud files metadata with local loaded files
     const mergedFiles = files.map(cloudFile => {
-      const localFile = local.files?.find(f => f.id === cloudFile.id);
-      if (localFile && (localFile as any)._loaded !== false) {
+      const localFile = local.files?.find(f => f.id === cloudFile.id) as (ChartFile & { _loaded?: boolean }) | undefined;
+      if (localFile && localFile._loaded !== false) {
         return localFile;
       }
       return {
@@ -76,22 +84,35 @@ export async function loadDatabaseFromCloud(): Promise<AppDatabase> {
       activeFileId: local.activeFileId ?? null,
     };
     saveLocalDatabase(db);
-    return db;
+    return { ok: true, db };
   } catch (err) {
-    console.warn('Cloud load failed, using localStorage:', err);
-    return loadLocalDatabase();
+    console.warn('Cloud load failed:', err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      fallback: loadLocalDatabase(),
+    };
   }
 }
 
 // ── Load single file content from cloud ───────────────────────────────────
-export async function loadFileFromCloud(id: string): Promise<ChartFile | null> {
+// Same explicit ok/not-ok shape as CloudLoadResult, for the same reason: the
+// old `ChartFile | null` return swallowed its own failure internally, so the
+// caller's try/catch never actually saw an error — `openFile` was left with
+// no way to distinguish "load failed" from "nothing to do", and stayed stuck
+// in `syncing` forever on failure.
+export type FileLoadResult =
+  | { ok: true; file: ChartFile }
+  | { ok: false; error: string };
+
+export async function loadFileFromCloud(id: string): Promise<FileLoadResult> {
   try {
     const row = await apiFetch(`/api/files?id=${encodeURIComponent(id)}`);
     const { content, ...meta } = row;
-    return { ...meta, ...content } as ChartFile;
+    return { ok: true, file: { ...meta, ...content } as ChartFile };
   } catch (err) {
     console.warn('File cloud load failed:', err);
-    return null;
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

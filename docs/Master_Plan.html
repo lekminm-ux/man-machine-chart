@@ -144,11 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.7</div>
-      <div><b>Updated</b>1 ส.ค. 2569</div>
+      <div><b>Version</b>1.10</div>
+      <div><b>Updated</b>2 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
       <div><b>Baseline commit</b>bb6f749</div>
-      <div><b>Status</b>Phase 1-3 เสร็จ + M4 ใช้โมเดลระยะเวลา · ถัดไป Phase 4</div>
+      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · deployment authorized by user</div>
+      <div><b>Status</b>Master Plan v1.11 · Production D1/schema remain protected · approved application release may be deployed after verification</div>
     </div>
   </div>
 </header>
@@ -161,6 +162,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <a href="#m3m4">M3 vs M4</a>
   <a href="#status">สถานะโมดูล</a>
   <a href="#data">สถาปัตยกรรมข้อมูล</a>
+  <a href="#security-capacity-gate">Security / Data Safety</a>
+  <a href="#data-safety-roadmap">Data Safety Plan</a>
+  <a href="#data-safety-runtime-guards">Phase 0B Runtime Guards</a>
   <a href="#formula">สูตรมาตรฐาน</a>
   <a href="#kaizen">Kaizen &amp; Before-After</a>
   <a href="#roadmap">Roadmap</a>
@@ -325,7 +329,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       </tr>
       <tr>
         <td><b>M3</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
-        <td>กราฟ SVG แกนเวลา: เส้นทึบ=คน · เส้นประ=เครื่อง · เส้นคลื่น=เดิน · เส้นแดง Takt · เส้นน้ำเงิน Cycle · Rule 1 วนกลับเมื่อเกิน Takt · Rule 2 แสดงเวลารอรายคน · Rule 3 เครื่องขนานกันคนละแถว · Takt ดึงจาก M2 อัตโนมัติหรือกรอกเอง</td>
+        <td>กราฟ SVG แกนเวลา: เส้นทึบ=คน · เส้นประ=เครื่อง · เส้นคลื่น=เดิน · เส้นแดง Takt · เส้นน้ำเงิน Cycle · Rule 1 วนกลับที่ max(Cycle,Takt) · Rule 2 แสดงเวลารอรายคน · Rule 3 เครื่องขนานกันคนละแถว · Takt ดึงจาก M2 อัตโนมัติหรือกรอกเอง</td>
         <td>งานต่อยอด: คลิกแถบใน M3 แล้วไฮไลต์ตำแหน่งใน M4</td>
       </tr>
       <tr>
@@ -415,7 +419,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <h3>M2 — ความสามารถกระบวนการ (ชีต Machine Capacity Sheet)</h3>
   <ul>
     <li><b>Completion Time</b> = <code>=SUM(Basic Time : Auto Time)</code> → เวลาคน + เวลาเครื่อง (ตัวอย่างจริง: 4.13 + 46.54 = 50.67 วินาที)</li>
-    <li><b>เวลาทำงานสุทธิต่อกะ</b> = เวลาต่อกะ − เวลาพัก = 540 − 80 = <b>460 นาที = 27,600 วินาที</b><br>
+    <li><b>เวลาทำงานสุทธิต่อกะ</b> = เวลาต่อกะ − เวลาพักเที่ยง − เวลาก่อน OT = 720 − 60 − 20 = <b>640 นาที = 38,400 วินาที</b>; 2 กะ = <b>1,280 นาที = 76,800 วินาทีต่อวัน</b><br>
         <span style="color:var(--muted)">(พักเที่ยง 60 นาที + พักก่อนทำ OT 20 นาที — ยืนยันโดยผู้ใช้ 1 ส.ค. 2569 · ตั้งค่าใหม่ได้ในหน้าจอ)</span></li>
     <li><b>เวลาเปลี่ยนอุปกรณ์ต่อชิ้น</b> = เวลาที่ใช้เปลี่ยน ÷ จำนวนชิ้นที่ผลิตได้ต่อการเปลี่ยน 1 ครั้ง</li>
     <li><b>Production Capacity ต่อกะ</b> = เวลาทำงานสุทธิ ÷ (Completion Time + เวลาเปลี่ยนอุปกรณ์ต่อชิ้น)</li>
@@ -434,7 +438,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <li>คอลัมน์ต่อแถว: <code>คน (E)</code> · <code>เครื่อง (F)</code> · <code>เดิน (G)</code></li>
     <li>เวลาเริ่มของแถวถัดไป = เวลาเริ่มเดิม + เวลาคน + เวลาเดินของแถวก่อน (<code>=H11+G11+E11</code>) → เป็นการไล่เวลาสะสมแบบต่อเนื่อง</li>
     <li>เส้นแดง = Takt Time · เส้นน้ำเงิน = Cycle Time</li>
-    <li>Rule 1: เครื่องล้นเกิน Takt → ตัดจบแล้ววนกลับเริ่มที่ 0 ในบรรทัดเดิม</li>
+    <li>Rule 1: จุดวนกลับของแถบใช้ <code>max(Cycle Time, Takt Time)</code> ตาม Standard Work</li>
     <li>Rule 2: Cycle &lt; Takt → แสดงลูกศรรอ พร้อมตัวเลขวินาทีที่ต้องรอ</li>
     <li>Rule 3: เครื่อง 2 เครื่องเริ่มพร้อมกัน → วาดเส้นคู่ขนาน ไม่ให้ทับกัน</li>
   </ul>
@@ -533,6 +537,22 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 </section>
 
 <!-- ═══════════════════════════════════════ -->
+<section id="security-capacity-gate">
+  <h2>Approved planning changes — 1 Aug 2026</h2>
+  <div class="callout">
+    <p><b>Authorization:</b> the current client-side Admin PIN is not acceptable as security. The next security phase must design app-managed accounts, server-side sessions, roles, API authorization, approval records, and audit logging. It must not depend on company IT, SSO, Active Directory, or a client-visible secret. No implementation begins until the bootstrap-admin and approval UX are specified.</p>
+    <p><b>Capacity:</b> the target plant has two shifts. Each shift is 720 minutes gross, less 60 minutes lunch and 20 minutes before OT, giving <b>640 net minutes per shift</b>. Standard capacity is shown per shift and for two shifts per day: 38,400 seconds/shift and 76,800 seconds/day. OT is excluded unless explicitly modeled later.</p>
+    <p><b>Chart readability requirement:</b> the Start → End input/display area must not consume the chart viewport. It must remain compact or be collapsible, and the timeline graph must remain visibly usable beside the table. The normal layout is the compact table view plus a separate full chart view; an expanded timing/detail view must never hide or squeeze the graph out of view.</p>
+    <p><b>Delivery gate:</b> after coding, Claude must inspect the actual rendered screen, test the affected workflow at the target viewport sizes, verify that the graph is visible and readable, inspect the browser console, and report the results before handoff. Passing tests/build alone is not sufficient.</p>
+    <p><b>Continuous Usability / No-Downtime Gate:</b> the deployed WebApp must remain usable while improvements are being developed. Local development and Production are separate environments, but the user-facing flow is not split: after GPT review, the approved version must be committed, deployed, and verified at <code>man-machine-chart.pages.dev</code>. A safety feature may block only the unsafe operation; it must not unnecessarily block viewing existing charts or normal chart work. If Cloud is unavailable, show cached data for review and fail closed for writes that could overwrite Production.</p>
+    <p><b>Database Safety / Data Preservation Gate:</b> Production D1 behind <code>man-machine-chart.pages.dev</code> is the canonical source of truth. Local Pages Dev at <code>127.0.0.1:8788</code>, Next dev/localStorage, and <code>.wrangler/</code> are separate test/cache environments. Never delete or recreate local D1 state to make a test convenient, and never use a one-folder sample as a restoration.</p>
+    <p><b>Hierarchy preservation:</b> every <code>folders</code> row, <code>parentId</code> relationship, existing four-level tree, <code>chart_files</code> row, and chart content must survive persistence, schema, API, and deployment work. Before any authorized write, export Production rows/schema to a timestamped directory outside the repository. Compare before/after folder count, root count, maximum depth, complete parent-child mapping, chart count, representative IDs, and content checksums. Any unexpected decrease is a STOP condition.</p>
+    <p><b>Fail-closed rule:</b> if a cloud read fails or the recovery export cannot be verified, block save/destructive actions and return <code>DATA_SAFETY_BLOCKED</code>. A passing test, lint, build, or deploy command is not evidence that data was preserved. The canonical detailed rules are in <code>docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md</code>.</p>
+    <p><b>Verified snapshot on 2 Aug 2026:</b> Production export contains 5 folder rows, 3 root folders, 6 chart files, and maximum folder nesting depth 3 (<code>PD6 → BlowMold → BYD</code>). If the UI counts the chart file as a fourth visible layer, that layer is also preserved. The export is evidence of the current state, not a seed or schema source.</p>
+    <p><b>Schema drift:</b> live Production <code>folders</code> has <code>parentId</code> appended without a self-referencing foreign key, while <code>schema.sql</code> declares that foreign key. Do not run <code>schema.sql</code>, <code>ALTER TABLE</code>, reset, or migration against Production in Phase 0B. Any normalization requires a separate GPT plan, rehearsal, and explicit authorization.</p>
+  </div>
+</section>
+
 <section id="roadmap">
   <h2><span class="num">7</span> Roadmap</h2>
   <p class="lead">ทำทีละเฟส ทดสอบผ่านแล้วค่อยขยับ — แต่ละเฟสจบด้วยการ commit + push + อัปเดตแผนนี้</p>
@@ -573,7 +593,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <h4>Phase 2 · M2 ความสามารถกระบวนการ</h4>
       <p>ตารางเครื่องจักรตามฟอร์ม Excel พร้อมคำนวณกำลังการผลิตด้วยสูตรมาตรฐาน TPS — ทดสอบผ่านแล้ว</p>
       <ul>
-        <li>✅ ตั้งค่าเวลากะได้เอง: เวลาต่อกะ 540 นาที − พัก 80 นาที (พักเที่ยง 60 + ก่อน OT 20) = <b>สุทธิ 460 นาที</b></li>
+        <li>✅ ตั้งค่าเวลากะได้เอง: เวลาต่อกะ 720 นาที − พักเที่ยง 60 − ก่อน OT 20 = <b>สุทธิ 640 นาทีต่อกะ</b>; รองรับ 2 กะรวม 1,280 นาทีต่อวัน</li>
         <li>✅ Completion Time = Manual + Auto · Tool Change ต่อชิ้น = เวลาเปลี่ยน ÷ จำนวนชิ้นต่อครั้ง</li>
         <li>✅ Capacity = เวลาทำงานสุทธิ ÷ (Completion + Tool change ต่อชิ้น)</li>
         <li>✅ ไฮไลต์แถวคอขวดสีแดง + Donut แสดง % ภาระ + Bottleneck Alert เมื่อผลิตไม่ทัน</li>
@@ -592,7 +612,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <li>✅ เส้นทึบ = คนทำงาน · เส้นประ = เครื่องทำงานเอง · เส้นคลื่น = เดิน</li>
         <li>✅ เส้นแดง Takt Time (ดึงจาก M2 อัตโนมัติ กรอกทับเองได้ และกดกลับไปใช้ค่า M2 ได้)</li>
         <li>✅ เส้นน้ำเงิน Cycle Time</li>
-        <li>✅ <b>Rule 1</b> — แถบที่ยาวเกิน Takt ถูกตัดที่เส้นแดงแล้ววนกลับไปเริ่มที่ 0 พร้อมสัญลักษณ์ ↩</li>
+        <li>✅ <b>Rule 1</b> — แถบที่เกินกรอบใช้จุดวนกลับที่ <code>max(Cycle Time, Takt Time)</code> พร้อมสัญลักษณ์ ↩</li>
         <li>✅ <b>Rule 2</b> — แสดงเวลารอของแต่ละคนจนถึง Takt และเตือนเมื่อใครเกิน Takt</li>
         <li>✅ <b>Rule 3</b> — เครื่องที่ทำงานพร้อมกันอยู่คนละแถวอยู่แล้ว เส้นไม่ทับกัน</li>
         <li>✅ โมเดลเวลา: คนแต่ละคนมีนาฬิกาของตัวเอง ส่วนเครื่องเริ่มนับเมื่องานก่อนหน้าจบ (คนโหลดเสร็จ) แล้วทำงานขนานไป โดยไม่ดันนาฬิกาของคน</li>
@@ -634,6 +654,38 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 </section>
 
 <!-- ═══════════════════════════════════════ -->
+<section id="data-safety-roadmap">
+  <h2>Phase 0A · Database Safety and Recovery Baseline — complete</h2>
+  <div class="callout">
+    <p><b>Result:</b> Claude completed the read-only preflight with <code>DATA_SAFE_READ_ONLY_COMPLETE</code>. No project source, schema, Production data, deployment, or Git history was changed.</p>
+    <ul>
+      <li>Production D1 is confirmed as the real source of truth; Local Pages Dev, localhost/localStorage, and <code>.wrangler/</code> are separate test state.</li>
+      <li>Verified inventory: 5 folders, 3 roots, maximum folder depth 3, and 6 chart files.</li>
+      <li>Recovery export and verification report: <code>D:/00_LocalFile_WebApp/ManMachineChart_Data_Backups/2026-08-02_082002/</code>.</li>
+      <li>Export verification reports zero database writes, matching row counts, readable JSON content, and matching content checksums.</li>
+      <li>Current live schema drift is recorded as a risk; it is not repaired in this phase.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="data-safety-runtime-guards">
+  <h2>Phase 0B · Runtime Data-Safety Guards — complete (GPT Review PASS)</h2>
+  <div class="callout">
+    <p><b>GPT Review result (2 Aug 2026):</b> <code>PASS</code>. Claude's targeted fix round passed 106/106 tests and a clean production build, introduced no new lint errors, and completed the required local visual smoke check. The user authorized commit, push, and deployment of the approved application changes. This closure does not authorize schema migration, Production D1 writes, or authentication implementation.</p>
+    <p><b>Objective:</b> prevent a failed cloud read, failed API operation, invalid hierarchy change, or optimistic local update from making the user believe that Production data was safely saved or from creating orphaned records.</p>
+    <p><b>Claude may change only:</b> <code>src/lib/storage.ts</code>, <code>src/store/useChartStore.ts</code>, <code>functions/api/folders.js</code>, <code>functions/api/files.js</code>, the minimum related UI state in <code>src/components/layout/Sidebar.tsx</code>, and focused tests under <code>tests/</code>. If another file is required, stop and return <code>PLAN_CHANGE_REQUIRED</code>.</p>
+    <ul>
+      <li>Cloud load failure must produce an explicit unsafe/unavailable state. LocalStorage may remain available for display or recovery review, but it must not be treated as a successfully hydrated cloud database and must not be saved over Production.</li>
+      <li>Destructive and structural actions must not optimistically remove or move local records before the server confirms success. Failed requests must leave the current data intact and show an error state.</li>
+      <li>Folder API must validate parent existence, reject self/descendant cycles, and refuse deletion when child folders or chart files remain. No recursive delete, cascade repair, or schema migration is allowed in this phase.</li>
+      <li>Do not make the browser Admin PIN look secure, do not add a secret to client JavaScript, and do not invent a fake server-side authorization system. Until the separate account/session/approval design is approved, destructive operations must remain denied or explicitly unavailable.</li>
+      <li>Use synthetic local fixtures that reproduce the Production topology for tests. Do not seed, overwrite, reset, or write to Production. The external recovery export is evidence only, not a code or seed source.</li>
+    </ul>
+    <p><b>Non-goals:</b> changing <code>schema.sql</code>, normalizing the live D1 table, implementing authentication/session/audit tables, changing the API contract broadly, or modifying the existing Production rows. Application deployment is a separate release action and is allowed only after GPT review, explicit user authorization, final verification, and post-deploy Production-tree checks.</p>
+    <p><b>Definition of Done:</b> tests cover cloud failure/save blocking, failed mutation rollback, parent/child integrity, cycle rejection, non-empty-folder deletion refusal, and preservation of the synthetic multi-level tree. Claude must run test, lint, build, local visual smoke checks, and return the handoff to GPT for review.</p>
+  </div>
+</section>
+
 <section id="tps4m">
   <h2><span class="num">8</span> แผนอนาคต — Web TPS Activity ครบ 4M</h2>
   <p class="lead">ต่อยอดจากฐานงานมาตรฐาน ขยายเป็นศูนย์กลางกิจกรรมปรับปรุงของทั้งสายการผลิต</p>
@@ -727,11 +779,13 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="decisions">
+  <div class="callout"><b>2 Aug 2026 — Phase 0A decision:</b> <code>DATA_SAFE_READ_ONLY_COMPLETE</code>. The verified Production snapshot contains 5 folders, 3 roots, 6 charts, and maximum folder depth 3; the external recovery export reports zero database writes and matching content checksums. The live <code>folders.parentId</code> schema drift is recorded as a risk and must not be repaired without a separate migration plan.</div>
   <h2><span class="num">10</span> Decision Log — สิ่งที่ตัดสินใจแล้ว</h2>
   <div class="tablewrap">
   <table>
     <thead><tr><th style="width:12%">วันที่</th><th style="width:30%">เรื่อง</th><th>มติ</th></tr></thead>
     <tbody>
+      <tr><td>2 ส.ค. 69</td><td>Database Safety / Data Preservation</td><td><b>Production D1 เป็น Source of Truth</b> · Local D1 และ <code>.wrangler/</code> ใช้ทดสอบเท่านั้น · ต้องตรวจนับ/สำรอง/เทียบโครงสร้างก่อนเขียนทุกครั้ง · ห้ามทำให้โฟลเดอร์ 4 ชั้นหรือ chart เดิมหาย</td></tr>
       <tr><td>31 ก.ค. 69</td><td>M1 เป็นนาฬิกาจับเวลาหรือตาราง</td><td><b>ตาราง key-in</b> — ถอดนาฬิกาออกจาก WebApp ทั้งหมด (การจับเวลาใช้นาฬิกาจริงหน้างาน)</td></tr>
       <tr><td>31 ก.ค. 69</td><td>วิธีส่งข้อมูล M1 → M2-M5</td><td><b>กดปุ่มส่งเองก่อน</b> · เก็บ Auto Sync ไว้ในแผนสำหรับอนาคต</td></tr>
       <tr><td>31 ก.ค. 69</td><td>ยุบรวม M3 กับ M4 ไหม</td><td><b>ไม่ยุบ</b> — คนละแกน (เวลา vs พื้นที่) และเป็นเอกสาร TPS คนละใบ ให้เชื่อมข้อมูลกันแทน</td></tr>
@@ -763,11 +817,20 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="changelog">
+  <div class="callout"><b>Version 1.11 — 2 Aug 2026:</b> Phase 0B passed GPT review after the targeted fix/retest loop. The approved runtime guards are ready for an explicitly authorized application deployment. Production D1 writes, schema migration, and authentication implementation remain separate protected gates. Added the Continuous Usability / No-Downtime Gate so the deployed WebApp remains usable while the next improvement phase is developed.</div>
   <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
   <div class="tablewrap">
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.11</b></td><td>2 ส.ค. 2569</td><td><code>working tree</code></td>
+        <td><b>ปิด Phase 0B หลัง GPT Review = PASS</b> — ยืนยัน runtime data-safety guards, 106/106 tests, build ผ่าน, local visual smoke test ผ่าน และเพิ่มกฎ Continuous Usability / No-Downtime: แก้ไขต่อเนื่องได้ แต่ Production WebApp ต้องยังใช้งานได้จริงหลัง deploy</td>
+      </tr>
+      <tr>
+        <td><b>1.9</b></td><td>2 ส.ค. 2569</td><td><code>working tree</code></td>
+        <td><b>เพิ่ม Database Safety / Data Preservation Gate</b> — แยก Production D1 ออกจาก Local D1 และ <code>.wrangler/</code> อย่างชัดเจน · บังคับ read-only inventory และ verified recovery export ก่อนงาน data/persistence · ต้องรักษา folder hierarchy 4 ชั้น, <code>parentId</code>, chart files และ content · ต้องเทียบ counts/tree/IDs ก่อน-หลัง และ fail closed เมื่อ cloud read ล้มเหลว · เพิ่มแผน Phase 0A ให้ Claude ทำ preflight ก่อนเขียนโค้ด</td>
+      </tr>
       <tr>
         <td><b>1.7</b></td><td>1 ส.ค. 2569</td><td><code>bb6f749</code> →</td>
         <td>
