@@ -50,7 +50,11 @@ REVIEW CHECKLIST
 1. Plan alignment: every requested acceptance criterion is implemented; no silent scope expansion.
 2. Calculation correctness: entered durations are not subtracted; cycle time, total duration, worker loop, machine parallelism, takt time, capacity, M3 combination, M4 chart, and M5 Yamazumi agree with the approved business rules.
 3. M1 source-of-truth: bridges to M2–M5 preserve data meaning, explicit user confirmation, and do not overwrite hand-entered data unexpectedly.
-4. Persistence safety: localStorage fallback, lazy cloud loading, save guards, D1 content, folder/file operations, refresh/reopen, and duplicate ID remapping are safe.
+4. Persistence safety: localStorage fallback, lazy cloud loading, save guards,
+   explicit Save-to-Cloud acknowledgement, complete deployed API read-back,
+   refresh/reopen persistence, D1 content, folder/file operations, and duplicate
+   ID remapping are safe. A local state change, passing request, test, build, or
+   deploy is not proof that Cloud data persisted.
 5. API/schema: request validation, response shapes, error handling, migrations, and D1 binding match the actual code and schema.
 6. UI/UX: actual workflow, labels, responsive layout, keyboard/focus behavior, empty/loading/error states, and export region remain usable.
 7. Test quality: tests cover the changed behavior and edge cases, not only happy paths. Build and lint results are real and reproducible.

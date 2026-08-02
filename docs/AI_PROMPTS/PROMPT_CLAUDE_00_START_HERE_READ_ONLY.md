@@ -76,7 +76,13 @@ REPORT REQUIRED
     explain whether the four-level folder hierarchy is preserved by the actual
     schema/API, and list any data-loss risk. Do not reset, seed, export over, or
     write to any database in this onboarding round.
-13. Recommended next action: return this read-only report to GPT/Codex for planning.
+13. Save-to-Cloud persistence audit: trace the Save flow from UI through the
+    deployed API to D1, and report whether success includes an explicit server
+    acknowledgement plus chart identity/version/timestamp, whether a fresh API
+    read-back matches the complete payload, and whether refresh/reopen loads the
+    same data from Cloud. Do not perform a write; use existing evidence/code and
+    clearly mark any unverified claim as a release blocker.
+14. Recommended next action: return this read-only report to GPT/Codex for planning.
 
 END CONDITION
 End with exactly one:

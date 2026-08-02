@@ -234,6 +234,76 @@ application version must be committed, deployed, and verified at
 - A local `127.0.0.1` or `localhost` URL is for testing only; it is not the
   user's deployed application and must not be reported as the final release.
 
+### Active-User Continuous Release Gate (mandatory)
+
+This is a live WebApp that will be used by users continuously while the team
+continues improving it. Development and release work must therefore be safe to
+perform while users are viewing or editing existing charts. "No downtime" means
+the current released version remains usable until the replacement is verified;
+it does not mean that an untested change may be patched directly into Production.
+
+- Every change must be delivered as a reviewable release commit. Keep the last
+  known-good Production deployment as the rollback target until the replacement
+  passes tests, build, visual smoke, console, and real-tree checks.
+- Existing UI, API, and saved chart data are compatibility contracts. Do not
+  remove/rename API fields, endpoints, or stored JSON fields in the same release
+  unless GPT approves a versioned migration and an old-client compatibility
+  window.
+- Schema changes must use a separately approved expand/compatibility/contract
+  plan. Additive changes come first, compatible code is deployed before any
+  authorized backfill, and destructive cleanup is deferred to a later approved
+  release. Never use an ad-hoc `ALTER TABLE`, `schema.sql`, reset, or seed as a
+  shortcut during an active-user release.
+- A failed or partially unavailable release must fail safely: existing charts
+  remain viewable, unsafe writes are blocked, users see a clear message, and no
+  empty/local fallback may overwrite cloud data. Roll back the application when
+  the new release is not usable; do not repair live data as part of rollback.
+- Multiple users must not silently overwrite one another. Before claiming that
+  concurrent editing is supported, implement real server-side authentication,
+  authorization, audit identity, optimistic concurrency/version checks, and a
+  conflict/retry flow. Until that gate is approved and implemented, do not
+  represent the Admin PIN or the current save flow as multi-user-safe for
+  destructive or conflicting edits.
+- If a breaking change, migration, or maintenance window is unavoidable, stop
+  and return to GPT/user approval with impact, affected users, rollback, and
+  communication steps. Do not surprise active users with an unannounced break.
+- Every active-user release record must include the source commit, deployment
+  result, live URL, verification evidence, rollback target, and any checks that
+  remain open.
+
+### Save-to-Cloud Persistence Gate (mandatory)
+
+The Save button is not considered successful because the browser changed local
+state or because the request returned without an error. A save is complete only
+after the deployed server confirms that the complete chart payload was written
+to the authoritative Cloudflare/D1 store and a fresh read proves that the same
+payload is still there.
+
+- Keep the chart dirty and show a clear unconfirmed/failed state until the API
+  returns an explicit success response containing the saved chart identity and
+  server version/timestamp. Never show a false "Saved" state from local state
+  alone.
+- After every save-flow implementation or release, test the full round trip:
+  save a uniquely identifiable change, read the chart back through the deployed
+  API, compare the saved metadata and all steps/timeline values, then refresh or
+  reopen the WebApp and fetch it again from Cloud. Do not count localStorage,
+  React state, a fixture, or a local D1 database as proof of Cloud persistence.
+- A failed, timed-out, or ambiguous save must fail closed: preserve the user's
+  unsaved work for retry, do not overwrite Cloud data with an empty/stale local
+  fallback, and tell the user whether the Cloud write was confirmed. If the
+  final write status cannot be proven, report it as unconfirmed rather than
+  successful.
+- The read-after-write check must bypass stale browser caches where applicable
+  and must identify the exact chart/folder and server version that was checked.
+  The verification record must include environment, URL, chart identity, save
+  response, read-back result, reopen result, and timestamp.
+- For updates to an existing chart, the server must protect against stale or
+  concurrent writes with a version/conflict check before the workflow may claim
+  that multiple users can edit safely. An Admin PIN alone is not sufficient.
+- Any schema, API, backup, restore, or data-recovery change needed to satisfy
+  this gate returns to GPT planning. Never reset, reseed, bulk-repair, or delete
+  data to make a persistence test appear to pass.
+
 ## Business Rules สำคัญ
 
 - **DURATION MODEL (adopted 2026-08-01, replaces the old stop-time model).** Every number typed into `manualTime` / `machineTime` / `walkingTime` / `idleTime` is the LENGTH of that element. Nothing is ever subtracted from it — "กรอกเท่าไร คิดเท่านั้น". Typing 100 gives a 100 s element, full stop.

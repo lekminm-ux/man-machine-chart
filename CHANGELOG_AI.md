@@ -2,6 +2,42 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-02 (Active-User Continuous Release Gate)
+
+### Tool
+
+- Codex
+
+### Decision
+
+- The user confirmed that this WebApp will have ongoing users while improvements continue.
+- Added a mandatory rule that the current Production release remains usable while a replacement is tested.
+- Added release requirements for backward-compatible UI/API/chart JSON, a retained rollback target, safe schema sequencing, fail-closed recovery, and explicit GPT/user approval for breaking changes.
+- Recorded that multi-user concurrent editing is not considered safe until server-side authentication/authorization, audit identity, optimistic version checks, and conflict handling are designed and reviewed.
+
+### Scope
+
+- Documentation/workflow rules only. No application source, D1 schema, Production data, or deployment was changed in this session.
+- Open conditions: API/schema compatibility, real server-side authorization, concurrency conflict handling, rollback verification, and an active-user smoke test remain release gates.
+
+## 2026-08-02 (Save-to-Cloud Persistence Gate)
+
+### Tool
+
+- Codex
+
+### Decision
+
+- The user approved the six-step active-user release workflow and requested an explicit rule for preventing save-related data loss.
+- A Save is successful only after the deployed API confirms the exact chart write, a fresh Cloud read-back matches the complete payload, and a refresh/reopen still shows the same data.
+- Ambiguous, timed-out, or failed saves must remain unconfirmed, preserve unsaved work for retry, block unsafe overwrite, and never use empty/stale local state to replace Cloud data.
+
+### Scope
+
+- Updated the project context, AI workflow rules, database safety gate, deployment checklist, and Master Plan v1.14.
+- No application source, D1 schema, Production data, or deployment was changed while adding this rule.
+- The next active-user audit must produce evidence for save response, deployed API read-back, reopen persistence, and the exact chart/version checked.
+
 ## 2026-08-02 (Release Gate — Phase 0B PASS and Continuous Usability)
 
 ### Tool

@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.12</div>
+      <div><b>Version</b>1.14</div>
       <div><b>Updated</b>2 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
       <div><b>Baseline commit</b>4c7dacf</div>
-      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · commit 4c7dacf deployed and live-verified</div>
-      <div><b>Status</b>Master Plan v1.12 · Production D1/schema remain protected · approved Phase 0B release is live at man-machine-chart.pages.dev</div>
+      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · active-user and save-to-cloud persistence gates added</div>
+      <div><b>Status</b>Master Plan v1.14 · Production D1/schema remain protected · approved release remains usable while future changes are developed · Save-to-Cloud persistence remains a release gate</div>
     </div>
   </div>
 </header>
@@ -545,6 +545,8 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <p><b>Chart readability requirement:</b> the Start → End input/display area must not consume the chart viewport. It must remain compact or be collapsible, and the timeline graph must remain visibly usable beside the table. The normal layout is the compact table view plus a separate full chart view; an expanded timing/detail view must never hide or squeeze the graph out of view.</p>
     <p><b>Delivery gate:</b> after coding, Claude must inspect the actual rendered screen, test the affected workflow at the target viewport sizes, verify that the graph is visible and readable, inspect the browser console, and report the results before handoff. Passing tests/build alone is not sufficient.</p>
     <p><b>Continuous Usability / No-Downtime Gate:</b> the deployed WebApp must remain usable while improvements are being developed. Local development and Production are separate environments, but the user-facing flow is not split: after GPT review, the approved version must be committed, deployed, and verified at <code>man-machine-chart.pages.dev</code>. A safety feature may block only the unsafe operation; it must not unnecessarily block viewing existing charts or normal chart work. If Cloud is unavailable, show cached data for review and fail closed for writes that could overwrite Production.</p>
+    <p><b>Active-User Continuous Release Gate:</b> users may be viewing or editing charts during every future change. Ship only a reviewable GPT-approved commit, preserve the last known-good deployment as the rollback target, and keep UI/API/saved-chart JSON backward-compatible. Schema changes require a separately approved expand/compatibility/contract plan; do not mix ad-hoc <code>ALTER TABLE</code>, reset, seed, or bulk repair with an ordinary release. If a release is unhealthy, keep existing charts readable, fail closed for unsafe writes, and roll back the application without repairing live data. Do not claim safe concurrent editing until server-side authentication, authorization, audit identity, optimistic version checks, and conflict handling are implemented and reviewed; Admin PIN alone is not enough.</p>
+    <p><b>Save-to-Cloud Persistence Gate:</b> the Save button is successful only after the deployed API explicitly confirms the exact chart write with a server version/timestamp. Every save-related change and release must save a uniquely identifiable edit, read it back through the deployed API, compare all metadata and step/timeline values, then refresh or reopen the WebApp and confirm the same data remains in Cloud. Local state, localStorage, fixtures, local D1, or a passing build/deploy are not proof. Ambiguous saves must remain unconfirmed, preserve work for retry, block unsafe overwrite, and never replace Cloud data with an empty or stale fallback.</p>
     <p><b>Database Safety / Data Preservation Gate:</b> Production D1 behind <code>man-machine-chart.pages.dev</code> is the canonical source of truth. Local Pages Dev at <code>127.0.0.1:8788</code>, Next dev/localStorage, and <code>.wrangler/</code> are separate test/cache environments. Never delete or recreate local D1 state to make a test convenient, and never use a one-folder sample as a restoration.</p>
     <p><b>Hierarchy preservation:</b> every <code>folders</code> row, <code>parentId</code> relationship, existing four-level tree, <code>chart_files</code> row, and chart content must survive persistence, schema, API, and deployment work. Before any authorized write, export Production rows/schema to a timestamped directory outside the repository. Compare before/after folder count, root count, maximum depth, complete parent-child mapping, chart count, representative IDs, and content checksums. Any unexpected decrease is a STOP condition.</p>
     <p><b>Fail-closed rule:</b> if a cloud read fails or the recovery export cannot be verified, block save/destructive actions and return <code>DATA_SAFETY_BLOCKED</code>. A passing test, lint, build, or deploy command is not evidence that data was preserved. The canonical detailed rules are in <code>docs/AI_PROMPTS/DATABASE_SAFETY_GATE.md</code>.</p>
@@ -818,7 +820,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="changelog">
-  <div class="callout"><b>Version 1.12 — 2 Aug 2026:</b> Phase 0B passed GPT review, commit <code>4c7dacf</code> was pushed, Cloudflare Pages confirmed the Git deployment, and the live application was smoke-tested successfully. Production D1 writes, schema migration, and authentication implementation remain separate protected gates. The Continuous Usability / No-Downtime Gate is now verified against the live WebApp.</div>
+  <div class="callout"><b>Version 1.14 — 2 Aug 2026:</b> Added the Save-to-Cloud Persistence Gate. A save is not successful until the deployed API confirms the exact chart write, a Cloud read-back matches the complete payload, and a refresh/reopen still shows the data. Ambiguous saves must fail closed without overwriting Cloud data; active-user, compatibility, rollback, and authentication/concurrency gates remain mandatory.</div>
   <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
   <div class="tablewrap">
   <table>

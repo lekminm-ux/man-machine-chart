@@ -50,6 +50,49 @@ and must never be deleted or recreated merely to make a test convenient.
    preserved. The real Production tree and representative existing charts must
    be reopened and checked after deployment.
 
+## Active-user release safety
+
+The WebApp is a continuously used system. A code or deployment change may run
+while users are viewing or editing charts, so the current release must remain
+usable until the replacement is verified.
+
+- Ship only a GPT-reviewed release commit and retain the last known-good
+  deployment as the rollback target.
+- Keep UI, API, and saved chart JSON backward-compatible for existing clients.
+  Breaking changes require a separately reviewed version/compatibility plan.
+- Use an expand/compatibility/contract sequence for schema changes. Do not mix
+  destructive schema cleanup, ad-hoc `ALTER TABLE`, reset, seed, or bulk repair
+  with an ordinary user-facing release.
+- If a release fails, preserve read access to existing charts, fail closed for
+  unsafe writes, and roll back the application. Never overwrite data as part of
+  an emergency recovery.
+- Concurrent editing is not considered safe until server-side authentication,
+  authorization, audit identity, optimistic version checks, and conflict
+  handling are implemented and GPT-reviewed. An Admin PIN alone is not enough.
+
+## Save-to-cloud persistence gate
+
+Never treat a browser-side state change or a request without a visible error as
+proof that a chart was saved. The authoritative result is the deployed API and
+Cloudflare/D1 read-back.
+
+- A save may be reported as successful only after the server returns explicit
+  success with the exact chart identity and a server version/timestamp.
+- The required verification sequence is: save a uniquely identifiable change
+  through the deployed WebApp, read the same chart through the deployed API,
+  compare metadata and every step/timeline value, refresh or reopen the WebApp,
+  and read it again from Cloud. Record the URL, chart identity, response,
+  read-back, reopen result, and timestamp.
+- A timeout, error, or ambiguous response must preserve unsaved work for retry,
+  block unsafe overwrite, and be reported as unconfirmed. Never write an empty
+  or stale local fallback over Cloud data.
+- Read-after-write checks must not rely on localStorage, React state, fixtures,
+  local D1, or a stale browser cache. A successful test/build/deploy alone is
+  not sufficient evidence.
+- If the application cannot prove this round trip, the release is not ready for
+  active users and must return to GPT planning. Do not reset, reseed, bulk-repair,
+  or delete data to make the check pass.
+
 ## Required data-safety preflight
 
 Before changing persistence, schema, API, deployment configuration, or starting

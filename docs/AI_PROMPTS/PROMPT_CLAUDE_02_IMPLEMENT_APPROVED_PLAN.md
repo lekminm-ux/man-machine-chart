@@ -84,6 +84,11 @@ VERIFICATION REQUIRED
 - Inspect browser console for application errors and warnings.
 - For time/data changes, cross-check M1, M2, M3, M4, and M5 figures against the approved invariants and regression cases.
 - For persistence changes, test local fallback, cloud failure handling, lazy file loading, save guard, refresh/reopen, and no data loss.
+- For every save-related change, prove the deployed API returns explicit success
+  for the exact chart with a server version/timestamp, read the complete payload
+  back from Cloud, compare it, then hard-refresh/reopen and read it again. Never
+  mark a save successful from local state alone; ambiguous saves must remain
+  unconfirmed and must not overwrite Cloud data with an empty/stale fallback.
 - For persistence or deployment changes, compare pre/post folder count, root count,
   maximum depth, complete parent-child mapping, chart count, representative IDs,
   and content checksums. Any unexpected decrease is a STOP condition.

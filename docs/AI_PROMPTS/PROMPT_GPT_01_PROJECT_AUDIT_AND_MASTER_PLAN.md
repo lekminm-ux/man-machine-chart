@@ -75,6 +75,10 @@ PROJECT FACTS TO VERIFY, NOT ASSUME
 - Production D1 is the source of truth for real folders/charts; local Pages Dev, localhost/localStorage, and `.wrangler/` are separate test/cache environments.
 - The existing four-level folder tree is user data represented by `parentId`; no plan may flatten, regenerate, seed over, or assume a fixed hierarchy depth.
 - Any persistence/schema/API/deployment plan must include a read-only preflight, verified external recovery export, before/after row/tree comparison, and a fail-closed behavior when cloud loading fails.
+- Any save/persistence plan must prove a deployed API acknowledgement, a
+  read-after-write comparison of the complete chart payload, and persistence
+  after refresh/reopen from Cloud. Local state, fixtures, localStorage, or local
+  D1 are not evidence of Production persistence.
 
 REQUIRED PLAN OUTPUT
 1. Current-state inventory: features, routes, modules, source files, API endpoints, schema, tests, and deployment path.
@@ -83,7 +87,7 @@ REQUIRED PLAN OUTPUT
 4. Current gaps and risks, ranked Blocker/Major/Minor, with exact file evidence.
 5. Proposed phase objective, non-goals, allowed files, data/schema impact, acceptance criteria, test plan, and Definition of Done.
 6. Calculation invariants and regression cases for time, totals, cycle time, takt time, machine capacity, Yamazumi, and M1→M2–M5 bridges.
-7. Persistence/API safety plan covering localStorage fallback, lazy cloud loading, save guards, D1 schema, hierarchy preservation, environment separation, verified recovery export, and data-loss prevention.
+7. Persistence/API safety plan covering localStorage fallback, lazy cloud loading, save guards, explicit Save-to-Cloud acknowledgement, read-after-write verification, refresh/reopen persistence, D1 schema, hierarchy preservation, environment separation, verified recovery export, and data-loss prevention.
 8. UI/UX/accessibility/responsive/export requirements appropriate to the actual existing screens.
 9. Deployment gate and rollback/verification plan, including pre/post folder/chart counts, parent-child tree comparison, representative existing charts, and recovery-export verification. Do not deploy in this planning task.
 10. A complete copy-paste Prompt for Claude that includes exact READ FIRST paths, inspection commands, allowed files, forbidden actions, acceptance criteria, stop conditions, and required handoff output.

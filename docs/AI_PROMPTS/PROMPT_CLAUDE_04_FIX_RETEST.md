@@ -65,6 +65,11 @@ RETEST
 - For data-related fixes, compare pre/post folder count, root count, maximum depth,
   full parent-child mapping, chart count, representative IDs, and content checksums;
   verify the recovery export and real Production reopen flow.
+- For save/persistence fixes, verify explicit deployed API success, complete
+  chart read-back from Cloud, and refresh/reopen persistence. Record the exact
+  chart identity, server version/timestamp, URL, and result; classify any
+  timeout or ambiguous response as unconfirmed and verify no stale/empty local
+  fallback can overwrite Cloud data.
 
 SESSION RECORDS
 - Update D:/00_LocalFile_WebApp/ManMachineChart_StandardOperation/CHANGELOG_AI.md with files changed, root causes, fixes, tests, and remaining risks.

@@ -39,6 +39,51 @@ viewing existing charts or normal chart work. If Cloud is unavailable, show
 cached data for review and fail closed for writes that could overwrite or
 delete Production data.
 
+## Active-user continuous release gate
+
+This WebApp has ongoing users. Future AI sessions must assume that users may be
+viewing or editing charts while the code is being improved.
+
+- Release only from a GPT-reviewed commit; keep the last known-good Production
+  deployment available as the rollback target until the new release is verified.
+- Preserve backward compatibility for existing UI clients, API fields/endpoints,
+  and saved chart JSON. Any breaking API or schema change requires a new GPT plan,
+  a compatibility window, and explicit user approval.
+- Treat schema work as an expand/compatibility/contract sequence. Never use an
+  ad-hoc `ALTER TABLE`, `schema.sql`, reset, seed, or bulk repair during a normal
+  active-user release.
+- If a release is unhealthy, keep existing charts readable, fail closed for
+  unsafe writes, show a clear message, and roll back the application. Do not
+  overwrite data while attempting recovery.
+- Do not claim safe concurrent editing until server-side authentication,
+  authorization, audit identity, optimistic version checks, and conflict
+  handling are implemented and reviewed. The Admin PIN is not a substitute.
+- Record commit, deployment result, live verification, rollback target, and open
+  checks in the Master Plan, Deployment Checklist, and CHANGELOG.
+
+## Save-to-cloud persistence gate
+
+The Save button is successful only when the deployed server confirms the write
+to the authoritative Cloudflare/D1 store and a fresh read confirms the complete
+payload. Local React state, localStorage, fixtures, or local D1 are never proof
+that Production data was saved.
+
+- Keep the chart dirty and show an unconfirmed/failed state until the API returns
+  explicit success with the chart identity and server version/timestamp.
+- For every save-related change and every release, make a uniquely identifiable
+  edit, save it through the deployed WebApp, read it back through the deployed
+  API, compare metadata and all step/timeline values, refresh/reopen the WebApp,
+  and read it again from Cloud. Record URL, chart identity, response, read-back,
+  reopen result, and timestamp.
+- On timeout, error, or ambiguous status, preserve unsaved work for retry, block
+  unsafe overwrite, and tell the user that the Cloud write is unconfirmed. Never
+  replace Cloud data with an empty or stale local fallback.
+- Existing-chart updates require server-side version/conflict protection before
+  safe concurrent editing may be claimed. An Admin PIN is not sufficient.
+- Any schema, API, backup, restore, or recovery work required by this gate must
+  return to GPT planning. Never reset, reseed, bulk-repair, or delete data to
+  make a persistence test appear to pass.
+
 ## Project-specific read policy
 
 Read the real project files before making decisions. Treat these as generated, local-only, or non-canonical unless a prompt explicitly asks for forensic inspection:
