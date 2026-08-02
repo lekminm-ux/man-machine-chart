@@ -38,6 +38,32 @@ This file is the shared AI work log for Codex, Claude Code, Antigravity, and any
 - No application source, D1 schema, Production data, or deployment was changed while adding this rule.
 - The next active-user audit must produce evidence for save response, deployed API read-back, reopen persistence, and the exact chart/version checked.
 
+## 2026-08-02 (Active-User Save Persistence Audit)
+
+### Tool
+
+- Codex
+
+### Result
+
+- Completed a read-only audit of the Save → `/api/files` → D1 → refresh/reopen
+  path. No application, D1, Production, or deployment write was performed.
+- `pnpm.cmd test` passed 106/106 and `pnpm.cmd run build` passed. Lint remains
+  at the known baseline of 5 errors and 7 warnings.
+- Persistence is not yet cleared: the client marks Save as Cloud-saved after
+  the PUT alone, the API does not validate affected rows or return a canonical
+  saved row, and hydration can prefer stale/local-only data after a successful
+  Cloud read. No live save/read-back evidence was claimed because the direct
+  live HTTP probe closed during receive in this environment.
+- Created `docs/AI_PROMPTS/REPORT_CODEX_ACTIVE_USER_SAVE_PERSISTENCE_AUDIT_2026-08-02.md`
+  with evidence, blockers, and the required GPT Master Plan scope.
+
+### Next gate
+
+- `NEXT_STATUS: GPT_MASTER_PLAN_REQUIRED`; Claude must not implement the
+  persistence changes until GPT approves the save contract, Cloud/local
+  reconciliation, recovery-export method, and verification test plan.
+
 ## 2026-08-02 (Release Gate — Phase 0B PASS and Continuous Usability)
 
 ### Tool
