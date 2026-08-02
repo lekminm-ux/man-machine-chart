@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.10</div>
+      <div><b>Version</b>1.12</div>
       <div><b>Updated</b>2 ส.ค. 2569</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>bb6f749</div>
-      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · deployment authorized by user</div>
-      <div><b>Status</b>Master Plan v1.11 · Production D1/schema remain protected · approved application release may be deployed after verification</div>
+      <div><b>Baseline commit</b>4c7dacf</div>
+      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · commit 4c7dacf deployed and live-verified</div>
+      <div><b>Status</b>Master Plan v1.12 · Production D1/schema remain protected · approved Phase 0B release is live at man-machine-chart.pages.dev</div>
     </div>
   </div>
 </header>
@@ -672,6 +672,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <h2>Phase 0B · Runtime Data-Safety Guards — complete (GPT Review PASS)</h2>
   <div class="callout">
     <p><b>GPT Review result (2 Aug 2026):</b> <code>PASS</code>. Claude's targeted fix round passed 106/106 tests and a clean production build, introduced no new lint errors, and completed the required local visual smoke check. The user authorized commit, push, and deployment of the approved application changes. This closure does not authorize schema migration, Production D1 writes, or authentication implementation.</p>
+    <p><b>Deployment result (2 Aug 2026):</b> commit <code>4c7dacf</code> was pushed to <code>main</code> and Cloudflare Pages Dashboard confirmed the Git deployment. The live URL <code>https://man-machine-chart.pages.dev/editor</code> was reloaded successfully: the existing multi-level tree and representative charts loaded, the table rendered 24 body rows with 4 SVG graph surfaces, and the browser console reported zero errors. No D1 command or Production data write ran.</p>
     <p><b>Objective:</b> prevent a failed cloud read, failed API operation, invalid hierarchy change, or optimistic local update from making the user believe that Production data was safely saved or from creating orphaned records.</p>
     <p><b>Claude may change only:</b> <code>src/lib/storage.ts</code>, <code>src/store/useChartStore.ts</code>, <code>functions/api/folders.js</code>, <code>functions/api/files.js</code>, the minimum related UI state in <code>src/components/layout/Sidebar.tsx</code>, and focused tests under <code>tests/</code>. If another file is required, stop and return <code>PLAN_CHANGE_REQUIRED</code>.</p>
     <ul>
@@ -817,12 +818,16 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="changelog">
-  <div class="callout"><b>Version 1.11 — 2 Aug 2026:</b> Phase 0B passed GPT review after the targeted fix/retest loop. The approved runtime guards are ready for an explicitly authorized application deployment. Production D1 writes, schema migration, and authentication implementation remain separate protected gates. Added the Continuous Usability / No-Downtime Gate so the deployed WebApp remains usable while the next improvement phase is developed.</div>
+  <div class="callout"><b>Version 1.12 — 2 Aug 2026:</b> Phase 0B passed GPT review, commit <code>4c7dacf</code> was pushed, Cloudflare Pages confirmed the Git deployment, and the live application was smoke-tested successfully. Production D1 writes, schema migration, and authentication implementation remain separate protected gates. The Continuous Usability / No-Downtime Gate is now verified against the live WebApp.</div>
   <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
   <div class="tablewrap">
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.12</b></td><td>2 ส.ค. 2569</td><td><code>4c7dacf</code></td>
+        <td><b>Deploy และตรวจ Production สำเร็จ</b> — Cloudflare Pages ยืนยัน Git deployment จาก <code>main</code>; live smoke test ที่ <code>man-machine-chart.pages.dev/editor</code> พบ tree/chart เดิม, ตาราง 24 แถว, graph SVG 4 ชุด และ browser console ไม่มี error</td>
+      </tr>
       <tr>
         <td><b>1.11</b></td><td>2 ส.ค. 2569</td><td><code>working tree</code></td>
         <td><b>ปิด Phase 0B หลัง GPT Review = PASS</b> — ยืนยัน runtime data-safety guards, 106/106 tests, build ผ่าน, local visual smoke test ผ่าน และเพิ่มกฎ Continuous Usability / No-Downtime: แก้ไขต่อเนื่องได้ แต่ Production WebApp ต้องยังใช้งานได้จริงหลัง deploy</td>

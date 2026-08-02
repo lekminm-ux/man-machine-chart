@@ -22,8 +22,15 @@ This file is the shared AI work log for Codex, Claude Code, Antigravity, and any
   deployed WebApp must remain usable while improvements continue.
 - A safety guard may block only the unsafe operation; existing chart viewing and
   normal chart work must remain available.
-- Deployment is pending the final release verification in this session. No D1
-  migration, reset, seed, delete, or Production data write is authorized.
+- Commit `4c7dacf` was pushed to `main`; Cloudflare Pages Dashboard confirmed a
+  successful Git deployment for `man-machine-chart`.
+- Live verification completed at `https://man-machine-chart.pages.dev/editor`:
+  the existing multi-level tree and representative charts loaded, the chart
+  table rendered 24 body rows with 4 SVG graph surfaces, and the browser
+  console reported zero errors.
+- The direct API probe was not counted as a pass because the browser client
+  blocked the `/api/*` navigation; no D1 migration, reset, seed, delete, or
+  Production data write was executed.
 
 ## 2026-08-02 (Phase 0A/0B Data Safety Plan)
 
