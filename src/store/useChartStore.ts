@@ -12,6 +12,7 @@ import {
   loadDatabaseFromCloud, loadFileFromCloud,
   createFolderCloud, updateFolderCloud, deleteFolderCloud,
   createFileCloud, saveFileCloud, deleteFileCloud,
+  chartFileContent,
 } from '@/lib/storage';
 import { computeCycleTime } from '@/lib/chart-utils';
 import {
@@ -21,7 +22,11 @@ import {
 import { emptyMachineCapacity, machineCapacityFromTimeStudy } from '@/lib/machine-capacity';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
-export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
+// 'unconfirmed' is distinct from 'error': the write call itself reported
+// success, but an independent fresh Cloud read either failed or didn't match
+// what was just sent — so the save must not be shown as 'saved', but it also
+// isn't a known outright failure.
+export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error' | 'unconfirmed';
 
 interface ChartState extends AppDatabase {
   hydrated: boolean;
@@ -118,6 +123,99 @@ function persistLocal(state: AppDatabase) {
   saveLocalDatabase({ folders: state.folders, files: state.files, activeFileId: state.activeFileId });
 }
 
+// Module-scoped re-entrancy guard for hydrate(), separate from the `hydrated`
+// state field. `hydrated` is deliberately not set until the Cloud result is
+// known (so the editor stays gated on a pending request), so it can no longer
+// double as an immediate "hydration already started" guard. Without this,
+// React StrictMode's dev-only double effect-invocation (editor/page.tsx's
+// `useEffect(() => { hydrate(); }, [])` has no cleanup) would start two
+// independent Cloud hydrations before either one's `hydrated` flip could stop
+// the second.
+let hydrating = false;
+
+// ── Helper: compare the persisted portion of two chart files ────────────────
+// Used to verify a save's fresh Cloud read-back actually matches what was
+// just sent. Reuses storage.ts's chartFileContent so this checks exactly the
+// same field list that actually gets written — id/name/folderId/updatedAt
+// plus every content field (header/steps/layoutDiagram/timeMeasurement/
+// timeStudy/machineCapacity), not a hand-picked subset that can silently
+// drift out of sync with what's really persisted. Both sides go through the
+// same JSON round trip the API itself uses (stringify to store, parse to
+// read back), so key ordering is consistent.
+function chartContentMatches(a: ChartFile, b: ChartFile): boolean {
+  const pick = (f: ChartFile) => JSON.stringify({
+    id: f.id, name: f.name, folderId: f.folderId, updatedAt: f.updatedAt,
+    ...chartFileContent(f),
+  });
+  return pick(a) === pick(b);
+}
+
+// ── Helper: refuse a Cloud-mutating action against an unready/unsynced target ──
+// Two independent reasons an action must never reach the Cloud API:
+//   (1) the cloud itself isn't confirmed ready (Phase 0B gate), or
+//   (2) any of the given ids — the record itself, or a parent/folder it's
+//       being attached to — belongs to a `_unsynced` record, one Cloud has
+//       never seen. Sending such an id to an UPDATE/DELETE, or attaching a
+//       new row under it via parentId/folderId, cannot possibly succeed —
+//       the API's own zero-row guard is a fallback, not a substitute for
+//       never sending that call in the first place.
+// Returns true (after setting syncStatus:'error') when the caller must stop.
+type Setter = (partial: Partial<ChartState>) => void;
+function blockCloudMutation(
+  set: Setter,
+  state: ChartState,
+  actionName: string,
+  ...ids: (string | null | undefined)[]
+): boolean {
+  if (!state.cloudReady) {
+    set({ syncStatus: 'error' });
+    console.warn(`${actionName} blocked: cloud is not confirmed ready.`);
+    return true;
+  }
+  for (const id of ids) {
+    if (!id) continue;
+    const record = state.folders.find(r => r.id === id) ?? state.files.find(r => r.id === id);
+    if ((record as { _unsynced?: boolean } | undefined)?._unsynced) {
+      set({ syncStatus: 'error' });
+      console.warn(`${actionName} blocked: "${id}" is local-only and has never been confirmed in Cloud.`);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── Helper: refuse a full-payload mutation against unloaded placeholder content ──
+// `_loaded === false` means this record's steps/layoutDiagram/module fields are
+// still the blank lazy-load placeholder (see loadDatabaseFromCloud), never the
+// real Cloud content — a metadata-only list entry the file was never actually
+// opened for in this session. Sending it through saveFileCloud/createFileCloud
+// would PUT that blank content over whatever the real chart currently holds.
+function blockUnloadedFile(set: Setter, actionName: string, file: ChartFile): boolean {
+  if ((file as ChartFile & { _loaded?: boolean })._loaded === false) {
+    set({ syncStatus: 'error' });
+    console.warn(`${actionName} blocked: file content has not finished loading from the cloud.`);
+    return true;
+  }
+  return false;
+}
+
+// ── Helper: refuse a full-payload mutation against an unconfirmed draft ─────
+// `_unconfirmed === true` means the last save's fresh Cloud read-back never
+// proved the write (or hasn't been retried yet) — the file has real, loaded
+// content, but Cloud's own copy of it is unverified. Renaming/moving/
+// duplicating it would still build a full-payload PUT/POST from that
+// unverified draft. Deliberately NOT used by `saveActiveFile`: Save is the
+// explicit retry path that resolves an unconfirmed draft, so it must stay
+// available precisely when `_unconfirmed` is true.
+function blockUnconfirmedFile(set: Setter, actionName: string, file: ChartFile): boolean {
+  if ((file as ChartFile & { _unconfirmed?: boolean })._unconfirmed) {
+    set({ syncStatus: 'error' });
+    console.warn(`${actionName} blocked: this file has an unconfirmed save pending — retry Save first.`);
+    return true;
+  }
+  return false;
+}
+
 // ── Helper: structural folder/file mutation with rollback-on-failure ────────
 // Applies the local change immediately for responsiveness, but only keeps it
 // once the paired cloud call actually confirms. Refuses to run at all while
@@ -125,7 +223,6 @@ function persistLocal(state: AppDatabase) {
 // pre-mutation snapshot if the cloud call rejects — so a failed delete/move/
 // rename/create never leaves an unconfirmed, orphaned local-only change
 // standing in for what the user believes was saved to Production.
-type Setter = (partial: Partial<ChartState>) => void;
 async function mutateWithRollback(
   set: Setter,
   snapshot: AppDatabase,
@@ -169,20 +266,46 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   // ── Hydration ─────────────────────────────────────────────────────────────────
   async hydrate() {
-    if (get().hydrated) return;
-    // Load local immediately for instant render
+    if (get().hydrated || hydrating) return;
+    hydrating = true;
+    // Load local data into state immediately so it's ready the instant Cloud
+    // resolves, but deliberately do NOT set `hydrated` yet. The editor
+    // (editor/page.tsx) gates its entire render on `hydrated` — flipping it
+    // true here, before Cloud is even asked, would let a cached local file
+    // (possibly `_unconfirmed` or a stale `_loaded:false` placeholder) render
+    // as if it were the confirmed active document during the pending
+    // request. `cloudReady` already correctly stays false during this
+    // window; `hydrated` must too.
     const local = loadLocalDatabase();
-    set({ ...local, hydrated: true, cloudReady: false, syncStatus: 'syncing' });
+    set({ ...local, cloudReady: false, syncStatus: 'syncing' });
     // Then fetch cloud data. `loadDatabaseFromCloud` never throws — it always
     // resolves to an explicit ok/not-ok result instead of silently standing
-    // a local fallback in for a confirmed cloud read.
+    // a local fallback in for a confirmed cloud read. Either branch below is
+    // the point `hydrated` becomes true: a known failure still counts as "the
+    // Cloud result is known" (and correctly falls back to reviewable cached
+    // data with cloudReady:false, per the Continuous Usability Gate).
     const result = await loadDatabaseFromCloud();
     if (result.ok) {
-      set({ ...result.db, hydrated: true, cloudReady: true, syncStatus: 'idle' });
+      const db = result.db;
+      // An active file that isn't confirmed loaded — a stale cache reset, an
+      // _unconfirmed draft, or a local-only _unsynced file — must never be
+      // silently shown as the active Cloud document on reload/reopen.
+      // `loadDatabaseFromCloud`'s merge already collapses an _unconfirmed
+      // draft to _loaded:false, but `_unconfirmed` is also checked directly
+      // here rather than relying solely on that cross-module conversion.
+      // Its data stays in `files` untouched for recovery; the editor falls
+      // back to the existing "no file open" state until the user re-opens it
+      // through openFile()'s verified path.
+      const wasActive = db.files.find(f => f.id === db.activeFileId) as (ChartFile & { _loaded?: boolean; _unsynced?: boolean; _unconfirmed?: boolean }) | undefined;
+      const activeFileId = wasActive && (wasActive._loaded === false || wasActive._unsynced || wasActive._unconfirmed) ? null : db.activeFileId;
+      const next: AppDatabase = { ...db, activeFileId };
+      set({ ...next, hydrated: true, cloudReady: true, syncStatus: 'idle' });
+      if (activeFileId !== db.activeFileId) persistLocal(next);
     } else {
       console.warn('Cloud hydration unavailable, showing cached data only:', result.error);
       set({ ...result.fallback, hydrated: true, cloudReady: false, syncStatus: 'error' });
     }
+    hydrating = false;
   },
 
   activeFile() {
@@ -201,38 +324,51 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   // ── Open file (lazy load content from cloud) ────────────────────────────────
   async openFile(id) {
-    set(s => ({ ...s, activeFileId: id }));
-    persistLocal({ ...get() });
+    // A file can become the active document immediately only if it's
+    // local-only (`_unsynced` — Cloud has no row to fetch in the first
+    // place), or if it's both loaded AND not `_unconfirmed`. An `_unconfirmed`
+    // file has real content but its last save's Cloud read-back never proved
+    // the write — same as an unloaded placeholder, it must not be trusted
+    // without a fresh GET. Anything else must prove its content with a fresh
+    // Cloud GET before it may become active — so `activeFileId` is
+    // deliberately NOT set here up front. Setting it optimistically would let
+    // an in-flight (or failed) fetch show placeholder/unconfirmed/stale
+    // content as if it were the confirmed active file.
+    const existing = get().files.find(f => f.id === id) as (ChartFile & { _loaded?: boolean; _unsynced?: boolean; _unconfirmed?: boolean }) | undefined;
+    if (existing && (existing._unsynced || (existing._loaded !== false && !existing._unconfirmed))) {
+      set(s => ({ ...s, activeFileId: id }));
+      persistLocal(get());
+      return;
+    }
 
-    // Check if content is already loaded
-    const existing = get().files.find(f => f.id === id);
-    if (!existing || (existing as ChartFile & { _loaded?: boolean })._loaded === false) {
-      set({ syncStatus: 'syncing' });
-      // loadFileFromCloud never throws — it always resolves to an explicit
-      // ok/not-ok result, so this can never fall through without setting a
-      // final status the way the old try/catch around a swallowed-error
-      // `null` return used to (that left syncStatus stuck on 'syncing').
-      const result = await loadFileFromCloud(id);
-      if (result.ok) {
-        set(s => ({
-          files: s.files.map(f => f.id === id ? { ...result.file, _loaded: true } as ChartFile : f),
-          syncStatus: 'idle',
-        }));
-        persistLocal(get());
-      } else {
-        console.warn('openFile: cloud load failed, leaving cached content as-is:', result.error);
-        set({ syncStatus: 'error' });
-        // Deliberately untouched: `files` stays exactly as it was, so a
-        // failed load never flips `_loaded` to true, never persists blank
-        // content over what's cached, and saveActiveFile's `_loaded===false`
-        // guard keeps blocking a save until a real load actually succeeds.
-      }
+    set({ syncStatus: 'syncing' });
+    // loadFileFromCloud never throws — it always resolves to an explicit
+    // ok/not-ok result, so this can never fall through without setting a
+    // final status the way the old try/catch around a swallowed-error
+    // `null` return used to (that left syncStatus stuck on 'syncing').
+    const result = await loadFileFromCloud(id);
+    if (result.ok) {
+      set(s => ({
+        files: s.files.map(f => f.id === id ? { ...result.file, _loaded: true } as ChartFile : f),
+        activeFileId: id,
+        syncStatus: 'idle',
+      }));
+      persistLocal(get());
+    } else {
+      console.warn('openFile: cloud load failed, retaining the previous selection:', result.error);
+      set({ syncStatus: 'error' });
+      // Deliberately untouched: `files` and `activeFileId` stay exactly as
+      // they were, so a failed load never flips `_loaded` to true, never
+      // persists blank content over what's cached, never swaps the active
+      // selection to an unverified target, and saveActiveFile's
+      // `_loaded===false` guard keeps blocking a save until a real load
+      // actually succeeds.
     }
   },
 
   // ── Folders ─────────────────────────────────────────────────────────────────
   async createFolder(name, processType, parentId = null) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'createFolder', parentId)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const folder: ChartFolder = {
@@ -244,7 +380,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   async renameFolder(id, name) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'renameFolder', id)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, name } : f) };
@@ -252,7 +388,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   async moveFolder(id, newParentId) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'moveFolder', id, newParentId)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, parentId: newParentId } : f) };
@@ -260,7 +396,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   async deleteFolder(id) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'deleteFolder', id)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const files = s.files.filter(f => f.folderId !== id);
@@ -274,10 +410,13 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const next: AppDatabase = { ...snapshot, folders: s.folders.map(f => f.id === id ? { ...f, expanded: !f.expanded } : f) };
 
-    if (!s.cloudReady) {
-      // Expand/collapse is harmless against a cached tree shown for review —
-      // allowed locally, but no cloud write is attempted while the cloud
-      // isn't confirmed ready.
+    const target = s.folders.find(f => f.id === id) as (ChartFolder & { _unsynced?: boolean }) | undefined;
+    if (!s.cloudReady || target?._unsynced) {
+      // Expand/collapse is harmless against a cached tree shown for review,
+      // or against a folder Cloud has never seen — allowed locally either
+      // way, but no cloud write is attempted: while the cloud isn't
+      // confirmed ready nothing should write, and an _unsynced folder's id
+      // has no matching Cloud row to update in the first place.
       set(next);
       persistLocal(next);
       return;
@@ -289,7 +428,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   // ── Files ────────────────────────────────────────────────────────────────────
   async createFile(folderId, name) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'createFile', folderId)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const file: ChartFile = {
@@ -305,29 +444,43 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   async renameFile(id, name) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    const file = get().files.find(f => f.id === id);
+    if (blockCloudMutation(set, get(), 'renameFile', id, file?.folderId)) return;
+    if (!file) return;
+    if (blockUnloadedFile(set, 'renameFile', file)) return;
+    if (blockUnconfirmedFile(set, 'renameFile', file)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const updatedAt = new Date().toISOString();
     const next: AppDatabase = { ...snapshot, files: s.files.map(f => f.id === id ? { ...f, name, updatedAt } : f) };
     const updatedFile = next.files.find(f => f.id === id);
     if (!updatedFile) return;
-    await mutateWithRollback(set, snapshot, next, () => saveFileCloud(updatedFile));
+    await mutateWithRollback(set, snapshot, next, async () => {
+      const result = await saveFileCloud(updatedFile, updatedAt);
+      if (!result.ok) throw new Error(result.error);
+    });
   },
 
   async moveFile(id, newFolderId) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'moveFile', id, newFolderId)) return;
     const s = get();
+    const file = s.files.find(f => f.id === id);
+    if (!file) return;
+    if (blockUnloadedFile(set, 'moveFile', file)) return;
+    if (blockUnconfirmedFile(set, 'moveFile', file)) return;
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const updatedAt = new Date().toISOString();
     const next: AppDatabase = { ...snapshot, files: s.files.map(f => f.id === id ? { ...f, folderId: newFolderId, updatedAt } : f) };
     const updatedFile = next.files.find(f => f.id === id);
     if (!updatedFile) return;
-    await mutateWithRollback(set, snapshot, next, () => saveFileCloud(updatedFile));
+    await mutateWithRollback(set, snapshot, next, async () => {
+      const result = await saveFileCloud(updatedFile, updatedAt);
+      if (!result.ok) throw new Error(result.error);
+    });
   },
 
   async deleteFile(id) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    if (blockCloudMutation(set, get(), 'deleteFile', id)) return;
     const s = get();
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const files = s.files.filter(f => f.id !== id);
@@ -337,10 +490,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   async duplicateFile(id) {
-    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
     const s0 = get();
     const file = s0.files.find(f => f.id === id);
+    if (blockCloudMutation(set, s0, 'duplicateFile', id, file?.folderId)) return;
     if (!file) return;
+    if (blockUnloadedFile(set, 'duplicateFile', file)) return;
+    if (blockUnconfirmedFile(set, 'duplicateFile', file)) return;
     const snapshot: AppDatabase = { folders: s0.folders, files: s0.files, activeFileId: s0.activeFileId };
 
     // Clone steps with new UUIDs
@@ -388,25 +543,54 @@ export const useChartStore = create<ChartState>((set, get) => ({
     }
     const file = get().activeFile();
     if (!file) return;
-    // Prevent saving if the file content has not loaded yet (prevents empty steps overwrite)
-    if ((file as ChartFile & { _loaded?: boolean })._loaded === false) {
-      console.warn('Save blocked: File content has not finished loading from the cloud.');
-      return;
-    }
-    const updated = { ...file, updatedAt: new Date().toISOString() };
+    if (blockCloudMutation(set, get(), 'saveActiveFile', file.id, file.folderId)) return;
+    if (blockUnloadedFile(set, 'saveActiveFile', file)) return;
+    const savedAt = new Date().toISOString();
+    // Marked _unconfirmed up front, optimistically, before we know the
+    // outcome — the safe default. It's only cleared once a fresh read-back
+    // actually proves the write. That way even a hard crash between here and
+    // the eventual result leaves the persisted local copy correctly flagged,
+    // and hydrate()'s merge (storage.ts) refuses to ever treat an
+    // _unconfirmed file as trusted Cloud content no matter what its
+    // updatedAt says.
+    const draft = { ...file, updatedAt: savedAt, _unconfirmed: true } as ChartFile;
+    // Update the local view immediately for a responsive editor, but this is
+    // not what makes the save "done" — syncStatus only becomes 'saved' after
+    // the write is independently confirmed by reading it back from Cloud.
     set(s => {
-      const next = { ...s, files: s.files.map(f => f.id === updated.id ? updated : f) };
+      const next = { ...s, files: s.files.map(f => f.id === draft.id ? draft : f) };
       persistLocal(next);
       return next;
     });
     set({ syncStatus: 'syncing' });
-    try {
-      await saveFileCloud(updated);
-      set({ syncStatus: 'saved' });
-      setTimeout(() => set({ syncStatus: 'idle' }), 3000);
-    } catch {
+
+    const writeResult = await saveFileCloud(draft, savedAt);
+    if (!writeResult.ok) {
       set({ syncStatus: 'error' });
+      console.warn('saveActiveFile: cloud write failed:', writeResult.error);
+      return;
     }
+
+    // The write call reporting success is not proof by itself — read the
+    // chart back fresh from Cloud and compare the complete payload before
+    // claiming 'saved'. A failed or mismatched read-back leaves the save
+    // 'unconfirmed', distinct from a known write failure — the draft (still
+    // marked _unconfirmed from above) stays in place, retryable, and is
+    // never presented as saved.
+    const readBack = await loadFileFromCloud(draft.id);
+    if (!readBack.ok || !chartContentMatches(draft, readBack.file)) {
+      set({ syncStatus: 'unconfirmed' });
+      console.warn('saveActiveFile: save could not be confirmed by a fresh Cloud read-back.');
+      return;
+    }
+
+    set(s => {
+      const next = { ...s, files: s.files.map(f => f.id === draft.id ? { ...readBack.file, _loaded: true, _unconfirmed: false } as ChartFile : f) };
+      persistLocal(next);
+      return next;
+    });
+    set({ syncStatus: 'saved' });
+    setTimeout(() => set(s => s.syncStatus === 'saved' ? { syncStatus: 'idle' } : {}), 3000);
   },
 
   // ── Header (local only — auto-saved on saveActiveFile) ───────────────────────

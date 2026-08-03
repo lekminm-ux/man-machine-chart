@@ -22,6 +22,8 @@ This project uses the same separation of responsibilities as the Technical Injec
 3. [GPT review of Claude handoff](PROMPT_GPT_03_REVIEW_CLAUDE_HANDOFF.md)
 4. [Claude fix and re-test loop](PROMPT_CLAUDE_04_FIX_RETEST.md)
 
+Fresh-chat handoff after Phase 0C: [final review and release prompt](PROMPT_NEW_CHAT_PHASE_0C_FINAL_REVIEW_AND_RELEASE.md).
+
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.
 

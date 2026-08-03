@@ -2,6 +2,963 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-03 (GPT/Codex Phase 0C final code review — Round 5)
+
+### Tool / Decision
+
+- Codex / GPT, code-review-only. The application source was not edited during
+  this review. Existing user/AI changes were preserved; no reset, restore,
+  delete, commit, push, deploy, remote command, migration, reset, seed, or
+  Production D1 write was performed.
+- Decision: `PASS` for the current Phase 0C implementation and its reviewed
+  local evidence. This means ready for a separately authorized release; it is
+  not Production authorization and does not close the live-verification gate.
+
+### What passed
+
+- `useChartStore.ts` now treats `_unconfirmed` files as unverified for
+  `openFile()`, `renameFile()`, `moveFile()`, and `duplicateFile()`. The
+  explicit `saveActiveFile()` retry path remains available and still requires
+  PUT success plus a fresh complete read-back before `saved`.
+- `hydrate()` keeps `hydrated:false` until the Cloud result is known, preserves
+  cached data for recovery, clears unverified active selections after a
+  successful Cloud result, and uses a re-entrancy guard for React Strict Mode.
+- The complete payload, `_unsynced` target/parent/folder guards, unloaded
+  placeholder guards, nested/four-level folder preservation, and API zero-row
+  file PUT behavior remain intact.
+- Local Pages Dev evidence records URL
+  `http://127.0.0.1:8788/editor`, chart ID
+  `7ae7d46a-d3be-4339-ae55-40bd40d29a22`, marker
+  `phase0c-round4-browser-smoketest-20260803`, PUT `200` with explicit
+  `success/id/updatedAt`, fresh GET `200`, hard refresh/reopen, and zero
+  console errors/warnings. This is local evidence only.
+- `.claude/launch.json` contains only the additive local Pages Dev launcher;
+  it changes no application behavior. It is recorded as tooling scope, not a
+  schema/API/business-rule change.
+
+### Verification
+
+- `node --test` → **155/155 pass**.
+- `npm.cmd run lint` → 5 existing baseline errors and 23 warnings in this
+  workspace. The five errors are unchanged (`StepTable.tsx`, `Sidebar.tsx`,
+  `TopBar.tsx`); the warning total includes generated `.wrangler/tmp` bundle
+  warnings that vary with local Pages Dev runs. No new persistence/store lint
+  error was introduced.
+- `npm.cmd run build` → exit 0; Turbopack compiled, TypeScript completed, and
+  all 5 static routes generated.
+- `git diff --check` → exit 0; only existing LF/CRLF normalization warnings.
+
+### Database Safety Gate / Production statement
+
+- `DATA_SAFE_READ_ONLY_COMPLETE` for this review boundary. No Production D1
+  write, `--remote` operation, schema migration, reset, seed, commit, push, or
+  deploy occurred.
+- Production deployment, live Save/read-back, and tree-preservation checks are
+  still pending separate explicit user authorization. A passing local test or
+  build is not being treated as proof of Production preservation.
+
+## 2026-08-03 (Update 11 — Phase 0C GPT-review fix round 4)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Fix the 2 findings from the "GPT/Codex Phase 0C review — Round 4" entry below
+(`APPROVED_FOR_CLAUDE_FIX`). No commit, push, or deploy this round; no
+Production D1 write; no schema/API/business-rule change. Handoff returns to
+GPT for another review round — this phase is not closed by this entry, and
+`PASS` is not claimed.
+
+### Findings addressed
+
+1. **P1/blocker — an `_unconfirmed` draft could bypass the same-session
+   active/mutation boundary.** Added a `blockUnconfirmedFile(set, actionName,
+   file)` helper in `src/store/useChartStore.ts`, matching the existing
+   `blockUnloadedFile` helper's style, and applied it to `renameFile`,
+   `moveFile`, and `duplicateFile` (never to `saveActiveFile` — Save is the
+   explicit retry path an `_unconfirmed` draft needs to stay available for).
+   `openFile()`'s immediate-select fast path now also requires
+   `!existing._unconfirmed`, so an `_unconfirmed` file forces a fresh Cloud GET
+   instead of being trusted from cache; on a failed GET, `activeFileId` is left
+   untouched (same pattern as the existing unloaded-placeholder case), so the
+   previously active, confirmed file stays shown and the unconfirmed draft's
+   content/flag are preserved untouched in `files` for recovery. On a
+   successful GET, the entry is fully replaced by the fresh Cloud object,
+   which implicitly clears `_unconfirmed` (it's a new object with no such key).
+2. **P1/major — local-first hydration rendered an unverified active editor
+   while the Cloud read was still pending.** `hydrate()` no longer sets
+   `hydrated: true` in its initial synchronous `set()` (which previously ran
+   before the Cloud request even started); `hydrated` now only flips once the
+   Cloud result — success or failure — is known, matching the editor's
+   existing `!hydrated` render gate in `editor/page.tsx`. Local data is still
+   loaded into state immediately (so it's ready the instant Cloud resolves,
+   and preserved for recovery either way), it just no longer renders as the
+   confirmed active document during the pending window. `hydrate()`'s
+   post-resolve active-file clearing condition now also checks `_unconfirmed`
+   directly (previously relied only on `_loaded === false`, which
+   `storage.ts`'s merge happens to also produce for an `_unconfirmed` file,
+   but only after going through that specific cross-module conversion — the
+   direct check is more robust and self-contained).
+
+### Regression caught and fixed during implementation (not separately named by GPT)
+
+Delaying `hydrated: true` removed its side effect as an implicit re-entrancy
+guard. `next.config.ts` has `reactStrictMode: true`, and
+`editor/page.tsx`'s `useEffect(() => { hydrate(); }, [])` has no cleanup, so
+React's dev-mode double effect-invocation would have started two independent
+Cloud hydrations before either could stop the second. Added a module-scoped
+`hydrating` boolean in `useChartStore.ts`, checked and set before the local
+`loadLocalDatabase()`/`set()` call and cleared after either branch resolves,
+so a concurrent second `hydrate()` call while one is in flight is a no-op.
+Covered by a dedicated regression test.
+
+### Files changed
+
+- `src/store/useChartStore.ts` — new `blockUnconfirmedFile` helper, applied to
+  `renameFile`/`moveFile`/`duplicateFile`; `openFile()`'s fast-path condition
+  extended to exclude `_unconfirmed`; `hydrate()` restructured to delay
+  `hydrated: true` until the Cloud result is known, its active-file clearing
+  condition extended to check `_unconfirmed` directly, and a new module-scoped
+  `hydrating` guard added against concurrent calls.
+- `tests/store.test.cjs` — 1 existing test (the read-back-mismatch case)
+  extended with an explicit `_unconfirmed` assertion; 9 new tests: `openFile`
+  forces a fresh GET for an `_unconfirmed` file and does not expose it as
+  confirmed on a failed GET (while preserving the draft); `renameFile`/
+  `moveFile`/`duplicateFile` are blocked against an `_unconfirmed` file with no
+  cloud call; `saveActiveFile` is confirmed NOT blocked by `_unconfirmed` and
+  a successful retry clears the flag; `hydrate()` stays `hydrated:false` while
+  Cloud is pending; a concurrent second `hydrate()` call makes no duplicate
+  fetch; `hydrate()` clears a raw `_unconfirmed` active file even without a
+  separate `_loaded:false` reset.
+- `.claude/launch.json` — added an `mm-chart-pages-dev` entry
+  (`npx wrangler pages dev out --port 8788`) alongside the existing `next dev`
+  entry, needed to run the required local Pages Dev browser smoke test through
+  the Browser pane tooling (the existing entry has no D1-backed API behind
+  it). Tooling-only change, no application behavior affected.
+- No change to `src/lib/storage.ts`, `src/app/editor/page.tsx`,
+  `functions/api/*.js`, or `schema.sql`.
+
+### Verification
+
+- `git status --short --branch` → working tree matches the pre-session dirty
+  state plus this round's edits; no unexpected files.
+- `node --test` → **155/155 pass** (146 prior + 9 new).
+- `npm run lint` → **5 errors**, byte-identical to the Round 4 review's own
+  recorded baseline (`StepTable.tsx` hook/entity issues, `Sidebar.tsx`
+  explicit `any`, `TopBar.tsx` helper-order); none in `useChartStore.ts` or
+  any file changed this round. Warning count varies with how many stale
+  `.wrangler/tmp/bundle-*` directories exist (19 before this round's local
+  Pages Dev smoke test, 23 after — each `wrangler` invocation leaves a new
+  generated bundle behind, each contributing the same 2 known warnings;
+  `.wrangler/` is git-ignored, never committed, and not source code). The 3
+  actual source warnings (`ManMachineChart.tsx` ×2, `TopBar.tsx` 'e' ×1) are
+  unchanged.
+- `npm run build` → exit 0; Turbopack compiled, TypeScript clean, all 5
+  static routes generated.
+- `git diff --check` → exit 0 on the changed files (only pre-existing
+  LF/CRLF-normalization warnings, no new issue).
+
+### Local Pages Dev browser smoke test
+
+Real browser evidence via `mm-chart-pages-dev` (`wrangler pages dev out`,
+local D1, `mode: local` confirmed in the server's own binding output — not
+Production, not `--remote`):
+
+- **URL**: `http://127.0.0.1:8788/editor`. **Chart**: `Side Step LH, RH`
+  (id `7ae7d46a-d3be-4339-ae55-40bd40d29a22`, the same chart used in prior
+  rounds' local evidence). **Marker**:
+  `phase0c-round4-browser-smoketest-20260803`, typed into Process Name.
+- Opened the chart from the sidebar (exercising the fixed `openFile()` path):
+  `GET /api/files?id=7ae7d46a-...` → `200`, real content rendered, zero
+  console errors.
+- Clicked Save: `PUT /api/files` → `200`
+  `{"success":true,"id":"7ae7d46a-d3be-4339-ae55-40bd40d29a22","updatedAt":"2026-08-03T04:53:50.855Z"}`,
+  immediately followed by the automatic fresh read-back
+  `GET /api/files?id=7ae7d46a-...` → `200`, response body confirmed
+  `content.header.processName` equals the exact marker, with the pre-existing
+  `timeMeasurement`/`timeStudy`/`machineCapacity` module data from earlier
+  rounds still intact (corroborating the Round 1 complete-payload fix is
+  still in effect). Zero console errors.
+- Hard reload (`navigate` with `force:true`) at the same URL: `GET
+  /api/folders` + `GET /api/files` re-fired (fresh `hydrate()`), page showed
+  "Updated: 8/3/2026" and, confirmed via direct DOM read
+  (`input.value`), the Process Name field still held
+  `phase0c-round4-browser-smoketest-20260803` — the reopened chart matches
+  what was saved. Zero console errors/warnings throughout.
+- This is local evidence only, not Production evidence.
+
+### Database Safety Gate / Production statement
+
+- No Production D1 write, remote D1 command, migration, schema change,
+  commit, push, or deploy occurred this round. Production data was not
+  written or modified. The local Pages Dev smoke test used only the local
+  `mm-chart-db` D1 binding in `local` mode.
+- The verified `DATA_SAFE_READ_ONLY_COMPLETE` Production baseline and
+  external recovery export recorded on 2026-08-02 remain the source-of-truth
+  evidence; this round performed no Production or remote database command.
+
+## 2026-08-03 (GPT/Codex Phase 0C review — Round 4)
+
+### Tool / Decision
+
+- Codex / GPT, code-review-only. Application source was not edited. The dirty
+  working tree was preserved; no reset, restore, delete, commit, push, deploy,
+  remote command, migration, seed, or Production D1 write was performed.
+- Decision: `APPROVED_FOR_CLAUDE_FIX` — not `PASS`, not phase closure, and not
+  release approval.
+
+### What passed
+
+- `src/lib/storage.ts` has one complete persisted payload definition for
+  `header`, `steps`, `layoutDiagram`, `timeMeasurement`, `timeStudy`, and
+  `machineCapacity`. `saveActiveFile()` requires an explicit successful PUT,
+  a fresh GET, and a complete comparison including the chart identity,
+  metadata, and all persisted content before reporting `saved`.
+- The reviewed Cloud-mutating store paths guard Cloud readiness and the
+  covered `_unsynced` target/parent/folder IDs before calling the API.
+  Unloaded placeholders are guarded for the full-payload rename/move/duplicate
+  and Save paths. The synthetic nested/four-level folder tree remains intact.
+- The recorded local Pages Dev evidence has the required shape: URL
+  `http://127.0.0.1:8788/editor`, chart ID
+  `7ae7d46a-d3be-4339-ae55-40bd40d29a22`, unique marker
+  `phase0c-round2-browser-smoketest-20260802`, explicit PUT `200` response,
+  fresh GET response with the marker/module fields, hard refresh/reopen, and
+  zero browser console errors/warnings. This is local evidence only.
+
+### Findings remaining
+
+1. **P1 / blocker — an `_unconfirmed` draft can bypass the same-session
+   active/mutation boundary.**
+   `saveActiveFile()` leaves a failed or mismatched-read-back draft marked
+   `_unconfirmed` while retaining `_loaded: true`. `openFile()` in
+   `src/store/useChartStore.ts` immediately selects any file where
+   `_loaded !== false` and does not exclude `_unconfirmed`; `blockUnloadedFile()`
+   also checks only `_loaded === false`. Consequently, rename/move/duplicate
+   can send the unconfirmed full payload to Cloud and `mutateWithRollback()`
+   can report `saved` after the PUT without a fresh GET. A read-only inline
+   reproduction reached `saveFileCloud` once and reported `saved` for such a
+   draft. Fix by treating `_unconfirmed` as not confirmed: force a fresh GET
+   before selection, and block or re-verify every full-payload mutation against
+   it (while retaining the explicit Save retry path). Retest with a failed
+   read-back followed by open, rename, move, and duplicate, proving no unsafe
+   call or false `saved` state.
+
+2. **P1 / major — local-first hydration renders an unverified active editor
+   while the Cloud read is still pending.**
+   `hydrate()` sets `hydrated: true` from localStorage before its Cloud request
+   resolves, while `src/app/editor/page.tsx` gates rendering only on
+   `hydrated`. A paused read therefore exposes a cached `_unconfirmed` or
+   `_loaded:false` file through `activeFile()` before the later successful
+   hydration clears the selection. The `cloudReady:false`/`syncing` indicator
+   is not an active-editor source boundary. Fix by keeping the editor gated
+   until the Cloud result is known, or by clearing the active selection during
+   the pending state while preserving the cached record for recovery. Retest
+   with a paused Cloud load and assert that no unverified file is rendered or
+   selectable as the confirmed editor before the result.
+
+### Verification
+
+- `node --test` → **146/146 pass**.
+- `npm.cmd run lint` → **5 errors / 19 warnings**, matching the recorded
+  baseline; the errors remain the existing `StepTable.tsx` hook/entity issues,
+  `Sidebar.tsx` explicit `any`, and `TopBar.tsx` helper-order lint issue. No
+  new error was introduced in `storage.ts` or `useChartStore.ts`.
+- `npm.cmd run build` → exit 0; Turbopack compiled, TypeScript completed, and
+  all 5 static routes generated.
+- `git diff --check` → exit 0; only the existing LF/CRLF normalization
+  warnings were emitted.
+- The two inline probes above were read-only store simulations; they did not
+  contact an API or database.
+
+### Database Safety Gate / Production statement
+
+- Review result: `DATA_SAFE_READ_ONLY_COMPLETE` for this review boundary — no
+  database command or write was made. No Production D1 write, `--remote`
+  operation, schema migration, reset, seed, commit, push, or deploy occurred.
+- This does not prove that Production data is preserved after deployment.
+  Production deployment and live read-back/tree verification remain pending
+  separate explicit user authorization and a later GPT `PASS`.
+
+## 2026-08-03 (Update 10 — Phase 0C GPT-review fix round 3)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Fix the 4 findings from the "GPT/Codex Phase 0C final review — Round 3" entry
+below (`APPROVED_FOR_CLAUDE_FIX`). No commit, push, or deploy this round; no
+Production D1 write; no schema/API/business-rule change. Handoff returns to
+GPT for another review round — this phase is not closed by this entry.
+
+### Findings addressed
+
+1. **P1/blocker — unloaded placeholders could reach full-payload mutations.**
+   `renameFile`, `moveFile`, and `duplicateFile` in `useChartStore.ts` sent a
+   file through `saveFileCloud`/`createFileCloud` without checking whether its
+   content had actually finished loading (`_loaded === false` means the record
+   is still the blank lazy-load placeholder, not real Cloud content). Added a
+   `blockUnloadedFile(set, actionName, file)` helper, matching the existing
+   `blockCloudMutation` helper's style, and applied it to all three actions
+   plus reused it in `saveActiveFile` (which already had an equivalent inline
+   check, but silently — see finding 1 continued below).
+2. **P1/major — the `_unsynced` parent/folder guard was incomplete.**
+   `renameFile`, `duplicateFile`, and `saveActiveFile` sent the file's
+   `folderId` to the Cloud API but only passed the file's own `id` into
+   `blockCloudMutation`, so a confirmed file attached to a local-only
+   (`_unsynced`) folder could still reach the API. All three now also pass
+   `file.folderId` into the same guard. `moveFile` (already checked both `id`
+   and `newFolderId`) and `createFile` (already checked `folderId`) needed no
+   change — confirmed by tracing exactly what each action's Cloud call body
+   contains.
+3. **P1/major — the active-file source boundary still had two bypasses.**
+   (a) `hydrate()` only cleared `activeFileId` when the previously-active file
+   had `_loaded === false`; it now also clears it when that file is
+   `_unsynced` (local-only, never confirmed by Cloud either). (b) `openFile()`
+   set `activeFileId` optimistically before its fresh Cloud GET resolved, and
+   left it pointed at the unverified target if that GET failed. It's now
+   restructured so `activeFileId` is only set immediately for a file that's
+   already loaded or is `_unsynced` (no Cloud row exists to fetch); for
+   everything else, `activeFileId` is left completely untouched — retaining
+   whatever was previously active — until a fresh GET actually succeeds. Only
+   caller in the app is `Sidebar.tsx`'s file-tree `onClick`; traced and
+   confirmed nothing depends on the old synchronous assignment.
+4. **P2/medium — the explicit PUT identity was not validated.**
+   `storage.ts`'s `saveFileCloud()` checked `res.success` and `res.updatedAt`
+   but never required `res.id === file.id`; `useChartStore.ts`'s
+   `chartContentMatches()` also omitted `id` from its read-back comparison.
+   Both now include the id check/field. Confirmed by reading
+   `functions/api/files.js`'s PUT handler (read-only, unmodified) that the
+   real API already echoes the request's own `id` on every success response —
+   this closes a defense-in-depth gap against a malformed/future response, not
+   a currently-live bug.
+
+### Files changed
+
+- `src/store/useChartStore.ts` — new `blockUnloadedFile` helper; `renameFile`,
+  `moveFile`, `duplicateFile` gained the unloaded-placeholder guard;
+  `renameFile`, `duplicateFile`, `saveActiveFile` gained the `folderId`
+  argument to `blockCloudMutation`; `saveActiveFile`'s inline unloaded-check
+  now goes through the shared helper (so a blocked save now also sets
+  `syncStatus:'error'`, closing a silent-no-feedback gap — no existing test
+  relied on the old silent behavior); `hydrate()`'s active-file clearing
+  condition now also covers `_unsynced`; `openFile()` restructured per finding
+  3(b) above; `chartContentMatches()` now includes `id` in its comparison.
+- `src/lib/storage.ts` — `saveFileCloud()`'s success condition now also
+  requires `res.id === file.id`.
+- `tests/store.test.cjs` — 2 existing `openFile` tests extended with
+  `activeFileId` assertions; 12 new tests covering all 4 findings (unloaded
+  placeholders for rename/move/duplicate/save; `_unsynced`-folder blocking for
+  rename/duplicate/save; `hydrate()` clearing an `_unsynced` active file;
+  `openFile` retaining a real prior selection on failure, and taking the
+  immediate-select fast path for both an already-loaded file and an
+  `_unsynced` one; a read-back id mismatch reporting `unconfirmed`).
+- `tests/storage.test.cjs` — 1 new test: `saveFileCloud` reports failure when
+  the response `id` doesn't match the file being saved.
+- No change to `src/types/index.ts`, `functions/api/files.js`,
+  `functions/api/folders.js`, `schema.sql`, `Sidebar.tsx`, `TopBar.tsx`, or
+  `editor/page.tsx`.
+
+### Known, accepted rough edge — not fixed this round
+
+Blocking `renameFile`/`moveFile`/`duplicateFile` on an unloaded placeholder
+(finding 1) means a user who tries to rename/move/duplicate a sidebar file
+they've never opened in this session gets only a small TopBar sync-error
+indicator, no inline message — the same limited feedback `saveActiveFile`
+already had for this case pre-Round-3. Improving that requires touching
+`Sidebar.tsx`, which is outside this round's allowed scope. Flagging for a
+future round, not a blocker.
+
+### Verification
+
+- `npm test` (`node --test`) → **146/146 pass** (133 prior + 13 new: 12 in
+  `tests/store.test.cjs`, 1 in `tests/storage.test.cjs`).
+- `npm run lint` → 5 errors / 19 warnings, matching the Round 3 review's own
+  baseline exactly (3 in `StepTable.tsx`, 1 in `Sidebar.tsx`, 1 in
+  `TopBar.tsx`); none in `useChartStore.ts` or `storage.ts`.
+- `npm run build` → exit 0; Turbopack compiled successfully, TypeScript
+  clean, all 5 static routes generated.
+- `git diff --check` → exit 0 on the 4 changed source/test files.
+- No dev server or browser smoke test this round — code/test-only fix, per
+  GPT's own Round 3 scope (code-review-only, no application writes). The
+  Round 2 browser evidence already on file remains the most recent browser
+  verification.
+
+### Database Safety Gate / Production statement
+
+- No Production D1 write, remote D1 command, migration, schema change,
+  commit, push, or deploy occurred this round. Production data was not
+  written or modified.
+- The verified `DATA_SAFE_READ_ONLY_COMPLETE` Production baseline and
+  external recovery export recorded on 2026-08-02 remain the source-of-truth
+  evidence; this round performed no database command of any kind, local or
+  remote.
+- `functions/api/folders.js`'s `meta.changes` gap (noted as residual risk in
+  the Round 3 review) remains untouched, exactly as that review scoped it —
+  a separate, future defense-in-depth change, not part of this round.
+
+## 2026-08-03 (GPT/Codex Phase 0C final review — Round 3)
+
+### Tool / Decision
+
+- Codex / GPT, code-review-only; no application source edits were made.
+- Decision: `APPROVED_FOR_CLAUDE_FIX` — not `PASS`, not phase closure, and not
+  release approval. No commit, push, deploy, or Production D1 write was
+  authorized or performed.
+
+### What passed
+
+- `src/lib/storage.ts` now uses one complete persisted payload definition for
+  `header`, `steps`, `layoutDiagram`, `timeMeasurement`, `timeStudy`, and
+  `machineCapacity`.
+- `saveActiveFile()` requires an explicit successful PUT, a fresh GET, and a
+  full-field comparison before `syncStatus: 'saved'`; failed or mismatched
+  read-back keeps the draft `_unconfirmed` and retryable.
+- The covered store actions block `_unsynced` record IDs and checked parent or
+  destination IDs before their Cloud calls. `toggleFolder` is deliberately
+  local-only for `_unsynced` folders and makes no API call.
+- Hydration turns an `_unconfirmed` or stale file into `_loaded:false`, clears
+  an active `_loaded:false` file selection, and preserves the draft data for
+  recovery. The synthetic nested folder tree remains intact.
+- The recorded local Pages Dev browser evidence meets the required local
+  evidence shape: URL `http://127.0.0.1:8788/editor`, chart id
+  `7ae7d46a-d3be-4339-ae55-40bd40d29a22`, marker
+  `phase0c-round2-browser-smoketest-20260802`, PUT `200` with explicit
+  `success/id/updatedAt`, fresh GET `200` with the marker and module fields,
+  hard reload/reopen with fresh folder/file GETs, and zero browser console
+  errors/warnings. This is local evidence only, not Production evidence.
+
+### Findings remaining
+
+1. **P1 / blocker — unloaded placeholders can reach full-payload mutations.**
+   `src/store/useChartStore.ts` symbols `renameFile`, `moveFile`, and
+   `duplicateFile` do not require `_loaded:true` before calling
+   `saveFileCloud()` or `createFileCloud()`. A metadata-only Cloud row is
+   represented by a blank `_loaded:false` placeholder; renaming it can PUT
+   blank `steps`/layout/module content over the real chart. Fix by loading and
+   confirming the file first, or by using a metadata-only API path that cannot
+   serialize placeholder content. Retest with an unloaded placeholder and
+   spies proving no destructive full-payload call occurs.
+2. **P1 / major — the `_unsynced` parent/folder guard is incomplete.**
+   `renameFile`, `duplicateFile`, and `saveActiveFile` pass a file's
+   `folderId` to the Cloud API but call `blockCloudMutation()` only with the
+   file id. A confirmed file attached to a local-only folder can therefore
+   still reach the API. Pass every serialized folder/parent id to the guard
+   before the call and add no-call/no-mutation tests for each path.
+3. **P1 / major — active-file source boundary still has bypasses.**
+   `hydrate()` only tests `_loaded:false`; an `_unsynced` active file whose
+   cached content has no false flag can remain selected and render as the
+   active editor. Separately, `openFile()` sets `activeFileId` before its
+   fresh GET and leaves it selected after a failed load, so placeholder or
+   cached draft content can be shown while unverified. Clear/retain the
+   previous confirmed selection until the GET succeeds, and treat
+   `_unsynced`/`_unconfirmed`/not-confirmed-loaded files as non-active or
+   clearly read-only recovery data. Retest hydration and failed-open UI/store
+   behavior.
+4. **P2 / medium — the explicit PUT identity is not validated.**
+   `src/lib/storage.ts:saveFileCloud()` checks `success` and `updatedAt` but
+   never requires `res.id === file.id`; `chartContentMatches()` also omits the
+   file id. The current API echoes the request id, but the client contract
+   must reject a malformed or mismatched success response. Validate the exact
+   id and add a mismatch test before allowing `saved`.
+
+### Residual risk noted, not counted as a current store-path blocker
+
+`functions/api/folders.js` still does not check D1 `meta.changes` on a direct
+PUT, so a caller that bypasses the guarded store could receive a false success
+for an unknown folder id. Current store guards prevent `_unsynced` folder IDs
+from reaching it; any defense-in-depth endpoint change should be separately
+scoped and reviewed because Phase 0C did not authorize a broader folder API
+contract change.
+
+### Verification
+
+- `node --test`: **133/133 passed**.
+- `pnpm.cmd test`: could not start because pnpm was denied access to
+  `C:\Users\lekmi\AppData\Local\pnpm\config\config.yaml` (`EPERM`); the
+  direct Node built-in test runner completed the same repository test suite.
+- `npm.cmd run lint`: exit 1, **5 errors / 19 warnings**. The 5 errors are
+  the known baseline findings in `StepTable.tsx` (3), `Sidebar.tsx` (1), and
+  `TopBar.tsx` (1); source-only lint reports the same 5 errors and 3 existing
+  warnings, while the remaining warnings are generated `.wrangler` output.
+  No new Phase 0C lint error was identified.
+- `npm.cmd run build`: exit 0; Next.js compiled successfully, TypeScript
+  completed, and all 5 static routes were generated.
+- `git diff --check`: exit 0.
+
+### Database Safety Gate / Production statement
+
+- The verified `DATA_SAFE_READ_ONLY_COMPLETE` Production baseline and external
+  recovery export recorded on 2026-08-02 remain the source-of-truth evidence.
+  This review performed no Production or local-D1 database command.
+- No `--remote`, Production D1 write, migration, schema change, reset, seed,
+  commit, push, or deploy occurred. Production data was not written or
+  modified. Live deployment and Production-tree verification remain pending
+  separate GPT PASS and explicit user authorization.
+
+## 2026-08-02 (Update 9 — fresh-chat handoff)
+
+Added `docs/AI_PROMPTS/PROMPT_NEW_CHAT_PHASE_0C_FINAL_REVIEW_AND_RELEASE.md`.
+It separates the immediate GPT/Codex final review from the later Claude
+commit/push/deploy chat, carries the current Phase 0C data-safety context, and
+requires explicit review and user authorization before any release action.
+
+## 2026-08-02 (Update 8 — Phase 0C GPT-review fix round 2)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Fix the 2 blockers from `docs/AI_PROMPTS/REPORT_CODEX_GPT_REVIEW_PHASE_0C_ROUND_2_2026-08-02.md`
+(`APPROVED_FOR_CLAUDE_FIX`). No commit, push, or deploy this round; no Production
+D1 write; no schema/auth/concurrency change. Handoff returns to GPT for another
+review round.
+
+### Findings addressed
+
+1. **Blocker — local-only rows remained inside the `cloudReady` mutation state**
+   (`storage.ts:90-111`, `useChartStore.ts:201-206` per GPT's line refs) — added
+   a `blockCloudMutation(set, state, actionName, ...ids)` helper in
+   `src/store/useChartStore.ts` that refuses to proceed (no API call, no local
+   mutation, `syncStatus:'error'`) whenever `cloudReady` is false **or** any of
+   the given ids — the record itself, or a parent/folder it's being attached
+   to — belongs to an `_unsynced` record. Applied to every Cloud-mutating
+   action: `createFolder` (checks `parentId`), `renameFolder`, `moveFolder`
+   (checks both `id` and `newParentId`), `deleteFolder`, `createFile` (checks
+   `folderId`), `renameFile`, `moveFile` (checks both `id` and `newFolderId`),
+   `deleteFile`, `duplicateFile`, `saveActiveFile`. `toggleFolder` is the one
+   deliberate exception: an `_unsynced` folder still toggles **locally**
+   (harmless review-only UI state, same reasoning already applied to
+   `cloudReady:false`), but never calls `updateFolderCloud` — no id local to
+   Cloud is ever sent either way. A local-only id can now never reach any
+   Cloud API call from the app.
+2. **Major — an unconfirmed draft was still rendered as the active document
+   after hydration** (`editor/page.tsx` renders `activeFile()` immediately;
+   `hydrate()` never re-verified it) — `hydrate()` now checks whether the
+   file the persisted `activeFileId` points at has `_loaded === false` in the
+   merged result (this single flag already covers both `_unconfirmed` drafts
+   and stale-updatedAt resets — `loadDatabaseFromCloud`'s merge collapses
+   both cases to it). If so, `activeFileId` is cleared to `null` before the
+   store's `cloudReady:true` set, so the editor falls back to its existing
+   "No Project Selected" state instead of silently showing an unverified
+   draft. The file's data is left untouched in `files` for recovery — the
+   user re-opens it through `openFile()`'s already-verified Cloud-read path.
+   A normal, confirmed, already-loaded active file is unaffected and stays
+   active across hydration (verified by a dedicated non-regression test).
+
+### Files changed
+
+- `src/store/useChartStore.ts` — `blockCloudMutation` helper added; applied
+  to all 10 Cloud-mutating actions listed above; `hydrate()`'s cloud-success
+  branch gets the `activeFileId`-clearing check.
+- `tests/store.test.cjs` — 10 new tests: 7 proving `_unsynced` targets block
+  every action named above (rename/move/delete/save/create-into/toggle,
+  covering both files and folders) with no cloud call and no local mutation;
+  3 proving `hydrate()`'s new `activeFileId` handling (unconfirmed-with-
+  matching-timestamp cleared, merely-unloaded cleared, confirmed-loaded
+  stays active).
+- No change to `src/types/index.ts`, `functions/api/files.js`,
+  `functions/api/folders.js`, or `schema.sql`.
+
+### Observation — not fixed, flagging for your call
+
+GPT's report cited `functions/api/folders.js:69-70` (the `PUT` handler
+doesn't check D1's `meta.changes`, unlike `files.js`'s zero-row guard from
+Update 6) as evidence the blocker was real. With the client-side guard above,
+the app can no longer send a local-only folder id to this endpoint at all, so
+the gap is now unreachable through normal use — but the endpoint itself is
+still permissive if called directly (e.g. a stale request, or a future
+caller that bypasses the store). Left untouched this round per the
+`PLAN_CHANGE_REQUIRED`-before-touching-`folders.js` instruction, since the
+client guard is sufficient for the finding as stated. Flagging in case you
+want the same `meta.changes` zero-row check ported to `folders.js` for
+defense-in-depth in a future round.
+
+### Verification
+
+- `npx tsc --noEmit` → clean.
+- `pnpm test` → **133/133 pass** (123 prior + 10 new).
+- `pnpm run lint` → 5 errors / 15 warnings, byte-identical line-for-line to
+  the Update 6/7 baseline (confirmed by direct diff of the error list) —
+  none in code touched this round.
+- `pnpm run build` → clean, TypeScript clean, 5/5 pages prerendered.
+- `git diff --check` → exit 0 (edits inherited the already-LF-normalized
+  files from Update 6; no new normalization pass needed).
+
+### Browser smoke test — local Pages Dev only (`http://127.0.0.1:8788`)
+
+Both automation surfaces that failed in Update 6 were retried; the embedded
+Browser pane worked this time (no server crash) and produced genuine
+in-browser evidence, captured from the browser's own network log:
+
+- **URL**: `http://127.0.0.1:8788/editor`. **Chart**: `Side Step LH, RH`
+  (id `7ae7d46a-d3be-4339-ae55-40bd40d29a22`). **Marker**:
+  `phase0c-round2-browser-smoketest-20260802`, typed into the Process Name
+  field via the real form input.
+- **Save**: clicking the ☁ Save button produced `PUT /api/files → 200 OK`,
+  body `{"success":true,"id":"7ae7d46a-...","updatedAt":"2026-08-02T13:56:54.146Z"}`,
+  immediately followed by an independent `GET /api/files?id=7ae7d46a-...  →
+  200 OK` whose body echoed the marker in `content.header.processName` and
+  confirmed `timeStudy`/`machineCapacity` from earlier rounds were still
+  intact (not clobbered by this save) — the exact write-then-read-back
+  sequence `saveActiveFile()` performs. Sidebar showed no unsynced/unconfirmed
+  badge on the file afterward, consistent with a confirmed save.
+- **Hard refresh**: `navigate` to `/editor` again produced a genuine full
+  reload (`GET /editor → 200 OK` in the network log, plus fresh
+  `GET /api/folders` and `GET /api/files`). The file reappeared as the active
+  document automatically (Finding 2's non-regression path — a *confirmed*
+  save correctly stays active across reload) and
+  `document.querySelector('input[placeholder="e.g. Blow Molding"]').value`
+  still read `phase0c-round2-browser-smoketest-20260802`.
+- **Console**: checked at initial load, after opening the file, after save,
+  and after reload — clean every time, zero errors or warnings logged.
+- **Network**: every request in the full session log (`/api/folders`,
+  `/api/files`, `/editor`, all static chunks) returned 200 — no 4xx/5xx
+  anywhere.
+- Timestamp: 2026-08-02T13:56:54Z (PUT confirmed) through the post-reload
+  check moments later. No Production D1 touched — local Pages Dev D1 only,
+  existing state reused (not reset).
+
+## 2026-08-02 (Update 7 — GPT Review of Phase 0C fix round 2)
+
+### Tool / Decision
+
+- Codex / GPT review
+- `APPROVED_FOR_CLAUDE_FIX` — not yet `PASS`; no commit, push, or deploy.
+- Report: `docs/AI_PROMPTS/REPORT_CODEX_GPT_REVIEW_PHASE_0C_ROUND_2_2026-08-02.md`.
+
+### Verification
+
+- `pnpm.cmd test`: 123/123 passed.
+- `pnpm.cmd run build`: passed.
+- `pnpm.cmd run lint`: 5 known pre-existing errors and 15 warnings; no new
+  Phase 0C error identified.
+- `git diff --check`: passed.
+- Local API/D1 full-payload Save → GET → repeated GET proof exists; browser
+  rendered Save/reopen/console evidence is still missing.
+- No Production write, remote D1 command, schema change, commit, push, or deploy.
+
+### Remaining blockers
+
+- `_unsynced` folders/files remain inside the `cloudReady` mutation state. The
+  badge is visibility only; mutations can still be attempted, and folder PUT
+  does not verify zero affected rows.
+- `_unconfirmed` drafts remain the cached `activeFile` after hydration until a
+  user explicitly opens them, so the editor can show the draft before a fresh
+  Cloud GET and global status is reset to idle.
+- These two boundaries and the browser smoke evidence must be fixed/recorded
+  before GPT can return `PASS`.
+
+## 2026-08-02 (Update 6 — Phase 0C GPT-review fix round)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Fix the 6 findings from `docs/AI_PROMPTS/REPORT_CODEX_GPT_REVIEW_PHASE_0C_2026-08-02.md`
+(`APPROVED_FOR_CLAUDE_FIX`), per the user's direct authorization. No commit, push,
+or deploy this round; no Production D1 write; no schema/auth/concurrency change;
+stayed within the existing Phase 0C file boundary. Handoff returns to GPT for
+another review round.
+
+### Findings addressed
+
+1. **Incomplete `ChartFile` persisted/compared** — added an exported
+   `chartFileContent(file)` in `src/lib/storage.ts` returning the full
+   `{header, steps, layoutDiagram, timeMeasurement, timeStudy, machineCapacity}`
+   set. `createFileCloud`/`saveFileCloud` now build the save payload from it
+   instead of an ad-hoc destructure that silently dropped the 3 module fields.
+2. **Save marked "Saved" without a complete comparison** — `chartContentMatches`
+   in `src/store/useChartStore.ts` now spreads `chartFileContent()` (plus
+   `name`/`folderId`/`updatedAt`) before comparing, so a save can only report
+   `'saved'` when every field — not just header/steps/layoutDiagram — matches
+   the fresh read-back.
+3. **No unconfirmed/dirty contract on read-back failure or mismatch** —
+   `saveActiveFile()` now sets `_unconfirmed: true` on the draft *before* the
+   optimistic local update, keeps it `true` on any write failure or read-back
+   mismatch, and only clears it (`_unconfirmed: false`) after a full-field
+   match. `loadDatabaseFromCloud()`'s hydration merge checks `_unconfirmed`
+   **before** the `updatedAt`-match check, so a coincidentally-matching
+   `updatedAt` can never smuggle an unproven draft through as Cloud-confirmed;
+   the draft's data is kept (`_loaded:false`), never discarded.
+4. **Local-only records not visibly separated from Cloud-authoritative state**
+   — `src/components/layout/Sidebar.tsx` gets a small `unsyncedBadge()` helper
+   showing "local only" (`_unsynced`) or "unconfirmed" (`_unconfirmed`) next to
+   the folder/file name, with a title tooltip explaining each. (The zero-row
+   `409` guard added in Update 4 already prevented an `_unsynced` file's save
+   from being falsely reported successful — this fix is visibility, not a new
+   safety mechanism.)
+5. **No regression test for Save → GET → hard refresh/reopen** — 3 new tests
+   in `tests/storage.test.cjs` (complete-payload PUT body, `_unconfirmed`
+   survives a matching-`updatedAt` hydration without being trusted, a 3-level
+   folder tree survives hydration alongside local-only records) and 1 new test
+   in `tests/store.test.cjs` (`saveActiveFile` reports `'unconfirmed'` when
+   `machineCapacity` alone is dropped by the read-back).
+6. **`git diff --check` failing on CRLF/trailing whitespace** — this repo has
+   no `.gitattributes`; with only `core.autocrlf=true` set, the default
+   `git diff --check` whitespace ruleset flags any CRLF-terminated *added*
+   line regardless of the file's surrounding convention. Fixed by normalizing
+   every file touched this round to pure LF and stripping trailing
+   `[ \t]+$` from every line (this also caught a pre-existing whitespace-only
+   blank line at `TopBar.tsx:28`, unrelated to this round's logic).
+
+### Files changed
+
+- `src/lib/storage.ts` — `chartFileContent()` added; `createFileCloud`/
+  `saveFileCloud` use it; `loadDatabaseFromCloud`'s merge gets the
+  `_unconfirmed`-first check.
+- `src/store/useChartStore.ts` — `chartContentMatches` uses `chartFileContent`;
+  `saveActiveFile` rewritten around the `_unconfirmed`-draft-first flow.
+- `src/components/layout/Sidebar.tsx` — `unsyncedBadge()` helper + call sites
+  for folders and files.
+- `functions/api/files.js`, `src/components/layout/TopBar.tsx`,
+  `tests/data-safety.test.cjs`, `tests/store.test.cjs` — line-ending
+  normalization only (Finding 6), plus `tests/store.test.cjs` also gets the
+  new test from Finding 5 and a `chartFileContent` entry added to
+  `makeStorageMock()`'s default export (was missing, broke 2 existing tests
+  once the store started calling the real implementation).
+- `tests/storage.test.cjs` — 3 new tests (Finding 5), plus line-ending
+  normalization.
+- No change to `src/types/index.ts`, `functions/api/folders.js`, or
+  `schema.sql` — `_unsynced`/`_unconfirmed` remain ad-hoc runtime flags
+  accessed via casts, not added to the shared types, matching the existing
+  Database Safety Gate convention.
+
+### Verification
+
+- `npx pnpm test` → **123/123 pass**.
+- `npx pnpm run lint` → 5 errors / 15 warnings — same pre-existing set as
+  Update 4/5 (`Sidebar.tsx:88` rules-of-hooks, `Sidebar.tsx:292` x2
+  unescaped-entities, `Sidebar.tsx:408` no-explicit-any — all in the
+  pre-existing Module Switcher / unrelated code, not the `unsyncedBadge`
+  addition — and `TopBar.tsx:29` pre-existing `withPatchedStylesheets`
+  hoisting issue); confirmed no new error was introduced.
+- `npx pnpm run build` → compiles clean, TypeScript clean, 5/5 pages
+  prerendered.
+- `git diff --check` → **exit 0** (Finding 6 resolved).
+- **Local (not Production) save → GET → reopen proof**, against the existing
+  local Pages Dev D1 (`wrangler pages dev out --d1 DB=... --port 8788`,
+  state reused, not reset): PUT `http://127.0.0.1:8788/api/files`
+  (chart id `7ae7d46a-d3be-4339-ae55-40bd40d29a22`) with a full payload
+  including `timeStudy`/`machineCapacity` markers, unique marker
+  `phase0c-fixround-verify-1785676831558` → `200 {"success":true,"id":...,
+  "updatedAt":"2026-08-02T13:20:31.558Z"}`; independent fresh `GET ?id=` →
+  header/timeStudy/machineCapacity markers and `updatedAt` all matched;
+  simulated hard-refresh/reopen via 2 further independent fetches (list `GET`
+  + single `GET`, new request each time, no client-side cache reused) →
+  same markers and `updatedAt` still matched. Server log confirms the exact
+  sequence: `PUT /api/files 200 OK` then 3x `GET /api/files 200 OK`.
+  Timestamp: 2026-08-02T13:20:31.924Z.
+
+### Known limitation — Finding 4's browser/console portion not completed
+
+GPT's required evidence for Finding 4 also asked for a browser-rendered
+hard-refresh/reopen with recorded console output, on top of the server-side
+proof above. Two independent browser-automation surfaces were attempted this
+round and both failed for environment reasons unrelated to the app:
+
+- The embedded Browser pane crashed the local `wrangler pages dev` server
+  mid-load (`status: failed`, page stuck loading, `curl` afterward confirmed
+  the server was unreachable) — the 5th time this exact failure has occurred
+  across sessions on this project.
+- Falling back to the `claude-in-chrome` surface (real Chrome), every
+  `navigate` to `http://127.0.0.1:8788/editor` or `/` failed with
+  `"Frame with ID 0 is showing error page"` on 3 separate attempts across 2
+  URLs, while `curl` confirmed the server returned `200` immediately
+  afterward each time — ruling out a server-side cause.
+
+No workaround was found this round. The server-side PUT → GET → reopen proof
+above is real and against the actual local API/D1 path the browser would also
+use, but it does not include an in-browser "Saved" badge or DevTools console
+check. Flagging this transparently for GPT to judge whether it's sufficient
+or whether a different verification method is needed next round.
+
+## 2026-08-02 (Update 5 — GPT Review of Phase 0C implementation)
+
+### Tool
+
+- Codex / GPT review
+
+### Decision
+
+- `APPROVED_FOR_CLAUDE_FIX` — the implementation direction is sound, but the
+  Phase 0C handoff is not `PASS` and is not approved for commit, push, or deploy.
+- Full review report: `docs/AI_PROMPTS/REPORT_CODEX_GPT_REVIEW_PHASE_0C_2026-08-02.md`.
+
+### Verification
+
+- `pnpm.cmd test`: 119/119 passed.
+- `pnpm.cmd run build`: passed.
+- `pnpm.cmd run lint`: the known 5 pre-existing errors remain; no new error was
+  identified in the changed Phase 0C logic.
+- `git diff --check`: failed on trailing CRLF markers in added lines; cleanup is
+  required in the next Claude round.
+- No Production write, remote D1 command, schema change, migration, deploy,
+  commit, or push was performed by this review.
+
+### Required next fixes
+
+- Persist and compare the complete `ChartFile` payload, including
+  `timeMeasurement`, `timeStudy`, and `machineCapacity`; the current save body
+  still sends only `header`, `steps`, and `layoutDiagram`.
+- Persist an unconfirmed/dirty marker so an ambiguous draft cannot be trusted
+  during the next hydration or silently replace Cloud content.
+- Keep local-only files/folders separate from the `cloudReady` authoritative
+  state; `_unsynced` alone is currently not enforced by the store/UI.
+- Add and evidence the full refresh/reopen sequence, then return the new diff to
+  GPT before any release action.
+
+## 2026-08-02 (Update 4 — Phase 0C Save-to-Cloud Persistence, implementation)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session Goal
+
+Implement `docs/Master_Plan.html` "Phase 0C · Save-to-Cloud Persistence and
+Active-User Safety — GPT plan", per the user's direct authorization and
+`docs/AI_PROMPTS/REPORT_CODEX_ACTIVE_USER_SAVE_PERSISTENCE_AUDIT_2026-08-02.md`'s
+findings. No Production write, no schema/API-contract/auth/concurrency change, no
+deploy — implementation and local verification only; handoff returns to GPT.
+
+### Findings addressed (from Codex's audit)
+
+1. **Save marked successful without Cloud read-back** — `saveActiveFile` now
+   performs an independent fresh `GET /api/files?id=` after every write and
+   compares the complete `header`/`steps`/`layoutDiagram`/`name`/`folderId`/
+   `updatedAt` payload before ever setting `syncStatus:'saved'`.
+2. **API returned success on a zero-row update** — `functions/api/files.js`'s
+   `PUT` now checks D1's `meta.changes` and returns `409` with no success claim
+   when nothing was actually written (a stale/local-only id).
+3. **Successful hydration could prefer stale local content** (flagged
+   Blocker) — `loadDatabaseFromCloud()`'s merge now only trusts a cached local
+   file when its `updatedAt` still matches what Cloud just reported; otherwise
+   it's reset to the lazy `_loaded:false` placeholder instead of being served
+   as if confirmed. Local-only files/folders absent from Cloud's list are now
+   flagged `_unsynced: true` rather than silently folded into a `cloudReady`
+   result.
+4. **Failed save had no explicit unconfirmed/dirty contract** — new
+   `SyncStatus` value `'unconfirmed'`, used specifically when the write call
+   itself reported success but the independent read-back failed or didn't
+   match — distinct from `'error'` (the write itself failed).
+5. **Multi-user version/conflict safety** — explicitly left untouched, per the
+   Phase 0C concurrency boundary; no version column, no auth, no conflict
+   handling added.
+
+### Files Changed
+
+- `src/lib/storage.ts` — `saveFileCloud` now takes an explicit `updatedAt` and
+  returns `SaveFileResult` (`{ok:true,id,updatedAt}` / `{ok:false,error}`)
+  instead of `Promise<void>`, and only reports `ok:true` when the API response
+  contains an explicit `success` + `updatedAt`. `loadDatabaseFromCloud`'s merge
+  logic gets the staleness/`_unsynced` fix described above.
+- `src/store/useChartStore.ts` — `saveActiveFile` rewritten around the
+  write-then-read-back-then-compare flow; new `chartContentMatches` helper;
+  `renameFile`/`moveFile` adapted to `saveFileCloud`'s new signature (both
+  already used the Phase 0B `mutateWithRollback` snapshot/restore path, now
+  translating the explicit result back into a throw for that shared helper);
+  `SyncStatus` gains `'unconfirmed'`.
+- `functions/api/files.js` — `PUT` checks `meta.changes`, returns `409` on a
+  zero-row update, returns `{success, id, updatedAt}` on a real write.
+- `src/components/layout/TopBar.tsx` — one new status-text branch for
+  `syncStatus === 'unconfirmed'` (`⚠ Save unconfirmed`). Nothing else touched.
+- `tests/store.test.cjs` — fixed 3 existing mocks that assumed the old
+  throw-based/`null`-returning contracts (would have broken as soon as any
+  test exercised the new read-back path); `makeStorageMock`'s defaults for
+  `loadFileFromCloud`/`saveFileCloud` now fail loudly instead of silently
+  succeeding with mismatched shape when a test forgets to override them; added
+  3 new tests (successful save confirmed by read-back, read-back mismatch →
+  `unconfirmed`, save blocked while `cloudReady` is false).
+- `tests/data-safety.test.cjs` — 2 new tests against the mock-D1 `files.js`
+  handler directly: zero-row `PUT` → 409, real write → confirmed
+  `id`/`updatedAt` echoed back.
+- `tests/storage.test.cjs` (**new**) — `src/lib/storage.ts` tested directly
+  (mocking only the global `fetch`/`localStorage`, not `@/lib/storage`
+  itself), since mocking the store's storage import bypasses the exact merge/
+  staleness logic this phase needed to prove: stale-local-file reset,
+  matching-local-file trusted, local-only file flagged `_unsynced`, network
+  failure never throws, `saveFileCloud`/`loadFileFromCloud` explicit-result
+  contracts.
+- `CHANGELOG_AI.md`.
+- No other file touched — `functions/api/folders.js`, `schema.sql`,
+  `src/types/index.ts` untouched, matching the approved Phase 0C file boundary
+  exactly.
+
+### Verification
+
+- `npx tsc --noEmit` → clean.
+- `npm.cmd test` → **119/119 pass** (106 prior + 3 store + 8 storage.test.cjs +
+  2 data-safety.test.cjs, all against mocks/in-memory fixtures per the
+  data-safety plan — no Production D1, local Pages Dev D1, or the external
+  recovery export used as a test fixture).
+- `npm.cmd run lint` → 5 errors / 7 warnings, byte-for-byte the same
+  pre-existing set as every prior round (`StepTable.tsx`, `Sidebar.tsx:385`,
+  `TopBar.tsx` pre-existing `withPatchedStylesheets` hoisting issue — not the
+  line this session added) — confirmed by direct comparison; nothing new.
+- `npm.cmd run build` → compiles clean, 5/5 pages prerendered.
+- **Local (not Production) live save/read-back verification**, against the
+  existing local D1 state reused as-is (never reset — same folder/chart
+  created in an earlier session): started `wrangler pages dev` bound to the
+  existing local D1, then via direct HTTP (curl), not the browser — this
+  session's embedded browser tool has a reproducible history of crashing
+  `wrangler pages dev` on a real page load; curl-only interaction has been
+  100% reliable across every prior session this project —
+  1. `PUT /api/files` with a uniquely identifiable marker
+     (`phase0c-verify-1785673439`) in `header.processName` and a specific
+     `updatedAt` → response `{"success":true,"id":"...","updatedAt":"2026-08-02T18:00:00.000Z"}`.
+  2. Immediately followed by a fresh `GET /api/files?id=...` → returned
+     content contained the exact marker and the exact `updatedAt` just sent,
+     proving a real write-then-read-back round trip through the actual SQL
+     path, not just the mocks.
+  3. `PUT` to a nonexistent id → `409` with `"no chart row was updated"`, zero
+     rows changed.
+  - Server logs showed no errors during this sequence; local D1 folder/file
+    row counts unchanged (1/1) before and after — only the one file's
+    `content`/`updatedAt` changed via the legitimate `PUT` itself, which is
+    expected and fine for this explicitly-disposable local test data.
+  - Cleaned up: stopped every `wrangler`/`workerd` process this session
+    started (including one leftover from an earlier session that was still
+    running), `.wrangler/state` left completely untouched otherwise.
+- **Did not run a UI/browser smoke test of the new `saveActiveFile` flow this
+  round** — beyond the local API-level verification above, a full
+  browser-driven check of the Save button showing `saved`/`unconfirmed`
+  through a real page load carries the same crash risk documented in the
+  2026-08-02 local-D1-seeding session. The `tsc`/lint/build/119-test pass
+  plus the direct local API round-trip above are the verification evidence
+  for this handoff; recommend a browser-based check as part of GPT review or
+  the next session if a visual confirmation is specifically wanted.
+
+### Data Safety Gate
+
+No Production write, no schema change, no `wrangler d1 execute --remote`, no
+deploy, no push. The only database mutation this session was a local-only
+`PUT`/read-back against the existing, already-disposable local D1 state
+(explicitly authorized for this kind of use throughout this project's Database
+Safety Gate).
+
+### Notes / Risks
+
+- `saveActiveFile`'s content-match check (`chartContentMatches`) is a
+  `JSON.stringify` comparison of the persisted fields — simple and
+  deterministic for this app's actual data flow (same object shapes
+  throughout), not a general deep-equal library. Flagging in case a future
+  field addition needs a smarter comparison.
+- The `'unconfirmed'` status only distinguishes "write succeeded but read-back
+  didn't confirm it" from "write failed outright" — there's no automatic retry
+  yet; the user must press Save again. Not requested in this phase's scope.
+- Multi-user conflict/version safety remains explicitly out of scope, per the
+  Phase 0C concurrency boundary — unchanged risk, not newly introduced.
+- Not committed or pushed. Recommend returning to GPT for review before any
+  live Production save/read-back verification or deployment.
+
 ## 2026-08-02 (Active-User Continuous Release Gate)
 
 ### Tool

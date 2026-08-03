@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.14</div>
-      <div><b>Updated</b>2 ส.ค. 2569</div>
+      <div><b>Version</b>1.18</div>
+      <div><b>Updated</b>3 Aug 2026</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
       <div><b>Baseline commit</b>4c7dacf</div>
       <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · Phase 0C Save-to-Cloud Persistence plan ready</div>
-      <div><b>Status</b>Master Plan v1.14 · Production D1/schema remain protected · approved release remains usable while future changes are developed · Phase 0C awaits implementation and live persistence evidence</div>
+      <div><b>Status</b>Master Plan v1.18 · Production D1/schema remain protected · Phase 0C code review <code>PASS</code>; separately authorized release and live Production verification remain pending</div>
     </div>
   </div>
 </header>
@@ -694,7 +694,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <h2>Phase 0C · Save-to-Cloud Persistence and Active-User Safety — GPT plan</h2>
   <div class="callout">
     <p><b>Status:</b> GPT plan ready for the user's approved six-step workflow. Claude may implement only the approved scope below; no schema migration, Production repair, or multi-user safety claim is included in this phase.</p>
-    <p><b>Problem to solve:</b> the current client reports <code>Saved to Cloud</code> after a successful PUT response, but the API does not return the canonical saved row or verify affected rows, and hydration can prefer stale/local-only content. Therefore Save-to-Cloud persistence is not yet proven.</p>
+    <p><b>Current GPT review (3 Aug 2026, Round 5):</b> <code>PASS</code> for the Phase 0C code and recorded local Pages Dev evidence. The complete payload/read-back contract, <code>_unsynced</code> and unloaded-placeholder guards, same-session <code>_unconfirmed</code> boundary, hydration gating, nested-tree preservation, and 155/155 tests passed review. The implementation is ready for a separately authorized release; no commit, push, deploy, Production write, or live verification is approved by this review.</p>
+    <p><b>Claude fix round 4 (3 Aug 2026):</b> both remaining findings implemented — <code>openFile()</code>, <code>renameFile()</code>, <code>moveFile()</code>, and <code>duplicateFile()</code> now treat an <code>_unconfirmed</code> draft as unverified, and <code>hydrate()</code> no longer sets <code>hydrated:true</code> until the Cloud result is known. The React Strict Mode double-hydration regression was also fixed with a module-scoped re-entrancy guard. 155/155 tests pass and local Pages Dev round-trip evidence is recorded. GPT Round 5 subsequently returned <code>PASS</code> for code review; no commit, push, deploy, or Production write occurred.</p>
+    <p><b>Problem to solve:</b> the original Save-to-Cloud persistence contract has been implemented, but the current same-session source boundary still permits an unconfirmed draft to be selected or sent through other full-payload mutations, and the local-first hydration render occurs before Cloud confirms the active selection. Therefore the Phase 0C active-user safety boundary is not yet proven.</p>
     <p><b>Objective:</b> after a user saves, the deployed API must confirm the exact chart write, a fresh Cloud read must match the complete chart payload, and a refresh/reopen must load the same data from Cloud. A failed or ambiguous save must remain visibly unconfirmed and must never overwrite Cloud data with empty or stale local state.</p>
     <p><b>Allowed implementation files:</b> <code>src/lib/storage.ts</code>, <code>src/store/useChartStore.ts</code>, <code>functions/api/files.js</code>, the minimum related UI state in <code>src/components/layout/TopBar.tsx</code> and any necessary cloud/local status UI, plus focused tests under <code>tests/</code>. If another file, API contract, schema, or migration is required, stop with <code>PLAN_CHANGE_REQUIRED</code> and return to GPT.</p>
     <p><b>Source-of-truth rule:</b> after a successful Cloud hydration, Cloud rows are authoritative. Local drafts or IDs missing from Cloud must be explicitly marked as local/unconfirmed and must not be merged into a state labelled <code>cloudReady</code> or sent as an update to a missing Cloud row.</p>
@@ -840,12 +842,26 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 
 <!-- ═══════════════════════════════════════ -->
 <section id="changelog">
+  <div class="callout"><b>3 Aug 2026 — Phase 0C GPT/Codex final code review Round 5:</b> <code>PASS</code> for the current implementation and recorded local Pages Dev evidence. The `_unconfirmed` same-session boundary, hydration gating, complete payload/read-back, mutation guards, nested-tree preservation, and 155/155 tests passed. This is ready for a separately authorized release; Production deployment/live verification remains pending and no commit, push, deploy, or Production write occurred.</div>
+  <div class="callout"><b>3 Aug 2026 — Phase 0C GPT review Round 4:</b> <code>APPROVED_FOR_CLAUDE_FIX</code>, not <code>PASS</code>. Automated tests/build, complete payload/read-back logic, covered <code>_unsynced</code> and unloaded-placeholder guards, nested-tree preservation, and the recorded local Pages Dev browser evidence passed. Remaining fixes are required for same-session <code>_unconfirmed</code> draft selection/full-payload mutation and the local-first hydration render boundary. Production/live verification is still pending separate authorization.</div>
   <div class="callout"><b>Version 1.14 — 2 Aug 2026:</b> Added the Save-to-Cloud Persistence Gate and the Phase 0C GPT implementation plan. A save is not successful until the deployed API confirms the exact chart write, a Cloud read-back matches the complete payload, and a refresh/reopen still shows the data. Ambiguous saves must fail closed without overwriting Cloud data; active-user, compatibility, rollback, and authentication/concurrency gates remain mandatory.</div>
   <h2><span class="num">12</span> Change Log ของแผนฉบับนี้</h2>
   <div class="tablewrap">
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.15</b></td><td>3 Aug 2026</td><td><code>working tree</code></td>
+        <td><b>Phase 0C GPT review — APPROVED_FOR_CLAUDE_FIX</b> — complete payload/read-back, covered <code>_unsynced</code> mutation guards, hydration safety, nested-tree preservation, 133/133 tests, build, diff check, and recorded local Pages Dev browser smoke evidence passed. Fixes remain required for unloaded placeholder writes, unsynced folderId checks, active-file selection after failed/unverified loads, and exact save-response identity validation. No Production write, commit, push, or deploy.</td>
+      </tr>
+      <tr>
+        <td><b>1.16</b></td><td>3 Aug 2026</td><td><code>working tree</code></td>
+        <td><b>Phase 0C GPT review Round 4 — APPROVED_FOR_CLAUDE_FIX</b> — 146/146 tests and build pass; lint remains the known 5-error/19-warning baseline; complete payload/read-back, covered mutation guards, nested-tree preservation, and local Pages Dev evidence pass. Remaining fixes: exclude same-session <code>_unconfirmed</code> drafts from active/full-payload mutation paths, and prevent local-first hydration from rendering an unverified active editor before Cloud resolves. No Production write, commit, push, or deploy.</td>
+      </tr>
+      <tr>
+        <td><b>1.18</b></td><td>3 Aug 2026</td><td><code>working tree</code></td>
+        <td><b>Phase 0C GPT/Codex final code review Round 5 — PASS</b> — 155/155 tests pass; known lint baseline remains 5 errors with generated-warning count varying by local <code>.wrangler</code> bundles; build and diff check pass; complete payload/read-back, unconfirmed/hydration safety, nested-tree preservation, and local Pages Dev evidence reviewed. Separately authorized release and Production/live verification remain pending. No Production write, commit, push, or deploy.</td>
+      </tr>
       <tr>
         <td><b>1.12</b></td><td>2 ส.ค. 2569</td><td><code>4c7dacf</code></td>
         <td><b>Deploy และตรวจ Production สำเร็จ</b> — Cloudflare Pages ยืนยัน Git deployment จาก <code>main</code>; live smoke test ที่ <code>man-machine-chart.pages.dev/editor</code> พบ tree/chart เดิม, ตาราง 24 แถว, graph SVG 4 ชุด และ browser console ไม่มี error</td>

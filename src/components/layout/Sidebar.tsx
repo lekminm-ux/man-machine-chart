@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import type { ChartFolder, ProcessType } from '@/types';
+import type { ChartFile, ChartFolder, ProcessType } from '@/types';
 
 const LEVEL_ICONS = ['🏭', '⚙️', '📦', '🗃️'];
 const LEVEL_COLORS = ['text-yellow-500', 'text-green-400', 'text-blue-300', 'text-slate-400'];
@@ -24,6 +24,27 @@ type ContextTarget = { type: 'folder'; id: string } | { type: 'file'; id: string
 // fake security. No PIN, password, or token is checked or sent anywhere.
 function denyDestructiveAction(actionName: string): void {
   alert(`${actionName} is not available yet — it requires server-side authorization, which has not shipped. This is a safety gate, not an error.`);
+}
+
+// Phase 0C: a folder/file whose id doesn't exist in Cloud at all (`_unsynced`)
+// or whose last save's read-back never confirmed the write (`_unconfirmed`)
+// must be visibly distinguished, not rendered identically to a confirmed
+// Cloud row — per the source-of-truth rule, these are local-only/unproven
+// until they successfully sync.
+function unsyncedBadge(item: { _unsynced?: boolean; _unconfirmed?: boolean }) {
+  if (!item._unsynced && !item._unconfirmed) return null;
+  const label = item._unsynced ? 'local only' : 'unconfirmed';
+  const title = item._unsynced
+    ? 'Not yet confirmed in Cloud — created while Cloud was unavailable, or never synced.'
+    : 'Not yet confirmed in Cloud — the last save could not be verified by a fresh read. Try saving again.';
+  return (
+    <span
+      className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 py-0.5 flex-shrink-0"
+      title={title}
+    >
+      {label}
+    </span>
+  );
 }
 
 export default function Sidebar() {
@@ -52,7 +73,7 @@ export default function Sidebar() {
   const [renameValue, setRenameValue]           = useState('');
   const [newFileFolder, setNewFileFolder]       = useState<string | null>(null);
   const [newFileName, setNewFileName]           = useState('');
-  
+
   const [movingTarget, setMovingTarget]         = useState<ContextTarget>(null);
 
   // Tooltip for truncated folder/file names
@@ -111,14 +132,14 @@ export default function Sidebar() {
 
     return (
       <div key={folder.id} className="mb-0.5">
-        <div 
+        <div
           className="group flex items-center gap-1 px-3 py-1.5 hover:bg-slate-200 cursor-pointer rounded mx-1 transition-colors"
           style={{ marginLeft: `${indent + 4}px` }}
         >
           <button onClick={() => toggleFolder(folder.id)} className="text-slate-500 hover:text-slate-700 text-xs w-4 text-center flex-shrink-0">
             {folder.expanded ? '▾' : '▸'}
           </button>
-          
+
           <span className="text-lg flex-shrink-0 drop-shadow-sm mr-1">{getLevelIcon(level)}</span>
 
           {renaming?.type === 'folder' && renaming.id === folder.id ? (
@@ -141,6 +162,7 @@ export default function Sidebar() {
               {folder.name}
             </span>
           )}
+          {unsyncedBadge(folder as ChartFolder & { _unsynced?: boolean })}
 
           {/* Action buttons */}
           {isMovingHere ? (
@@ -205,7 +227,7 @@ export default function Sidebar() {
           <div className="mt-0.5">
             {/* 1. Render Sub-folders */}
             {childFolders.map(child => renderFolderNode(child, level + 1))}
-            
+
             {/* 2. Render Files */}
             {childFiles.map(file => (
               <div
@@ -240,6 +262,7 @@ export default function Sidebar() {
                     {file.name}
                   </span>
                 )}
+                {unsyncedBadge(file as ChartFile & { _unsynced?: boolean; _unconfirmed?: boolean })}
 
                 <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -289,7 +312,7 @@ export default function Sidebar() {
       <div className="px-4 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
         <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Project Files</h2>
         {movingTarget?.type === 'folder' && (
-          <button 
+          <button
             onClick={() => submitMove()}
             className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700/50 hover:bg-green-800/50"
           >
@@ -297,8 +320,8 @@ export default function Sidebar() {
           </button>
         )}
         {movingTarget && (
-          <button 
-            onClick={() => setMovingTarget(null)} 
+          <button
+            onClick={() => setMovingTarget(null)}
             className="text-[10px] text-red-600 hover:text-red-500 font-semibold"
           >
             Cancel Move
@@ -337,8 +360,8 @@ export default function Sidebar() {
         {showNewFolder ? (
           <div className="space-y-2">
             <div className="text-xs text-blue-600 mb-1 font-semibold">
-              {newFolderParent 
-                ? `Creating sub-folder in "${folders.find(f => f.id === newFolderParent)?.name}"` 
+              {newFolderParent
+                ? `Creating sub-folder in "${folders.find(f => f.id === newFolderParent)?.name}"`
                 : 'Creating root folder (e.g. PD level)'}
             </div>
             <input

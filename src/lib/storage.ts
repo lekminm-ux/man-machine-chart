@@ -53,10 +53,29 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
     const cloudFileIds = new Set(files.map(f => f.id));
 
     // We have metadata for files; load full content lazily when file is opened
-    // Merge cloud files metadata with local loaded files
+    // Merge cloud files metadata with local loaded files. Cloud is
+    // authoritative once hydration succeeds: cached local content is only
+    // trusted when it's fully loaded AND its updatedAt still matches what
+    // Cloud just reported. A local file whose updatedAt differs (older —
+    // someone else's save landed since this browser last synced it; or from
+    // this browser's own past session) is stale and must go back through the
+    // lazy `_loaded: false` path rather than being presented as confirmed
+    // Cloud content.
     const mergedFiles = files.map(cloudFile => {
-      const localFile = local.files?.find(f => f.id === cloudFile.id) as (ChartFile & { _loaded?: boolean }) | undefined;
-      if (localFile && localFile._loaded !== false) {
+      const localFile = local.files?.find(f => f.id === cloudFile.id) as (ChartFile & { _loaded?: boolean; _unconfirmed?: boolean }) | undefined;
+      // A local file marked _unconfirmed (its last save's read-back never
+      // proved the write, or hasn't been retried) must never be trusted as
+      // Cloud content on this or any future hydration — regardless of
+      // whether its updatedAt happens to match Cloud's. Force it back
+      // through the lazy-load path so the next open re-fetches genuine
+      // Cloud content instead of silently presenting the unproven draft as
+      // saved. The draft's own data is kept (not overwritten here) so it
+      // isn't silently discarded — only `_loaded` flips, so `openFile`
+      // re-fetches and replaces it once the file is actually opened again.
+      if (localFile && localFile._unconfirmed) {
+        return { ...localFile, _loaded: false };
+      }
+      if (localFile && localFile._loaded !== false && localFile.updatedAt === cloudFile.updatedAt) {
         return localFile;
       }
       return {
@@ -68,14 +87,19 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
       };
     }) as (ChartFile & { _loaded: boolean })[];
 
-    // Keep any local files that are not in the cloud (not synced yet)
-    const unsyncedFiles = (local.files || []).filter(f => !cloudFileIds.has(f.id));
+    // Local files/folders absent from Cloud's own list are unconfirmed by
+    // definition — never synced, or created while Cloud was unavailable.
+    // Flagged with `_unsynced` rather than silently folded into a result
+    // that gets marked `cloudReady`, so they're never mistaken for confirmed
+    // Cloud rows (a save attempt against one still correctly fails, since
+    // there is no matching row for the API to update).
+    const unsyncedFiles = (local.files || []).filter(f => !cloudFileIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
     const finalFiles = [...mergedFiles, ...unsyncedFiles];
 
     // Keep any local folders that are not in the cloud
     const cloudFolderIds = new Set(folders.map(f => f.id));
     const mergedFolders = folders.map(f => ({ ...f, expanded: Boolean(f.expanded) }));
-    const unsyncedFolders = (local.folders || []).filter(f => !cloudFolderIds.has(f.id));
+    const unsyncedFolders = (local.folders || []).filter(f => !cloudFolderIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
     const finalFolders = [...mergedFolders, ...unsyncedFolders];
 
     const db: AppDatabase = {
@@ -138,26 +162,63 @@ export async function deleteFolderCloud(id: string): Promise<void> {
 }
 
 // ── File cloud actions ─────────────────────────────────────────────────────
+// The single canonical definition of "everything that goes in the `content`
+// JSON column" — every ChartFile field except the ones that are their own SQL
+// columns (id/name/folderId/createdAt/updatedAt). GPT review flagged that
+// createFileCloud/saveFileCloud previously hand-picked only
+// header/steps/layoutDiagram, silently dropping timeMeasurement/timeStudy/
+// machineCapacity (M1/M2 data) on every single save. Exported so
+// useChartStore's read-back comparison uses this exact same field list —
+// two independently-maintained copies of "what persists" is exactly how a
+// field gets missed again.
+export function chartFileContent(file: ChartFile) {
+  return {
+    header: file.header,
+    steps: file.steps,
+    layoutDiagram: file.layoutDiagram,
+    timeMeasurement: file.timeMeasurement,
+    timeStudy: file.timeStudy,
+    machineCapacity: file.machineCapacity,
+  };
+}
+
 export async function createFileCloud(file: ChartFile): Promise<void> {
-  const { header, steps, layoutDiagram, ...meta } = file;
+  const { id, name, folderId, createdAt, updatedAt } = file;
   await apiFetch('/api/files', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...meta, content: { header, steps, layoutDiagram } }),
+    body: JSON.stringify({ id, name, folderId, createdAt, updatedAt, content: chartFileContent(file) }),
   });
 }
 
-export async function saveFileCloud(file: ChartFile): Promise<void> {
-  const { header, steps, layoutDiagram, ...meta } = file;
-  await apiFetch('/api/files', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...meta,
-      updatedAt: new Date().toISOString(),
-      content: { header, steps, layoutDiagram },
-    }),
-  });
+// A save is not "done" just because the HTTP request didn't throw — the API
+// can report success on a zero-row update (a stale/local-only id), and a
+// response that arrives without the fields this checks for is not proof
+// anything was written. The caller (saveActiveFile) still does its own
+// independent fresh-GET read-back on top of this; this only confirms the
+// write call itself was explicit, not silently assumed.
+export type SaveFileResult =
+  | { ok: true; id: string; updatedAt: string }
+  | { ok: false; error: string };
+
+export async function saveFileCloud(file: ChartFile, updatedAt: string): Promise<SaveFileResult> {
+  const { id, name, folderId } = file;
+  try {
+    const res = await apiFetch('/api/files', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id, name, folderId, updatedAt,
+        content: chartFileContent(file),
+      }),
+    });
+    if (!res || res.success !== true || !res.updatedAt || res.id !== file.id) {
+      return { ok: false, error: 'save did not return an explicit confirmed response' };
+    }
+    return { ok: true, id: file.id, updatedAt: res.updatedAt };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function deleteFileCloud(id: string): Promise<void> {

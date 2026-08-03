@@ -51,13 +51,28 @@ function makeStorageMock(overrides = {}) {
     loadLocalDatabase: () => ({ folders: [], files: [], activeFileId: null }),
     saveLocalDatabase: () => {},
     loadDatabaseFromCloud: async () => ({ ok: true, db: { folders: [], files: [], activeFileId: null } }),
-    loadFileFromCloud: async () => null,
+    // Fail loudly, not silently-succeed-with-mismatched-data, when a test
+    // exercises openFile/saveActiveFile's read-back path without configuring
+    // what the "fresh Cloud read" should return — an unconfigured default
+    // that looked like success could mask a real contract mismatch.
+    loadFileFromCloud: async () => ({ ok: false, error: 'not found (default test mock — override loadFileFromCloud per test)' }),
     createFolderCloud: async () => {},
     updateFolderCloud: async () => {},
     deleteFolderCloud: async () => {},
     createFileCloud: async () => {},
-    saveFileCloud: async () => {},
+    saveFileCloud: async () => ({ ok: false, error: 'not implemented (default test mock — override saveFileCloud per test)' }),
     deleteFileCloud: async () => {},
+    // Real (not stubbed) implementation — it's a pure field-picker with no
+    // side effects, and useChartStore's read-back comparison depends on it
+    // matching the real one exactly, field-for-field.
+    chartFileContent: (file) => ({
+      header: file.header,
+      steps: file.steps,
+      layoutDiagram: file.layoutDiagram,
+      timeMeasurement: file.timeMeasurement,
+      timeStudy: file.timeStudy,
+      machineCapacity: file.machineCapacity,
+    }),
     ...overrides,
   };
 }
@@ -79,6 +94,14 @@ async function freshReadyStore(overrides = {}) {
   await store.getState().hydrate();
   assert.equal(store.getState().cloudReady, true, 'test setup expected hydrate() to succeed');
   return store;
+}
+
+// A promise whose resolution the test controls explicitly — used to inspect
+// store state *while* a Cloud request is still pending, not just before/after.
+function deferred() {
+  let resolve;
+  const promise = new Promise(res => { resolve = res; });
+  return { promise, resolve };
 }
 
 test('activeFile() returns a stable reference (no re-render loop)', async () => {
@@ -211,7 +234,7 @@ test('a failed delete leaves the local folder/file state unchanged (rollback, no
 
 test('a failed move leaves the local file state unchanged (rollback, not partial apply)', async () => {
   const store = await freshReadyStore({
-    saveFileCloud: async () => { throw new Error('server rejected the move'); },
+    saveFileCloud: async () => ({ ok: false, error: 'server rejected the move' }),
   });
   await store.getState().createFolder('Folder A', 'custom');
   const folderA = store.getState().folders[0].id;
@@ -315,6 +338,7 @@ test('a failed openFile cloud load never gets stuck in syncing, sets error, and 
   const file = store.getState().files.find(f => f.id === 'file-1');
   assert.equal(file._loaded, false, '_loaded must stay false — flipping it true with blank content would let a later save wipe the real cloud content');
   assert.equal(file.steps.length, 0, 'no blank content should have been substituted for the still-unloaded placeholder');
+  assert.equal(store.getState().activeFileId, null, 'a failed load must not select the unverified target as active');
 });
 
 test('a successful openFile cloud load marks the file loaded and sets idle', async () => {
@@ -345,11 +369,12 @@ test('a successful openFile cloud load marks the file loaded and sets idle', asy
   const file = store.getState().files.find(f => f.id === 'file-1');
   assert.equal(file._loaded, true);
   assert.equal(file.steps.length, 1);
+  assert.equal(store.getState().activeFileId, 'file-1', 'a successful load must select the newly confirmed file as active');
 });
 
 test('a failed saveActiveFile never reports saved and preserves the draft content', async () => {
   const store = await freshReadyStore({
-    saveFileCloud: async () => { throw new Error('server rejected the save'); },
+    saveFileCloud: async () => ({ ok: false, error: 'server rejected the save' }),
   });
   await store.getState().createFolder('F', 'custom');
   const folderId = store.getState().folders[0].id;
@@ -364,4 +389,752 @@ test('a failed saveActiveFile never reports saved and preserves the draft conten
   const file = store.getState().activeFile();
   assert.equal(file.steps[0].description, 'draft in progress', "the user's draft edits must survive a failed save");
   assert.equal(file.steps[0].manualTime, 42);
+});
+
+// ── Prompt 02 fix round: Phase 0C Save-to-Cloud Persistence ──────────────────
+
+test('a successful saveActiveFile is only reported saved after a matching fresh Cloud read-back', async () => {
+  let stored = null; // simulates the row Cloud actually holds after the PUT
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => {
+      stored = { ...file, updatedAt };
+      return { ok: true, id: file.id, updatedAt };
+    },
+    loadFileFromCloud: async (id) => {
+      if (!stored || stored.id !== id) return { ok: false, error: 'not found' };
+      return { ok: true, file: stored };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  store.getState().addStep();
+  const step = store.getState().activeFile().steps[0];
+  store.getState().updateStep(step.id, { description: 'confirmed content', manualTime: 15 });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'saved', 'a write confirmed by a matching read-back must report saved');
+  assert.equal(store.getState().activeFile().steps[0].description, 'confirmed content');
+});
+
+test('saveActiveFile reports unconfirmed, not saved, when the write succeeds but the read-back does not match', async () => {
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => ({ ok: true, id: file.id, updatedAt }),
+    // Cloud read-back returns something that does not match what was just
+    // sent — e.g. another process's row, or a write that silently applied
+    // differently than requested. This must never be reported as saved.
+    loadFileFromCloud: async (id) => ({
+      ok: true,
+      file: {
+        id, name: 'Chart 1', folderId: 'other-folder-entirely',
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+        header: { processName: 'unrelated stale content', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' },
+        steps: [], layoutDiagram: { elements: [], connections: [] },
+      },
+    }),
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'unconfirmed', 'a write whose read-back does not match the sent payload must not be reported as saved');
+  const file = store.getState().files.find(f => f.id === store.getState().activeFileId);
+  assert.equal(file._unconfirmed, true, 'the draft must be explicitly marked _unconfirmed for recovery/retry, not just reflected in the ephemeral syncStatus');
+});
+
+test('saveActiveFile is blocked while cloudReady is false, even with an otherwise-successful mock save', async () => {
+  const store = freshStore({
+    saveFileCloud: async (file, updatedAt) => ({ ok: true, id: file.id, updatedAt }),
+    loadFileFromCloud: async () => ({ ok: true, file: null }),
+  }); // never hydrated — cloudReady stays false
+  await store.getState().saveActiveFile();
+  assert.equal(store.getState().syncStatus, 'error', 'save must be blocked before any write is attempted while cloud is not confirmed ready');
+});
+
+test('saveActiveFile reports unconfirmed if even one module field (e.g. machineCapacity) is lost in the read-back', async () => {
+  let stored = null;
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => {
+      stored = { ...file, updatedAt };
+      return { ok: true, id: file.id, updatedAt };
+    },
+    loadFileFromCloud: async (id) => {
+      if (!stored || stored.id !== id) return { ok: false, error: 'not found' };
+      // Simulate the read-back silently losing machineCapacity — exactly the
+      // class of bug GPT's review caught (a whole module field dropped on
+      // save because only header/steps/layoutDiagram were ever compared).
+      const { machineCapacity, ...rest } = stored;
+      return { ok: true, file: rest };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  store.getState().updateMachineCapacity({
+    shiftGrossMinutes: 720, breakMinutes: 60, requiredPerShift: 50,
+    rows: [{ id: 'mc1', no: 1, processName: 'MARKER', machineNo: 'M1', manualTime: 1, autoTime: 1, changeQty: 0, changeTime: 0 }],
+  });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'unconfirmed', 'losing even one module field in the read-back must never be reported as saved');
+});
+
+// ── GPT review Round 2 fix: _unsynced records must block every Cloud action ──
+
+const blankHeader = { processName: '', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' };
+
+test('renameFile is blocked against a local-only (_unsynced) file — no cloud call, no rename, never reports saved', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unsyncedFile = {
+    id: 'local-file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _unsynced: true,
+  };
+  store.setState({ files: [unsyncedFile] });
+
+  await store.getState().renameFile('local-file-1', 'New Name');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a local-only id');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'local-file-1').name, 'Never Synced', 'the local-only file must not be silently renamed either');
+});
+
+test('moveFile is blocked against a local-only (_unsynced) source file, and against moving into a local-only folder', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unsyncedFile = {
+    id: 'local-file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _unsynced: true,
+  };
+  const normalFile = {
+    id: 'normal-file-1', name: 'Confirmed', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  store.setState({ files: [unsyncedFile, normalFile], folders: [unsyncedFolder] });
+
+  await store.getState().moveFile('local-file-1', 'some-other-folder');
+  await store.getState().moveFile('normal-file-1', 'local-folder-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted for either a local-only source file or a local-only destination folder');
+  assert.equal(store.getState().files.find(f => f.id === 'normal-file-1').folderId, 'folder-1', 'a confirmed file must not be moved into a local-only folder either');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('deleteFile is blocked against a local-only (_unsynced) file', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ deleteFileCloud: async () => { calls++; } });
+  const unsyncedFile = {
+    id: 'local-file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _unsynced: true,
+  };
+  store.setState({ files: [unsyncedFile] });
+
+  await store.getState().deleteFile('local-file-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a local-only id');
+  assert.equal(store.getState().files.length, 1, 'the local-only file must not be deleted locally either — it stays until it can be reconciled');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('saveActiveFile is blocked against a local-only (_unsynced) active file', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unsyncedFile = {
+    id: 'local-file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _unsynced: true,
+  };
+  store.setState({ files: [unsyncedFile], activeFileId: 'local-file-1' });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(calls, 0, 'no cloud call may be attempted when saving a local-only active file');
+  assert.equal(store.getState().syncStatus, 'error', 'a blocked save must never report saved');
+});
+
+test('createFile is blocked when the target folder is local-only (_unsynced)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { calls++; } });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  store.setState({ folders: [unsyncedFolder] });
+
+  await store.getState().createFile('local-folder-1', 'New Chart');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted when the target folder is local-only');
+  assert.equal(store.getState().files.length, 0, 'no local file should be created into a local-only folder either');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('renameFolder, moveFolder, and deleteFolder are all blocked against a local-only (_unsynced) folder', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({
+    updateFolderCloud: async () => { calls++; },
+    deleteFolderCloud: async () => { calls++; },
+  });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  store.setState({ folders: [unsyncedFolder] });
+
+  await store.getState().renameFolder('local-folder-1', 'New Name');
+  await store.getState().moveFolder('local-folder-1', null);
+  await store.getState().deleteFolder('local-folder-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a local-only folder id, for rename, move, or delete');
+  assert.equal(store.getState().folders.length, 1, 'the local-only folder must not be deleted locally either');
+  assert.equal(store.getState().folders[0].name, 'Never Synced Folder', 'nor renamed');
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('toggleFolder on a local-only (_unsynced) folder still toggles locally, but makes no cloud call', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ updateFolderCloud: async () => { calls++; } });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  store.setState({ folders: [unsyncedFolder] });
+
+  await store.getState().toggleFolder('local-folder-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a local-only folder id');
+  assert.equal(store.getState().folders[0].expanded, false, 'the local toggle itself must still work — it is harmless review-only UI state, not a Cloud mutation');
+});
+
+// ── GPT review Round 2 fix: an unconfirmed/unloaded draft must never surface as the active Cloud file ──
+
+test('hydrate clears activeFileId for an _unconfirmed draft, even with a matching updatedAt, but preserves its data', async () => {
+  const unconfirmedDraft = {
+    id: 'file-1', name: 'Draft Chart', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'UNCONFIRMED DRAFT MARKER' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    // This is exactly what storage.ts's real merge produces for an
+    // _unconfirmed file — _loaded:false regardless of the updatedAt match.
+    _loaded: false,
+    _unconfirmed: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [unconfirmedDraft], activeFileId: 'file-1' },
+    }),
+  });
+
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().cloudReady, true);
+  assert.notEqual(store.getState().activeFileId, 'file-1', 'an unconfirmed draft must never be silently presented as the active Cloud document after hydration');
+  assert.equal(store.getState().activeFile(), null, 'the editor must show "no file open", not the unconfirmed draft, until it is re-opened and confirmed');
+  const stillThere = store.getState().files.find(f => f.id === 'file-1');
+  assert.ok(stillThere, 'the draft itself must be preserved for recovery, not discarded');
+  assert.equal(stillThere.header.processName, 'UNCONFIRMED DRAFT MARKER', 'the draft content must survive so it can be inspected or retried');
+});
+
+test('hydrate also clears activeFileId for a merely un-loaded active file, not just _unconfirmed drafts', async () => {
+  const notYetLoaded = {
+    id: 'file-1', name: 'Chart', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [notYetLoaded], activeFileId: 'file-1' },
+    }),
+  });
+
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().activeFileId, null, 'a not-yet-loaded file must not be shown as active either, even without _unconfirmed set');
+});
+
+test('hydrate keeps a confirmed, fully-loaded file as the active file (non-regression)', async () => {
+  const confirmedFile = {
+    id: 'file-1', name: 'Chart', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'CONFIRMED' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [confirmedFile], activeFileId: 'file-1' },
+    }),
+  });
+
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().activeFileId, 'file-1', 'a confirmed, already-loaded active file must stay active across hydration');
+  assert.ok(store.getState().activeFile(), 'the editor must still show the confirmed file, not an empty state');
+});
+
+// ── GPT review Round 3 fix: unloaded placeholders must never reach a full-payload mutation ──
+
+test('renameFile is blocked against a placeholder file whose content has not finished loading from the cloud (_loaded:false)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  store.setState({ files: [placeholderFile] });
+
+  await store.getState().renameFile('file-1', 'New Name');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against an unloaded placeholder');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'file-1').name, 'Needs Loading', 'the placeholder must not be renamed locally either, to avoid a later save PUTting blank content under the new name');
+});
+
+test('moveFile is blocked against a placeholder file whose content has not finished loading from the cloud (_loaded:false)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  store.setState({ files: [placeholderFile] });
+
+  await store.getState().moveFile('file-1', 'some-other-folder');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against an unloaded placeholder');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'file-1').folderId, 'folder-1', 'the placeholder must not be moved locally either');
+});
+
+test('duplicateFile is blocked against a placeholder file whose content has not finished loading from the cloud (_loaded:false)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { calls++; } });
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  store.setState({ files: [placeholderFile] });
+
+  await store.getState().duplicateFile('file-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against an unloaded placeholder');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.length, 1, 'no blank copy should be created from an unloaded placeholder');
+});
+
+test('saveActiveFile is blocked against an active file whose content has not finished loading from the cloud (_loaded:false), and reports a sync error', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const placeholderFile = {
+    id: 'file-1', name: 'Needs Loading', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  store.setState({ files: [placeholderFile], activeFileId: 'file-1' });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(calls, 0, 'no cloud call may be attempted while the active file is still an unloaded placeholder');
+  assert.equal(store.getState().syncStatus, 'error', 'a blocked save must report a sync error instead of staying silently idle');
+});
+
+// ── GPT review Round 3 fix: a confirmed file's _unsynced folder must also block the Cloud call ──
+
+test("renameFile is blocked when the file's folder is local-only (_unsynced), even though the file itself is confirmed", async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  const confirmedFile = {
+    id: 'file-1', name: 'Confirmed', folderId: 'local-folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  store.setState({ folders: [unsyncedFolder], files: [confirmedFile] });
+
+  await store.getState().renameFile('file-1', 'New Name');
+
+  assert.equal(calls, 0, "no cloud call may be attempted for a file whose folder Cloud has never confirmed");
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'file-1').name, 'Confirmed', 'must not be renamed locally either');
+});
+
+test("duplicateFile is blocked when the source file's folder is local-only (_unsynced), even though the file itself is confirmed", async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { calls++; } });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  const confirmedFile = {
+    id: 'file-1', name: 'Confirmed', folderId: 'local-folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  store.setState({ folders: [unsyncedFolder], files: [confirmedFile] });
+
+  await store.getState().duplicateFile('file-1');
+
+  assert.equal(calls, 0, "no cloud call may be attempted for a file whose folder Cloud has never confirmed");
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.length, 1, 'no copy should be created');
+});
+
+test("saveActiveFile is blocked when the active file's folder is local-only (_unsynced), even though the file itself is confirmed", async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unsyncedFolder = { id: 'local-folder-1', parentId: null, name: 'Never Synced Folder', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z', _unsynced: true };
+  const confirmedFile = {
+    id: 'file-1', name: 'Confirmed', folderId: 'local-folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  store.setState({ folders: [unsyncedFolder], files: [confirmedFile], activeFileId: 'file-1' });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(calls, 0, "no cloud call may be attempted for an active file whose folder Cloud has never confirmed");
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+// ── GPT review Round 3 fix: hydrate must also clear an _unsynced active file ──
+
+test('hydrate also clears activeFileId for an _unsynced active file, not just _loaded:false ones', async () => {
+  const unsyncedFile = {
+    id: 'file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'LOCAL ONLY MARKER' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _unsynced: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [unsyncedFile], activeFileId: 'file-1' },
+    }),
+  });
+
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().cloudReady, true);
+  assert.notEqual(store.getState().activeFileId, 'file-1', 'a local-only file Cloud has never confirmed must not be silently presented as the active Cloud document after hydration');
+  assert.equal(store.getState().activeFile(), null, 'the editor must show "no file open" until the local-only file is re-opened explicitly');
+  const stillThere = store.getState().files.find(f => f.id === 'file-1');
+  assert.ok(stillThere, 'the local-only file itself must be preserved for recovery, not discarded');
+  assert.equal(stillThere.header.processName, 'LOCAL ONLY MARKER');
+});
+
+// ── GPT review Round 3 fix: openFile must not surface an unverified target as active ──
+
+test('a failed openFile on a different file retains the previously active, already-confirmed file — does not switch to the unverified target', async () => {
+  const openFileA = {
+    id: 'file-a', name: 'File A', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'FILE A CONTENT' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true,
+  };
+  const placeholderB = {
+    id: 'file-b', name: 'File B', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [openFileA, placeholderB], activeFileId: 'file-a' },
+    }),
+    loadFileFromCloud: async () => ({ ok: false, error: 'network unreachable' }),
+  });
+  await store.getState().hydrate();
+  assert.equal(store.getState().activeFileId, 'file-a', 'test setup: file A must be active after hydration');
+
+  await store.getState().openFile('file-b');
+
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().activeFileId, 'file-a', 'a failed open of a different file must retain the previously active, confirmed file');
+  assert.equal(store.getState().activeFile().header.processName, 'FILE A CONTENT', 'the editor must keep showing the confirmed file, not the unverified target');
+});
+
+test('openFile on an already-loaded file switches the active selection immediately, with no cloud fetch', async () => {
+  let calls = 0;
+  const loadedFile = {
+    id: 'file-1', name: 'Already Loaded', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [loadedFile], activeFileId: null },
+    }),
+    loadFileFromCloud: async () => { calls++; return { ok: false, error: 'must not be called' }; },
+  });
+  await store.getState().hydrate();
+
+  await store.getState().openFile('file-1');
+
+  assert.equal(calls, 0, 'an already-loaded file must not trigger a redundant cloud fetch');
+  assert.equal(store.getState().activeFileId, 'file-1');
+});
+
+test('openFile on a local-only (_unsynced) file switches the active selection immediately, with no cloud fetch attempted, even if it was never fully loaded', async () => {
+  let calls = 0;
+  const unsyncedPlaceholder = {
+    id: 'file-1', name: 'Never Synced', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: false, _unsynced: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [unsyncedPlaceholder], activeFileId: null },
+    }),
+    loadFileFromCloud: async () => { calls++; return { ok: false, error: 'must not be called' }; },
+  });
+  await store.getState().hydrate();
+
+  await store.getState().openFile('file-1');
+
+  assert.equal(calls, 0, 'a local-only file has no Cloud row to fetch — opening it must not attempt a cloud call even if _loaded is false');
+  assert.equal(store.getState().activeFileId, 'file-1');
+});
+
+// ── GPT review Round 3 fix: save read-back must validate the confirmed file id ──
+
+test('saveActiveFile reports unconfirmed when the read-back file id does not match what was saved', async () => {
+  let stored = null;
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => {
+      stored = { ...file, updatedAt };
+      return { ok: true, id: file.id, updatedAt };
+    },
+    loadFileFromCloud: async (id) => {
+      if (!stored || stored.id !== id) return { ok: false, error: 'not found' };
+      // Every field matches except the id — e.g. a swapped/misrouted response.
+      return { ok: true, file: { ...stored, id: 'a-completely-different-id' } };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'unconfirmed', 'a read-back whose id does not match the saved file must never be reported as saved');
+});
+
+// ── GPT review Round 4 fix: an _unconfirmed draft must never bypass verification ──
+
+test('openFile performs a fresh Cloud GET for an _unconfirmed file instead of taking the immediate-select fast path', async () => {
+  let calls = 0;
+  const unconfirmedDraft = {
+    id: 'file-1', name: 'Chart', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'DRAFT CONTENT' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [unconfirmedDraft], activeFileId: null },
+    }),
+    loadFileFromCloud: async () => { calls++; return { ok: false, error: 'still unreachable' }; },
+  });
+  await store.getState().hydrate();
+
+  await store.getState().openFile('file-1');
+
+  assert.equal(calls, 1, 'an _unconfirmed file must trigger a fresh Cloud GET, not the immediate-select fast path');
+});
+
+test('a failed reopen of an _unconfirmed file does not present it as confirmed, and preserves the draft for recovery', async () => {
+  const confirmedActive = {
+    id: 'file-a', name: 'File A', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'FILE A CONTENT' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true,
+  };
+  const unconfirmedDraft = {
+    id: 'file-b', name: 'File B', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'UNSAVED DRAFT CONTENT' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [confirmedActive, unconfirmedDraft], activeFileId: 'file-a' },
+    }),
+    loadFileFromCloud: async () => ({ ok: false, error: 'network unreachable' }),
+  });
+  await store.getState().hydrate();
+  assert.equal(store.getState().activeFileId, 'file-a', 'test setup: file A must be active after hydration');
+
+  await store.getState().openFile('file-b');
+
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().activeFileId, 'file-a', 'a failed reopen of an unconfirmed file must not switch the editor to it');
+  const draft = store.getState().files.find(f => f.id === 'file-b');
+  assert.ok(draft, 'the unconfirmed draft must still be present for recovery');
+  assert.equal(draft._unconfirmed, true, 'must remain flagged unconfirmed, not silently cleared');
+  assert.equal(draft.header.processName, 'UNSAVED DRAFT CONTENT', 'the draft content itself must be preserved, not discarded');
+});
+
+test('renameFile is blocked against a file with an unconfirmed save pending (_unconfirmed)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unconfirmedFile = {
+    id: 'file-1', name: 'Draft', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  store.setState({ files: [unconfirmedFile] });
+
+  await store.getState().renameFile('file-1', 'New Name');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a file with an unconfirmed save pending');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'file-1').name, 'Draft', 'must not be renamed locally either');
+});
+
+test('moveFile is blocked against a file with an unconfirmed save pending (_unconfirmed)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ saveFileCloud: async () => { calls++; return { ok: true, id: 'x', updatedAt: 'x' }; } });
+  const unconfirmedFile = {
+    id: 'file-1', name: 'Draft', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  store.setState({ files: [unconfirmedFile] });
+
+  await store.getState().moveFile('file-1', 'some-other-folder');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a file with an unconfirmed save pending');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.find(f => f.id === 'file-1').folderId, 'folder-1', 'must not be moved locally either');
+});
+
+test('duplicateFile is blocked against a file with an unconfirmed save pending (_unconfirmed)', async () => {
+  let calls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { calls++; } });
+  const unconfirmedFile = {
+    id: 'file-1', name: 'Draft', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  store.setState({ files: [unconfirmedFile] });
+
+  await store.getState().duplicateFile('file-1');
+
+  assert.equal(calls, 0, 'no cloud call may be attempted against a file with an unconfirmed save pending');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files.length, 1, 'no copy should be created from an unconfirmed draft');
+});
+
+test('saveActiveFile is NOT blocked by _unconfirmed — it is the explicit retry path, and a successful retry clears it', async () => {
+  let stored = null;
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => {
+      stored = { ...file, updatedAt };
+      return { ok: true, id: file.id, updatedAt };
+    },
+    loadFileFromCloud: async (id) => {
+      if (!stored || stored.id !== id) return { ok: false, error: 'not found' };
+      return { ok: true, file: stored };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  const fileId = store.getState().activeFileId;
+  store.setState(s => ({ files: s.files.map(f => f.id === fileId ? { ...f, _unconfirmed: true } : f) }));
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(store.getState().syncStatus, 'saved', 'retrying Save on an _unconfirmed file must be allowed and must succeed once confirmed');
+  const file = store.getState().files.find(f => f.id === fileId);
+  assert.equal(file._unconfirmed, false, 'a successful retry must clear the _unconfirmed flag');
+});
+
+// ── GPT review Round 4 fix: hydrate() must gate the editor while Cloud is pending ──
+
+test('hydrate() keeps hydrated:false while the Cloud request is pending — the editor must not render cached content as confirmed', async () => {
+  const cloud = deferred();
+  const store = freshStore({ loadDatabaseFromCloud: () => cloud.promise });
+
+  const hydratePromise = store.getState().hydrate();
+  // hydrate() does all of its synchronous setup (including the local-cache
+  // `set()`) before its first `await`, so the pending state is already
+  // observable here without needing a tick/microtask delay.
+  assert.equal(store.getState().hydrated, false, 'hydrated must stay false until the Cloud result is known');
+  assert.equal(store.getState().cloudReady, false);
+
+  cloud.resolve({ ok: true, db: { folders: [], files: [], activeFileId: null } });
+  await hydratePromise;
+
+  assert.equal(store.getState().hydrated, true, 'hydrated must become true once the Cloud result is known');
+  assert.equal(store.getState().cloudReady, true);
+});
+
+test('a concurrent second hydrate() call while the first is still pending does not trigger a second Cloud fetch', async () => {
+  let calls = 0;
+  const cloud = deferred();
+  const store = freshStore({
+    loadDatabaseFromCloud: () => { calls++; return cloud.promise; },
+  });
+
+  const first = store.getState().hydrate();
+  const second = store.getState().hydrate(); // e.g. React StrictMode's double effect-invocation
+  assert.equal(store.getState().hydrated, false);
+
+  cloud.resolve({ ok: true, db: { folders: [], files: [], activeFileId: null } });
+  await Promise.all([first, second]);
+
+  assert.equal(calls, 1, 'a second hydrate() call while one is already in flight must not start a duplicate Cloud fetch');
+  assert.equal(store.getState().hydrated, true);
+});
+
+test('hydrate also clears activeFileId for a raw _unconfirmed active file, even if _loaded was not separately reset to false', async () => {
+  const rawUnconfirmed = {
+    id: 'file-1', name: 'Chart', folderId: 'folder-1',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'RAW UNCONFIRMED' },
+    steps: [], layoutDiagram: { elements: [], connections: [] },
+    _loaded: true, _unconfirmed: true,
+  };
+  const store = freshStore({
+    loadDatabaseFromCloud: async () => ({
+      ok: true,
+      db: { folders: [], files: [rawUnconfirmed], activeFileId: 'file-1' },
+    }),
+  });
+
+  await store.getState().hydrate();
+
+  assert.equal(store.getState().cloudReady, true);
+  assert.notEqual(store.getState().activeFileId, 'file-1', 'an _unconfirmed file must not remain active even if _loaded is still true');
+  assert.equal(store.getState().activeFile(), null, 'the editor must show "no file open" until the draft is re-opened and confirmed');
+  const stillThere = store.getState().files.find(f => f.id === 'file-1');
+  assert.ok(stillThere, 'preserved for recovery');
+  assert.equal(stillThere.header.processName, 'RAW UNCONFIRMED');
 });

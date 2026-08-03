@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "--port", "3456"],
       "port": 3456
+    },
+    {
+      "name": "mm-chart-pages-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "pages", "dev", "out", "--port", "8788"],
+      "port": 8788
     }
   ]
 }

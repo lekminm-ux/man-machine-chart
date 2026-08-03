@@ -25,7 +25,7 @@ export default function TopBar() {
         alert('Export region not found. Please open a chart first.');
         return;
       }
-      
+
       const canvas = await withPatchedStylesheets(async () => {
         return html2canvas(container, {
           scale: 2,
@@ -225,6 +225,9 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
           )}
           {syncStatus === 'saved' && (
             <span className="text-emerald-500">✓ Saved to Cloud</span>
+          )}
+          {syncStatus === 'unconfirmed' && (
+            <span className="text-amber-600" title="The write call reported success, but a fresh Cloud read-back did not confirm it — retry the save.">⚠ Save unconfirmed</span>
           )}
           {syncStatus === 'error' && (
             <span className="text-red-500">⚠ Sync Error</span>

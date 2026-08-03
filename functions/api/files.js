@@ -69,16 +69,24 @@ export async function onRequestPut(context) {
     // folderId was previously accepted by the client (moveFile sends it) but
     // silently dropped here — a move looked successful without ever being
     // persisted. It's now applied the same COALESCE way as the other fields.
-    await env.DB.prepare(
+    const savedUpdatedAt = updatedAt ?? new Date().toISOString();
+    const result = await env.DB.prepare(
       'UPDATE chart_files SET name = COALESCE(?, name), folderId = COALESCE(?, folderId), updatedAt = ?, content = COALESCE(?, content) WHERE id = ?'
     ).bind(
       name ?? null,
       folderId ?? null,
-      updatedAt ?? new Date().toISOString(),
+      savedUpdatedAt,
       content !== undefined ? JSON.stringify(content) : null,
       id
     ).run();
-    return json({ success: true });
+    // D1 reports affected rows via meta.changes. A stale or local-only id
+    // (nothing to update) must not report success — that's exactly the "save
+    // looked fine but nothing was actually written" failure this endpoint
+    // used to allow.
+    if (!result || !result.meta || result.meta.changes === 0) {
+      return json({ error: 'no chart row was updated — this id does not exist in Cloud', id }, 409);
+    }
+    return json({ success: true, id, updatedAt: savedUpdatedAt });
   } catch (err) {
     return error(err);
   }

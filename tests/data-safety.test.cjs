@@ -321,3 +321,29 @@ test('POST /api/files rejects a folderId that does not reference an existing fol
   assert.equal(res.status, 400);
   assert.equal(mock.state.chart_files.length, 2, 'no row should have been inserted');
 });
+
+// ── Phase 0C: Save-to-Cloud Persistence — API save contract ────────────────
+
+test('PUT /api/files returns 409 and reports nothing was written for a stale/local-only id', async () => {
+  const mock = makeMockD1(syntheticTree());
+  const res = await filesApi.onRequestPut({
+    env: mock.env,
+    request: fakeRequest({ id: 'never-existed-in-cloud', name: 'X', updatedAt: '2026-01-07T00:00:00.000Z', content: { header: {}, steps: [], layoutDiagram: { elements: [], connections: [] } } }),
+  });
+  assert.equal(res.status, 409, 'a zero-row update must not report success');
+  const body = await bodyOf(res);
+  assert.match(body.error, /no chart row was updated/);
+});
+
+test('PUT /api/files returns the confirmed id and updatedAt on a real write', async () => {
+  const mock = makeMockD1(syntheticTree());
+  const res = await filesApi.onRequestPut({
+    env: mock.env,
+    request: fakeRequest({ id: 'chart-1', name: 'Renamed', updatedAt: '2026-01-07T00:00:00.000Z' }),
+  });
+  assert.equal(res.status, 200);
+  const body = await bodyOf(res);
+  assert.equal(body.success, true);
+  assert.equal(body.id, 'chart-1');
+  assert.equal(body.updatedAt, '2026-01-07T00:00:00.000Z', 'the response must echo the canonical saved version/timestamp so the client can verify against it');
+});
