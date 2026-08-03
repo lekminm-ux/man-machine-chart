@@ -2,6 +2,80 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-03 (Update 12 — Phase 0C release: commit, push, deploy)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized, via structured choice, after GPT/Codex's Round 5
+`PASS`: commit + push to `main`; deploy to Cloudflare Pages Production;
+**read-only** live verification only (no Production D1 write authorized).
+
+### Actions taken
+
+1. Staged exactly the 15 files from the agreed release scope (the Phase 0C
+   application/API/UI files, their tests, and the review/changelog/master-plan
+   documentation) — no broad `git add -A`, nothing else in the working tree
+   touched.
+2. Committed as `4e19fb0` — "release: close phase 0C save-to-cloud
+   persistence safety gaps".
+3. Pushed to `origin/main`: `87f9a47..4e19fb0`. Confirmed via `git fetch` +
+   `git status` immediately before push that no upstream divergence existed.
+4. Ran `npm run build` fresh from the pushed commit (exit 0, 5/5 static
+   routes), then deployed:
+   `npx wrangler pages deploy out --project-name=man-machine-chart
+   --branch=main --commit-dirty=true` → deployment URL
+   `https://0040583c.man-machine-chart.pages.dev`.
+
+### Live verification (read-only — no Production D1 write performed)
+
+- Opened `https://man-machine-chart.pages.dev/editor` fresh (new browser
+  session, no cached local state). Zero console errors/warnings throughout.
+- Folder tree matches the `DATA_SAFE_READ_ONLY_COMPLETE` baseline recorded on
+  2026-08-02 exactly: 3 roots (`581D`, `P703`, `PD6`), 5 folders total
+  (`PD6` → `BlowMold` → `BYD`, max depth 3), 6 charts
+  (`Coverouter581D`; `Inner LH Rev.01 เจ้ก้อยB`; `Inner RH Rev.01 เจ้แป๋ม B`;
+  `BYDSidestep Rev.00`; `BYDSidestep Rev.01.`; `5F00_Facestep_#2_R00`). No
+  folder, root, or chart count decreased.
+- Opened `BYDSidestep Rev.00` (id `1c70da4a-4efb-490d-8b25-a6a97a2bb4a7`) via
+  `GET /api/files?id=...` → `200`. Step table and Timeline Visualization
+  rendered with the full real dataset (timeline extent 1091s, matching the
+  chart's known content). `GET /api/folders` and `GET /api/files` (list) both
+  `200`.
+- No file was created, renamed, moved, duplicated, deleted, or saved against
+  Production during this verification — view-only navigation.
+
+### Rollback target
+
+The deployment immediately prior to this one in Cloudflare Pages' own
+deployment history for the `man-machine-chart` project (each `wrangler pages
+deploy` creates a new immutable deployment; rollback is a Cloudflare
+Pages-level action, not a separate git commit this log can single out with
+certainty). No schema or data migration accompanied this release, so rollback
+is a pure code revert with no data-shape implications.
+
+### Remaining open items (not part of this release)
+
+- No live Save→PUT→fresh-GET→refresh round trip was run against Production
+  this round (explicitly not authorized — read-only verification only). The
+  most recent full round-trip evidence remains the local Pages Dev evidence
+  recorded in the Round 4/5 entries below.
+- Multi-user concurrent-editing safety, server-side authentication/
+  authorization, and the `functions/api/folders.js` `meta.changes`
+  defense-in-depth gap all remain separately scoped, exactly as every prior
+  review round already recorded.
+
+### Database Safety Gate / Production statement
+
+- **No Production D1 write occurred.** Verification was strictly read-only,
+  per explicit user choice.
+- Commit, push, and deploy **did** occur this round, explicitly authorized by
+  the user. This is the first git/deploy mutation of the entire Phase 0C
+  workflow — every prior round was code-only with no git action.
+
 ## 2026-08-03 (GPT/Codex Phase 0C final code review — Round 5)
 
 ### Tool / Decision
