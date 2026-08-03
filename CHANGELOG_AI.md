@@ -2,6 +2,47 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-03 (Codex Phase 4A M5 Yamazumi Min/Max/Avg overlay)
+
+### Tool / Scope
+
+- Codex / GPT implementation-only handoff for Phase 4A M5.
+- Implemented Min/Max/Average overlay from M1 time-study rows only. Phase 4B
+  and Phase 4C remain out of scope.
+
+### Changes
+
+- `src/lib/time-study.ts`: added `manMin`, `walkMin`, and `idleMin` to each
+  operator total. Existing `min`, `max`, `average`, and `rowCount` behavior
+  remains unchanged; machine rows remain grouped under the existing `Auto M/C`
+  bucket.
+- `src/components/modules/Module5_YamazumiChart.tsx`: when M1 rows exist,
+  renders solid Min work, a hatched Max overlay, and an Average marker with
+  the Max/Average legend entries. With no M1 rows, the existing step-based
+  fallback rendering remains unchanged.
+- `tests/time-study.test.cjs`: added mixed-kind split/no-leakage coverage and
+  literal regression assertions for existing total fields.
+- `CHANGELOG_AI.md`: recorded this implementation handoff.
+
+### Verification
+
+- `node --test`: PASS, 156/156 tests.
+- `npm.cmd run lint`: expected baseline result, 5 existing errors and 29
+  warnings; no errors reported in the Phase 4A files.
+- `npm.cmd run build`: PASS, 5/5 static routes generated.
+- `npx.cmd tsc --noEmit`: PASS.
+- `git diff --check`: PASS; only Git line-ending warnings were emitted.
+- Manual local fixture check: M1 data showed Min/Max/Average for two human
+  operators and the Max/Average legend; the no-M1 fixture preserved the
+  existing fallback and omitted Max/Average. Current fixture-page console was
+  clean.
+
+### Handoff / Safety
+
+- The pre-existing `docs/AI_PROMPTS/README.md` modification and untracked
+  prompt file were preserved exactly and not edited by this implementation.
+- No commit, push, deploy, migration, or Production D1 write was performed.
+
 ## 2026-08-03 (Update 12 — Phase 0C release: commit, push, deploy)
 
 ### Tool

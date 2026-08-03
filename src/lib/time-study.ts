@@ -104,6 +104,9 @@ export interface OperatorTotal {
   max: number;
   average: number;
   rowCount: number;
+  manMin: number;
+  walkMin: number;
+  idleMin: number;
 }
 
 /**
@@ -121,12 +124,19 @@ export function computeOperatorTotals(study: TimeStudy): OperatorTotal[] {
 
   return [...byOperator.entries()].map(([operator, rows]) => {
     const stats = rows.map(computeRowStats);
+    const sumStats = (pick: (row: TimeStudyRow, stats: TimeStudyRowStats) => boolean) =>
+      round2(stats.reduce((sum, rowStats, index) =>
+        sum + (pick(rows[index], rowStats) ? rowStats.min : 0), 0));
+
     return {
       operator,
       min: round2(stats.reduce((a, s) => a + s.min, 0)),
       max: round2(stats.reduce((a, s) => a + s.max, 0)),
       average: round2(stats.reduce((a, s) => a + s.average, 0)),
       rowCount: rows.length,
+      manMin: sumStats(row => row.kind === 'man'),
+      walkMin: sumStats(row => row.kind === 'walk'),
+      idleMin: sumStats(row => row.kind === 'idle'),
     };
   });
 }

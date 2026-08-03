@@ -138,9 +138,54 @@ test('operator totals split workers from the machine', () => {
 
   assert.equal(byOp['Worker A'].min, 6);   // 5 + 1
   assert.equal(byOp['Worker A'].max, 8);   // 7 + 1
+  assert.equal(byOp['Worker A'].average, 6.6);
   assert.equal(byOp['Worker B'].min, 9);
+  assert.equal(byOp['Worker B'].max, 9);
+  assert.equal(byOp['Worker B'].average, 9);
   assert.equal(byOp['Auto M/C'].min, 30);
   assert.equal(byOp['Worker A'].rowCount, 2);
+  assert.equal(byOp['Worker B'].rowCount, 1);
+  assert.equal(byOp['Auto M/C'].max, 31);
+  assert.equal(byOp['Auto M/C'].average, 30.2);
+  assert.equal(byOp['Auto M/C'].rowCount, 1);
+});
+
+test('operator totals split mixed work kinds without leaking across operators', () => {
+  const study = {
+    readingCount: 3,
+    rows: [
+      row('A-man', 'Worker A', 'man', [5, 6, 7]),
+      row('A-walk', 'Worker A', 'walk', [1, 2, 3]),
+      row('A-idle', 'Worker A', 'idle', [4, 5, 6]),
+      row('B-man', 'Worker B', 'man', [9, 10, 11]),
+      row('B-walk', 'Worker B', 'walk', [2, 2, 2]),
+    ],
+  };
+  const totals = timeStudy.computeOperatorTotals(study);
+  const byOp = Object.fromEntries(totals.map(t => [t.operator, t]));
+
+  assert.deepEqual(
+    {
+      manMin: byOp['Worker A'].manMin,
+      walkMin: byOp['Worker A'].walkMin,
+      idleMin: byOp['Worker A'].idleMin,
+      min: byOp['Worker A'].min,
+    },
+    { manMin: 5, walkMin: 1, idleMin: 4, min: 10 }
+  );
+  assert.deepEqual(
+    {
+      manMin: byOp['Worker B'].manMin,
+      walkMin: byOp['Worker B'].walkMin,
+      idleMin: byOp['Worker B'].idleMin,
+      min: byOp['Worker B'].min,
+    },
+    { manMin: 9, walkMin: 2, idleMin: 0, min: 11 }
+  );
+
+  for (const total of totals) {
+    assert.equal(total.manMin + total.walkMin + total.idleMin, total.min);
+  }
 });
 
 test('resizing the sheet keeps existing readings and pads with blanks', () => {

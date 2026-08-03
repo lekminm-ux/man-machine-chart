@@ -8,9 +8,11 @@ This project uses the same separation of responsibilities as the Technical Injec
 
 | Role | Responsibility | Coding authority |
 |---|---|---|
-| GPT/Codex | Read the project, own the Master Plan, review plans and code, define improvements, and close phases | Does not write code unless the user explicitly asks |
-| Claude | Implement and fix code according to the approved plan and GPT review findings | May edit code only after GPT approval and explicit user authorization |
+| Claude | Review, root-cause analysis, fix/feature planning, Acceptance Criteria, Debug/QA, Final Review after Codex implements | Does not write application source code unless the user explicitly authorizes that specific instance |
+| GPT/Codex | Implement application source code per Claude's plan, write/adjust automated tests, run test/lint/build/diff-check | Implements only the approved scope; must not expand scope on its own |
 | User | Approves scope, starts coding, decides unresolved business choices, and authorizes deployment/escalation | Final decision maker |
+
+(Role split updated 2026-08-03 — the user reversed the original GPT/Claude split above it replaced: Claude now owns review/plan/QA, Codex now owns implementation. Prompts 1-4 below predate this change and describe the old GPT-reviews/Claude-implements loop; treat their *content* as historical reference for what each phase covered, not as the current role assignment.)
 
 ## Prompt order
 
@@ -23,6 +25,9 @@ This project uses the same separation of responsibilities as the Technical Injec
 4. [Claude fix and re-test loop](PROMPT_CLAUDE_04_FIX_RETEST.md)
 
 Fresh-chat handoff after Phase 0C: [final review and release prompt](PROMPT_NEW_CHAT_PHASE_0C_FINAL_REVIEW_AND_RELEASE.md).
+
+Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
+[Phase 4a — Min/Max/Avg overlay](PROMPT_CODEX_PHASE4A_M5_YAMAZUMI_MINMAXAVG.md). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.

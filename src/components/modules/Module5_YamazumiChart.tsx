@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { ALL_WORKERS } from '@/types';
 import { getCalculatedSteps, type CalculatedStep } from '@/lib/chart-utils';
+import { computeOperatorTotals } from '@/lib/time-study';
 import { BarChart3 } from 'lucide-react';
 
 export default function Module5_YamazumiChart() {
@@ -34,17 +35,46 @@ export default function Module5_YamazumiChart() {
     }
   });
 
-  // Filter out operators that have no tasks
-  const activeOperators = ALL_WORKERS.filter(w => operatorSteps[w].length > 0);
+  const hasTimeStudy = (activeFile.timeStudy?.rows?.length ?? 0) > 0;
+  const timeStudyTotals = hasTimeStudy ? computeOperatorTotals(activeFile.timeStudy!) : [];
+  const timeStudyByOperator = new Map(timeStudyTotals.map(total => [total.operator, total]));
 
-  // Calculate operator totals
+  // Use Module 1 as the source of truth when it has rows. Keep the existing
+  // Module 4 calculation path intact for charts that have never used Module 1.
+  const activeOperators = hasTimeStudy
+    ? ALL_WORKERS.filter(operator => (timeStudyByOperator.get(operator)?.rowCount ?? 0) > 0)
+    : ALL_WORKERS.filter(w => operatorSteps[w].length > 0);
+
   const operatorTotals = activeOperators.map(op => {
+    if (hasTimeStudy) {
+      const total = timeStudyByOperator.get(op);
+      return {
+        op,
+        total: total?.min ?? 0,
+        totalMin: total?.min ?? 0,
+        totalMax: total?.max ?? 0,
+        totalAverage: total?.average ?? 0,
+        manMin: total?.manMin ?? 0,
+        walkMin: total?.walkMin ?? 0,
+        idleMin: total?.idleMin ?? 0,
+      };
+    }
+
     const total = operatorSteps[op].reduce((acc, step) => acc + step.calcManual + step.calcWalk + step.calcIdle, 0);
-    return { op, total };
+    return {
+      op,
+      total,
+      totalMin: total,
+      totalMax: total,
+      totalAverage: total,
+      manMin: 0,
+      walkMin: 0,
+      idleMin: 0,
+    };
   });
 
   // Find max total time for scaling the chart height
-  const maxTotalTime = Math.max(localTaktTime, ...operatorTotals.map(t => t.total), 0);
+  const maxTotalTime = Math.max(localTaktTime, ...operatorTotals.map(t => t.totalMax), 0);
 
   // Chart rendering constants
   const CHART_HEIGHT = 400;
@@ -89,6 +119,21 @@ export default function Module5_YamazumiChart() {
               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-800 rounded-sm"></div> Manual Work</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-sm"></div> Walking</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-sm"></div> Idle</div>
+              {hasTimeStudy && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-sm border border-slate-500"
+                      style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(71, 85, 105, 0.45) 0 3px, rgba(226, 232, 240, 0.7) 3px 6px)' }}
+                    ></div>
+                    Max
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-violet-700 rounded-full"></div>
+                    Average
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -119,49 +164,114 @@ export default function Module5_YamazumiChart() {
             <div className="absolute left-10 right-0 bottom-[40px] h-full flex justify-around items-end pt-10">
               {activeOperators.map(op => {
                 const steps = operatorSteps[op];
+                const total = operatorTotals.find(t => t.op === op);
+                const totalMin = total?.totalMin ?? 0;
+                const totalMax = total?.totalMax ?? 0;
+                const totalAverage = total?.totalAverage ?? 0;
+                const manMin = total?.manMin ?? 0;
+                const walkMin = total?.walkMin ?? 0;
+                const idleMin = total?.idleMin ?? 0;
                 return (
                   <div key={op} className="relative w-24 flex flex-col items-center group">
                     {/* The Stacked Bar */}
-                    <div className="w-16 relative flex flex-col-reverse shadow-sm rounded-t-sm overflow-hidden" style={{ height: maxTotalTime * pxPerSec }}>
-                      {steps.map((step) => {
-                        const hManual = step.calcManual * pxPerSec;
-                        const hWalk = step.calcWalk * pxPerSec;
-                        const hIdle = step.calcIdle * pxPerSec;
+                    {hasTimeStudy ? (
+                      <div className="w-16 relative shadow-sm rounded-t-sm" style={{ height: maxTotalTime * pxPerSec }}>
+                        <div
+                          className="absolute bottom-0 left-0 right-0 flex flex-col-reverse overflow-hidden rounded-t-sm"
+                          style={{ height: totalMin * pxPerSec }}
+                        >
+                          {manMin > 0 && (
+                            <div
+                              className="w-full bg-slate-800 border-b border-slate-700"
+                              style={{ height: manMin * pxPerSec }}
+                              title={`Manual Min: ${manMin}s`}
+                            />
+                          )}
+                          {walkMin > 0 && (
+                            <div
+                              className="w-full bg-emerald-500 border-b border-emerald-600"
+                              style={{ height: walkMin * pxPerSec }}
+                              title={`Walking Min: ${walkMin}s`}
+                            />
+                          )}
+                          {idleMin > 0 && (
+                            <div
+                              className="w-full bg-red-500 border-b border-red-600"
+                              style={{ height: idleMin * pxPerSec }}
+                              title={`Idle Min: ${idleMin}s`}
+                            />
+                          )}
+                        </div>
 
-                        return (
-                          <React.Fragment key={step.id}>
-                            {hManual > 0 && (
-                              <div 
-                                className="w-full bg-slate-800 border-b border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer relative"
-                                style={{ height: hManual }}
-                                title={`${step.description} (Manual: ${step.calcManual}s)`}
-                              >
-                                {hManual > 15 && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white opacity-0 group-hover:opacity-100 truncate px-1">{step.calcManual}s</span>}
-                              </div>
-                            )}
-                            {hWalk > 0 && (
-                              <div 
-                                className="w-full bg-emerald-500 border-b border-emerald-600 hover:bg-emerald-400 transition-colors cursor-pointer relative"
-                                style={{ height: hWalk }}
-                                title={`${step.description} (Walk: ${step.calcWalk}s)`}
-                              ></div>
-                            )}
-                            {hIdle > 0 && (
-                              <div 
-                                className="w-full bg-red-500 border-b border-red-600 hover:bg-red-400 transition-colors cursor-pointer relative"
-                                style={{ height: hIdle }}
-                                title={`${step.description} (Idle: ${step.calcIdle}s)`}
-                              ></div>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
+                        {totalMax > totalMin && (
+                          <div
+                            className="absolute left-0 right-0 border border-slate-500/80"
+                            style={{
+                              bottom: totalMin * pxPerSec,
+                              height: (totalMax - totalMin) * pxPerSec,
+                              backgroundImage: 'repeating-linear-gradient(135deg, rgba(71, 85, 105, 0.35) 0 4px, rgba(226, 232, 240, 0.55) 4px 8px)',
+                            }}
+                            title={`Max overlay: ${totalMax}s (Min: ${totalMin}s)`}
+                          />
+                        )}
+
+                        {totalAverage > 0 && (
+                          <div
+                            className="absolute -left-1 -right-1 z-20 h-1 bg-violet-700 rounded-full shadow-sm"
+                            style={{ bottom: totalAverage * pxPerSec, transform: 'translateY(50%)' }}
+                            title={`Average: ${totalAverage}s`}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-16 relative flex flex-col-reverse shadow-sm rounded-t-sm overflow-hidden" style={{ height: maxTotalTime * pxPerSec }}>
+                        {steps.map((step) => {
+                          const hManual = step.calcManual * pxPerSec;
+                          const hWalk = step.calcWalk * pxPerSec;
+                          const hIdle = step.calcIdle * pxPerSec;
+
+                          return (
+                            <React.Fragment key={step.id}>
+                              {hManual > 0 && (
+                                <div
+                                  className="w-full bg-slate-800 border-b border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer relative"
+                                  style={{ height: hManual }}
+                                  title={`${step.description} (Manual: ${step.calcManual}s)`}
+                                >
+                                  {hManual > 15 && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white opacity-0 group-hover:opacity-100 truncate px-1">{step.calcManual}s</span>}
+                                </div>
+                              )}
+                              {hWalk > 0 && (
+                                <div
+                                  className="w-full bg-emerald-500 border-b border-emerald-600 hover:bg-emerald-400 transition-colors cursor-pointer relative"
+                                  style={{ height: hWalk }}
+                                  title={`${step.description} (Walk: ${step.calcWalk}s)`}
+                                ></div>
+                              )}
+                              {hIdle > 0 && (
+                                <div
+                                  className="w-full bg-red-500 border-b border-red-600 hover:bg-red-400 transition-colors cursor-pointer relative"
+                                  style={{ height: hIdle }}
+                                  title={`${step.description} (Idle: ${step.calcIdle}s)`}
+                                ></div>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    )}
                     
                     {/* Total Time Label above bar */}
-                    <div className="absolute -top-6 text-sm font-bold text-slate-700 font-mono">
-                      {operatorTotals.find(t => t.op === op)?.total}s
-                    </div>
+                    {hasTimeStudy ? (
+                      <div className="absolute -top-9 text-center text-sm font-bold text-slate-700 font-mono whitespace-nowrap">
+                        <div>Max {totalMax}s</div>
+                        <div className="text-[10px] font-normal text-slate-500">Min {totalMin}s · Avg {totalAverage}s</div>
+                      </div>
+                    ) : (
+                      <div className="absolute -top-6 text-sm font-bold text-slate-700 font-mono">
+                        {total?.total}s
+                      </div>
+                    )}
                     
                     {/* Operator Label below bar */}
                     <div className="absolute -bottom-8 font-bold text-sm text-slate-600 whitespace-nowrap">
