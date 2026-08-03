@@ -27,7 +27,8 @@ This project uses the same separation of responsibilities as the Technical Injec
 Fresh-chat handoff after Phase 0C: [final review and release prompt](PROMPT_NEW_CHAT_PHASE_0C_FINAL_REVIEW_AND_RELEASE.md).
 
 Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
-[Phase 4a — Min/Max/Avg overlay](PROMPT_CODEX_PHASE4A_M5_YAMAZUMI_MINMAXAVG.md). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
+[Phase 4a — Min/Max/Avg overlay](PROMPT_CODEX_PHASE4A_M5_YAMAZUMI_MINMAXAVG.md) (shipped, commit 06898ea),
+[Phase 4b — Periodical/Changeover tiers](PROMPT_CODEX_PHASE4B_M5_PERIODICAL_CHANGEOVER.md). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.
