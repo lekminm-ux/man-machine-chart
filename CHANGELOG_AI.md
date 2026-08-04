@@ -2,6 +2,59 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-04 (Update 13 — Phase 4a+4b release: commit, push, deploy)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized commit + push for both Phase 4a and Phase 4b
+(separately, after each was independently reviewed), then explicitly
+authorized deployment of both to Cloudflare Pages Production.
+
+### Actions taken
+
+1. Phase 4a: committed `06898ea` ("feat(m5): add Min/Max/Average overlay to
+   Yamazumi chart"), pushed `7274db8..06898ea`.
+2. Phase 4b: committed `979774a` ("feat(m5): add Periodical/Changeover time
+   tiers to Yamazumi chart"), pushed `0a1ae7e..979774a`.
+3. Fresh `npm run build` (exit 0, 5/5 static routes) from the pushed
+   commit, then deployed:
+   `npx wrangler pages deploy out --project-name=man-machine-chart
+   --branch=main --commit-dirty=true` → deployment URL
+   `https://c121d9b3.man-machine-chart.pages.dev`.
+
+### Live verification (read-only — no Production D1 write performed)
+
+- Opened `https://man-machine-chart.pages.dev/editor` fresh. Folder tree
+  matches the known baseline exactly: 3 roots (`581D`, `P703`, `PD6`), 5
+  folders (`PD6` → `BlowMold` → `BYD`, depth 3), 6 charts. No decrease.
+- Opened `BYDSidestep Rev.00` (real Production data, multiple readings up to
+  10 columns, 3 operators). Module 1 renders correctly with the new
+  "หมวดเวลา" column present and defaulting to "ปกติ" for every row (none of
+  the existing Production data has ever been categorized — expected).
+  Module 5 renders the Phase 4a Min/Max/Average treatment correctly (Worker
+  A/B/C all show matching Max/Min/Avg, consistent with this chart's actual
+  reading data) with no Periodical/Changeover tiers or legend entries —
+  correct, since no row is categorized.
+- Zero console errors/warnings across every step. No file was created,
+  renamed, moved, duplicated, deleted, saved, or categorized against
+  Production during this verification — view-only navigation.
+
+### Rollback target
+
+The Cloudflare Pages deployment immediately prior to this one in the
+project's own deployment history (same mechanism as the Phase 0C release
+entry above). No schema or data migration accompanied this release.
+
+### Database Safety Gate / Production statement
+
+- **No Production D1 write occurred.** Verification was strictly read-only.
+- Commit, push, and deploy did occur this round, explicitly authorized by
+  the user at each step.
+
 ## 2026-08-03 (Codex Phase 4A M5 Yamazumi Min/Max/Avg overlay)
 
 ### Tool / Scope

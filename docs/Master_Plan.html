@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.19</div>
-      <div><b>Updated</b>3 Aug 2026</div>
+      <div><b>Version</b>1.20</div>
+      <div><b>Updated</b>4 Aug 2026</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>4e19fb0 (deployed)</div>
-      <div><b>Planning gate</b>Phase 0A complete · Phase 0B runtime guards GPT-reviewed PASS · Phase 0C Save-to-Cloud Persistence deployed to Production, read-only verified</div>
-      <div><b>Status</b>Master Plan v1.19 · Production D1/schema remain protected · Phase 0C committed, pushed, and deployed with explicit user authorization; read-only live check confirmed the existing folder tree (3 roots / 5 folders / 6 charts) and a representative chart intact with zero console errors. No Production D1 write performed — a live Save→PUT→fresh-GET round trip against Production remains a separate, not-yet-authorized step.</div>
+      <div><b>Baseline commit</b>979774a (deployed)</div>
+      <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4a+4b (M5 Yamazumi Min/Max/Avg + Periodical/Changeover) deployed to Production, read-only verified · Phase 4c (Drag &amp; Drop) not started</div>
+      <div><b>Status</b>Master Plan v1.20 · Production D1/schema remain protected · Phase 4a (Min/Max/Avg overlay) and Phase 4b (Periodical/Changeover tiers) committed, pushed, and deployed with explicit user authorization; read-only live check confirmed the existing folder tree (3 roots / 5 folders / 6 charts) and a representative chart (including the new "หมวดเวลา" column and unaffected M5 rendering) intact with zero console errors. No Production D1 write performed.</div>
     </div>
   </div>
 </header>
@@ -339,9 +339,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td><b>รอบนี้ไม่แก้ตามที่สั่ง</b> — งานเสริม (Symbol Library, Walking Path) เลื่อนไป Phase 6</td>
       </tr>
       <tr>
-        <td><b>M5</b></td><td><span class="b b-wip">แก้บั๊กแล้ว · ยังไม่ครบตาม PDF</span></td>
-        <td>แท่ง Yamazumi + เส้น Takt — <b>แก้บั๊กเวลา 31 ก.ค.</b> เดิมบวก "เวลาหยุด" ดิบ ทำให้ตัวเลขเกินความจริง ตอนนี้ใช้ระยะเวลาจริงและตรงกับ M1/M4 แล้ว</td>
-        <td>เพิ่มส่วนทับ Max + จุด Avg + แถบ Periodical/Changeover + Drag &amp; Drop จัดสมดุล</td>
+        <td><b>M5</b></td><td><span class="b b-wip">Phase 4a+4b deployed · รอ 4c</span></td>
+        <td>แท่ง Yamazumi + เส้น Takt (แก้บั๊กเวลา 31 ก.ค.) + <b>Min/Max/Avg overlay จาก M1 (Phase 4a, 3 ส.ค.)</b> + <b>แถบ Periodical/Changeover (Phase 4b, 4 ส.ค.)</b> — deploy ขึ้น Production แล้วทั้งคู่</td>
+        <td>เหลือ Drag &amp; Drop จัดสมดุล (Phase 4c) — ยังไม่เริ่ม</td>
       </tr>
       <tr>
         <td><b>M6</b></td><td><span class="b b-todo">ยังไม่มี</span></td>
@@ -624,10 +624,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-plan">ถัดไป</span></div>
+    <div class="tag"><span class="b b-wip">กำลังทำ (4a+4b เสร็จแล้ว)</span></div>
     <div class="body">
       <h4>Phase 4 · M5 Yamazumi ฉบับสมบูรณ์</h4>
-      <p>เปลี่ยนฐานเป็น Min จาก M1 · ทับ Max · จุด Avg · เส้น Takt · แถบ Periodical/Changeover · Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล</p>
+      <p>✅ 4a (3 ส.ค., deployed): ฐาน Min จาก M1 · ทับ Max · จุด Avg · เส้น Takt<br>
+         ✅ 4b (4 ส.ค., deployed): แถบ Periodical/Changeover พร้อม dropdown หมวดเวลาใน M1<br>
+         ⏳ 4c (ยังไม่เริ่ม): Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล</p>
     </div>
   </div>
 
