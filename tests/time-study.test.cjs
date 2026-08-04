@@ -43,8 +43,9 @@ const chartUtils = loadTypeScriptModule('src/lib/chart-utils.ts');
 let seq = 0;
 const nextId = () => `id-${++seq}`;
 
-function row(jobElement, operator, kind, readings) {
-  return { id: nextId(), seq: 0, jobElement, operator, kind, readings };
+function row(jobElement, operator, kind, readings, category) {
+  const base = { id: nextId(), seq: 0, jobElement, operator, kind, readings };
+  return category ? { ...base, category } : base;
 }
 
 // ── Reference data straight out of JOB_C CAP_1 (3 TEN SET Line SUV_Rev.01.xlsx)
@@ -186,6 +187,141 @@ test('operator totals split mixed work kinds without leaking across operators', 
   for (const total of totals) {
     assert.equal(total.manMin + total.walkMin + total.idleMin, total.min);
   }
+});
+
+test('categorized rows are excluded from regular totals and counted in their category buckets', () => {
+  const study = {
+    readingCount: 3,
+    rows: [
+      row('regular-man', 'Worker A', 'man', [5, 6, 7]),
+      row('periodical-man', 'Worker A', 'man', [10, 12, 11], 'periodical'),
+      row('changeover-idle', 'Worker A', 'idle', [20, 22, 21], 'changeover'),
+    ],
+  };
+  const total = timeStudy.computeOperatorTotals(study)[0];
+
+  assert.deepEqual(
+    {
+      min: total.min,
+      max: total.max,
+      average: total.average,
+      rowCount: total.rowCount,
+      manMin: total.manMin,
+      walkMin: total.walkMin,
+      idleMin: total.idleMin,
+      periodicalMin: total.periodicalMin,
+      changeoverMin: total.changeoverMin,
+    },
+    {
+      min: 5,
+      max: 7,
+      average: 6,
+      rowCount: 1,
+      manMin: 5,
+      walkMin: 0,
+      idleMin: 0,
+      periodicalMin: 10,
+      changeoverMin: 20,
+    }
+  );
+});
+
+test('rows without a category preserve Phase 4A regular totals exactly', () => {
+  const study = {
+    readingCount: 3,
+    rows: [
+      row('A-man', 'Worker A', 'man', [5, 6, 7]),
+      row('A-walk', 'Worker A', 'walk', [1, 2, 3]),
+      row('A-idle', 'Worker A', 'idle', [4, 5, 6]),
+      row('B-man', 'Worker B', 'man', [9, 10, 11]),
+      row('B-walk', 'Worker B', 'walk', [2, 2, 2]),
+    ],
+  };
+  const totals = timeStudy.computeOperatorTotals(study);
+
+  assert.equal(study.rows.every(r => r.category === undefined), true);
+  assert.deepEqual(
+    totals.map(total => ({
+      operator: total.operator,
+      min: total.min,
+      max: total.max,
+      average: total.average,
+      rowCount: total.rowCount,
+      manMin: total.manMin,
+      walkMin: total.walkMin,
+      idleMin: total.idleMin,
+    })),
+    [
+      { operator: 'Worker A', min: 10, max: 16, average: 13, rowCount: 3, manMin: 5, walkMin: 1, idleMin: 4 },
+      { operator: 'Worker B', min: 11, max: 13, average: 12, rowCount: 2, manMin: 9, walkMin: 2, idleMin: 0 },
+    ]
+  );
+});
+
+test('mixed regular, periodical, and changeover rows stay isolated per operator', () => {
+  const study = {
+    readingCount: 3,
+    rows: [
+      row('A-man', 'Worker A', 'man', [5, 6, 7]),
+      row('A-walk', 'Worker A', 'walk', [1, 2, 3]),
+      row('A-periodical', 'Worker A', 'man', [10, 11, 12], 'periodical'),
+      row('A-changeover', 'Worker A', 'idle', [20, 21, 22], 'changeover'),
+      row('B-man', 'Worker B', 'man', [9, 10, 11]),
+      row('B-periodical', 'Worker B', 'walk', [30, 31, 32], 'periodical'),
+      row('B-changeover', 'Worker B', 'man', [40, 41, 42], 'changeover'),
+    ],
+  };
+  const totals = timeStudy.computeOperatorTotals(study);
+  const byOp = Object.fromEntries(totals.map(total => [total.operator, total]));
+
+  assert.deepEqual(
+    {
+      min: byOp['Worker A'].min,
+      max: byOp['Worker A'].max,
+      average: byOp['Worker A'].average,
+      rowCount: byOp['Worker A'].rowCount,
+      manMin: byOp['Worker A'].manMin,
+      walkMin: byOp['Worker A'].walkMin,
+      idleMin: byOp['Worker A'].idleMin,
+      periodicalMin: byOp['Worker A'].periodicalMin,
+      changeoverMin: byOp['Worker A'].changeoverMin,
+    },
+    {
+      min: 6,
+      max: 10,
+      average: 8,
+      rowCount: 2,
+      manMin: 5,
+      walkMin: 1,
+      idleMin: 0,
+      periodicalMin: 10,
+      changeoverMin: 20,
+    }
+  );
+  assert.deepEqual(
+    {
+      min: byOp['Worker B'].min,
+      max: byOp['Worker B'].max,
+      average: byOp['Worker B'].average,
+      rowCount: byOp['Worker B'].rowCount,
+      manMin: byOp['Worker B'].manMin,
+      walkMin: byOp['Worker B'].walkMin,
+      idleMin: byOp['Worker B'].idleMin,
+      periodicalMin: byOp['Worker B'].periodicalMin,
+      changeoverMin: byOp['Worker B'].changeoverMin,
+    },
+    {
+      min: 9,
+      max: 11,
+      average: 10,
+      rowCount: 1,
+      manMin: 9,
+      walkMin: 0,
+      idleMin: 0,
+      periodicalMin: 30,
+      changeoverMin: 40,
+    }
+  );
 });
 
 test('resizing the sheet keeps existing readings and pads with blanks', () => {

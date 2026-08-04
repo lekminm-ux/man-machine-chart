@@ -7,6 +7,9 @@ import { getCalculatedSteps, type CalculatedStep } from '@/lib/chart-utils';
 import { computeOperatorTotals } from '@/lib/time-study';
 import { BarChart3 } from 'lucide-react';
 
+const PERIODICAL_PATTERN = 'repeating-linear-gradient(45deg, rgba(30, 41, 59, 0.7) 0 3px, rgba(148, 163, 184, 0.45) 3px 7px)';
+const CHANGEOVER_PATTERN = 'linear-gradient(90deg, rgba(30, 41, 59, 0.6) 0 1px, transparent 1px 8px), linear-gradient(0deg, rgba(30, 41, 59, 0.6) 0 1px, transparent 1px 8px)';
+
 export default function Module5_YamazumiChart() {
   const activeFile = useChartStore(s => s.activeFile());
   const updateTimeMeasurement = useChartStore(s => s.updateTimeMeasurement);
@@ -38,11 +41,12 @@ export default function Module5_YamazumiChart() {
   const hasTimeStudy = (activeFile.timeStudy?.rows?.length ?? 0) > 0;
   const timeStudyTotals = hasTimeStudy ? computeOperatorTotals(activeFile.timeStudy!) : [];
   const timeStudyByOperator = new Map(timeStudyTotals.map(total => [total.operator, total]));
+  const hasCategorizedTime = hasTimeStudy && activeFile.timeStudy!.rows.some(row => row.category !== undefined);
 
   // Use Module 1 as the source of truth when it has rows. Keep the existing
   // Module 4 calculation path intact for charts that have never used Module 1.
   const activeOperators = hasTimeStudy
-    ? ALL_WORKERS.filter(operator => (timeStudyByOperator.get(operator)?.rowCount ?? 0) > 0)
+    ? ALL_WORKERS.filter(operator => timeStudyByOperator.has(operator))
     : ALL_WORKERS.filter(w => operatorSteps[w].length > 0);
 
   const operatorTotals = activeOperators.map(op => {
@@ -57,6 +61,8 @@ export default function Module5_YamazumiChart() {
         manMin: total?.manMin ?? 0,
         walkMin: total?.walkMin ?? 0,
         idleMin: total?.idleMin ?? 0,
+        periodicalMin: total?.periodicalMin ?? 0,
+        changeoverMin: total?.changeoverMin ?? 0,
       };
     }
 
@@ -70,11 +76,19 @@ export default function Module5_YamazumiChart() {
       manMin: 0,
       walkMin: 0,
       idleMin: 0,
+      periodicalMin: 0,
+      changeoverMin: 0,
     };
   });
 
   // Find max total time for scaling the chart height
-  const maxTotalTime = Math.max(localTaktTime, ...operatorTotals.map(t => t.totalMax), 0);
+  const maxTotalTime = Math.max(
+    localTaktTime,
+    ...operatorTotals.map(t => hasTimeStudy
+      ? t.totalMax + t.periodicalMin + t.changeoverMin
+      : t.totalMax),
+    0
+  );
 
   // Chart rendering constants
   const CHART_HEIGHT = 400;
@@ -132,6 +146,24 @@ export default function Module5_YamazumiChart() {
                     <div className="w-4 h-0.5 bg-violet-700 rounded-full"></div>
                     Average
                   </div>
+                  {hasCategorizedTime && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-sm border border-slate-500"
+                          style={{ backgroundImage: PERIODICAL_PATTERN }}
+                        ></div>
+                        Periodical
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-sm border border-slate-500"
+                          style={{ backgroundImage: CHANGEOVER_PATTERN, backgroundSize: '8px 8px' }}
+                        ></div>
+                        Changeover
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -171,6 +203,8 @@ export default function Module5_YamazumiChart() {
                 const manMin = total?.manMin ?? 0;
                 const walkMin = total?.walkMin ?? 0;
                 const idleMin = total?.idleMin ?? 0;
+                const periodicalMin = total?.periodicalMin ?? 0;
+                const changeoverMin = total?.changeoverMin ?? 0;
                 return (
                   <div key={op} className="relative w-24 flex flex-col items-center group">
                     {/* The Stacked Bar */}
@@ -220,6 +254,33 @@ export default function Module5_YamazumiChart() {
                             className="absolute -left-1 -right-1 z-20 h-1 bg-violet-700 rounded-full shadow-sm"
                             style={{ bottom: totalAverage * pxPerSec, transform: 'translateY(50%)' }}
                             title={`Average: ${totalAverage}s`}
+                          />
+                        )}
+
+                        {periodicalMin > 0 && (
+                          <div
+                            className="absolute left-0 right-0 z-10 border border-slate-700/80"
+                            style={{
+                              bottom: totalMax * pxPerSec,
+                              height: periodicalMin * pxPerSec,
+                              backgroundColor: '#334155',
+                              backgroundImage: PERIODICAL_PATTERN,
+                            }}
+                            title={`Periodical: ${periodicalMin}s`}
+                          />
+                        )}
+
+                        {changeoverMin > 0 && (
+                          <div
+                            className="absolute left-0 right-0 z-10 border border-slate-700/80 rounded-t-sm"
+                            style={{
+                              bottom: (totalMax + periodicalMin) * pxPerSec,
+                              height: changeoverMin * pxPerSec,
+                              backgroundColor: '#334155',
+                              backgroundImage: CHANGEOVER_PATTERN,
+                              backgroundSize: '8px 8px',
+                            }}
+                            title={`Changeover: ${changeoverMin}s`}
                           />
                         )}
                       </div>

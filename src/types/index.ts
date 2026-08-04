@@ -134,6 +134,7 @@ export interface TimeStudyRow {
   jobElement: string;
   operator: OperatorType;
   kind: TimeStudyKind;
+  category?: 'periodical' | 'changeover';
   /** One stopwatch reading per round; `null` = not measured yet. */
   readings: (number | null)[];
 }

@@ -59,6 +59,10 @@ export function isMachineRow(row: TimeStudyRow): boolean {
   return row.kind === 'machine' || row.operator === 'Auto M/C';
 }
 
+function rowCategory(row: TimeStudyRow): 'regular' | 'periodical' | 'changeover' {
+  return row.category ?? 'regular';
+}
+
 export interface TimeStudyTotals {
   /** Per reading column, machine rows excluded — `=SUM(C8:C44)-C25`. */
   perReading: number[];
@@ -107,6 +111,8 @@ export interface OperatorTotal {
   manMin: number;
   walkMin: number;
   idleMin: number;
+  periodicalMin: number;
+  changeoverMin: number;
 }
 
 /**
@@ -123,20 +129,21 @@ export function computeOperatorTotals(study: TimeStudy): OperatorTotal[] {
   }
 
   return [...byOperator.entries()].map(([operator, rows]) => {
-    const stats = rows.map(computeRowStats);
-    const sumStats = (pick: (row: TimeStudyRow, stats: TimeStudyRowStats) => boolean) =>
-      round2(stats.reduce((sum, rowStats, index) =>
-        sum + (pick(rows[index], rowStats) ? rowStats.min : 0), 0));
+    const regularRows = rows.filter(row => rowCategory(row) === 'regular');
+    const sumRows = (sourceRows: TimeStudyRow[], pick: (stats: TimeStudyRowStats) => number) =>
+      round2(sourceRows.reduce((sum, row) => sum + pick(computeRowStats(row)), 0));
 
     return {
       operator,
-      min: round2(stats.reduce((a, s) => a + s.min, 0)),
-      max: round2(stats.reduce((a, s) => a + s.max, 0)),
-      average: round2(stats.reduce((a, s) => a + s.average, 0)),
-      rowCount: rows.length,
-      manMin: sumStats(row => row.kind === 'man'),
-      walkMin: sumStats(row => row.kind === 'walk'),
-      idleMin: sumStats(row => row.kind === 'idle'),
+      min: sumRows(regularRows, stats => stats.min),
+      max: sumRows(regularRows, stats => stats.max),
+      average: sumRows(regularRows, stats => stats.average),
+      rowCount: regularRows.length,
+      manMin: sumRows(regularRows.filter(row => row.kind === 'man'), stats => stats.min),
+      walkMin: sumRows(regularRows.filter(row => row.kind === 'walk'), stats => stats.min),
+      idleMin: sumRows(regularRows.filter(row => row.kind === 'idle'), stats => stats.min),
+      periodicalMin: sumRows(rows.filter(row => rowCategory(row) === 'periodical'), stats => stats.min),
+      changeoverMin: sumRows(rows.filter(row => rowCategory(row) === 'changeover'), stats => stats.min),
     };
   });
 }

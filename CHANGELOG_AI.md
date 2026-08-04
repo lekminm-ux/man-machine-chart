@@ -2579,3 +2579,54 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
   วิธีที่เร็วที่สุดคือกรอกที่ M1 แล้วกด "ส่งข้อมูลไป M2–M5" มาทับ
 - ไม่มีการเขียนทับฐานข้อมูลจริง — การเปลี่ยนแปลงเกิดตอนแสดงผลเท่านั้น จนกว่าผู้ใช้จะกด Save
 - ไฟล์ Rev.00 ก็ได้รับผลเดียวกัน (ตัวเลขเดิมเป็นยอดสะสม) ต้องกรอกใหม่เช่นกัน
+
+## 2026-08-03 (Codex Phase 4B M1 time categories and M5 three-tier Yamazumi)
+
+### Tool / Scope
+
+- Codex / GPT implementation-only handoff for Phase 4B.
+- Phase 4C Drag & Drop remains out of scope.
+
+### Changes
+
+- Changed exactly these files: `src/types/index.ts`, `src/lib/time-study.ts`,
+  `src/components/modules/Module1_TimeMeasurement.tsx`,
+  `src/components/modules/Module5_YamazumiChart.tsx`,
+  `tests/time-study.test.cjs`, and `CHANGELOG_AI.md`.
+- Added the optional `TimeStudyRow.category` field with only
+  `'periodical' | 'changeover'`; an absent or undefined value means regular
+  work.
+- Scoped operator `min`, `max`, `average`, `manMin`, `walkMin`, `idleMin`,
+  and `rowCount` to regular rows. This is intentional: categorized time is
+  shown in its own M5 tier and must not be counted again in the regular tier.
+  Added `periodicalMin` and `changeoverMin` per operator. M5 now stacks
+  Regular, Periodical diagonal hatch, and Changeover grid hatch in that order;
+  the Phase 4A Max/Average treatment remains on Regular only.
+- Added the M1 `หมวดเวลา` dropdown with `ปกติ`, `ทำเป็นรอบ`, and `เปลี่ยนรุ่น`.
+
+### Verification
+
+- `git status --short --branch`: clean before implementation (`## main...origin/main`).
+- `node --test`: PASS, 159/159 tests.
+- `node --test tests/time-study.test.cjs`: PASS, 18/18 tests.
+- `npm run lint`: blocked by the machine PowerShell execution policy for
+  `npm.ps1`; equivalent `npm.cmd run lint` ran and reported only the known
+  baseline 5 errors plus warnings, with no error in any Phase 4B file.
+- `npm run build`: blocked by the same PowerShell execution policy;
+  equivalent `npm.cmd run build`: PASS, 5/5 static routes generated.
+- `git diff --check`: PASS; only existing LF/CRLF normalization warnings.
+- Manual browser verification was blocked by local tooling state: Next dev at
+  `localhost:3000` had no API/fixture chart; Pages Dev could not start because
+  `wrangler` is not installed and `npx` could not access its registry cache;
+  the existing Chrome production tab was still the Phase 4A bundle and was not
+  written to. A local in-memory fixture proxy was prepared but the Browser URL
+  policy rejected its port, so categorized and uncategorized visual smoke
+  results remain open for review.
+
+### Handoff / Safety
+
+- `rowCount` is regular-only so Module 1's `N งาน` label matches the regular
+  summary meaning; M5 detects operator presence independently so category-only
+  operators are not hidden.
+- No commit, push, deploy, migration, remote operation, or Production D1 write
+  occurred.

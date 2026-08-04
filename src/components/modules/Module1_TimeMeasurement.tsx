@@ -28,6 +28,12 @@ const KIND_OPTIONS: { value: TimeStudyKind; label: string; cls: string }[] = [
   { value: 'idle',    label: 'รอ',     cls: 'text-rose-700' },
 ];
 
+const CATEGORY_OPTIONS: { value: '' | 'periodical' | 'changeover'; label: string; cls: string }[] = [
+  { value: '',           label: 'ปกติ',       cls: 'text-slate-700' },
+  { value: 'periodical', label: 'ทำเป็นรอบ', cls: 'text-indigo-700' },
+  { value: 'changeover', label: 'เปลี่ยนรุ่น', cls: 'text-violet-700' },
+];
+
 const ALL_OPERATORS: OperatorType[] = [...ALL_WORKERS, 'Auto M/C'];
 
 function emptyStudy(readingCount = DEFAULT_READING_COUNT): TimeStudy {
@@ -227,6 +233,7 @@ export default function Module1_TimeMeasurement() {
                 <th className="border border-slate-200 px-2 py-2 text-left font-bold min-w-[240px]">Job Element</th>
                 <th className="border border-slate-200 px-2 py-2 w-28 font-bold">Worker</th>
                 <th className="border border-slate-200 px-2 py-2 w-20 font-bold">ประเภท</th>
+                <th className="border border-slate-200 px-2 py-2 w-24 font-bold">หมวดเวลา</th>
                 {labels.map(l => (
                   <th key={l} className="border border-slate-200 px-1 py-2 w-16 font-bold">{l}</th>
                 ))}
@@ -298,6 +305,20 @@ export default function Module1_TimeMeasurement() {
                       </select>
                     </td>
 
+                    <td className="border border-slate-200 px-1 py-1">
+                      <select
+                        value={row.category ?? ''}
+                        onChange={e => patchRow(row.id, {
+                          category: e.target.value === '' ? undefined : e.target.value as 'periodical' | 'changeover',
+                        })}
+                        className={`w-full bg-transparent font-semibold focus:outline-none focus:bg-white rounded px-0.5 ${
+                          CATEGORY_OPTIONS.find(c => c.value === (row.category ?? ''))?.cls ?? ''
+                        }`}
+                      >
+                        {CATEGORY_OPTIONS.map(c => <option key={c.value || 'regular'} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </td>
+
                     {row.readings.slice(0, study.readingCount).map((val, col) => (
                       <td key={col} className="border border-slate-200 p-0">
                         <input
@@ -346,7 +367,7 @@ export default function Module1_TimeMeasurement() {
 
               {study.rows.length === 0 && (
                 <tr>
-                  <td colSpan={study.readingCount + 10} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
+                  <td colSpan={study.readingCount + 11} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
                     ยังไม่มีข้อมูล — กด <b>เพิ่มแถว</b> เพื่อกรอกเอง หรือ <b>ดึงข้อมูลจาก M4</b> เพื่อนำ step ที่มีอยู่แล้วมาตั้งต้น
                   </td>
                 </tr>
@@ -356,7 +377,7 @@ export default function Module1_TimeMeasurement() {
             {study.rows.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white font-bold">
-                  <td className="border border-slate-700 px-2 py-2 text-center" colSpan={5}>
+                  <td className="border border-slate-700 px-2 py-2 text-center" colSpan={6}>
                     TOTAL <span className="font-normal text-slate-300">(ไม่รวมแถวเครื่องจักร)</span>
                   </td>
                   {totals.perReading.map((v, i) => (
