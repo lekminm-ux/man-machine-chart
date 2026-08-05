@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import { ALL_WORKERS } from '@/types';
 import { getCalculatedSteps, type CalculatedStep } from '@/lib/chart-utils';
-import { computeOperatorTotals } from '@/lib/time-study';
+import { computeOperatorTotals, computeRowStats, rowsForOperatorByCategory } from '@/lib/time-study';
 import { BarChart3 } from 'lucide-react';
 
 const PERIODICAL_PATTERN = 'repeating-linear-gradient(45deg, rgba(30, 41, 59, 0.7) 0 3px, rgba(148, 163, 184, 0.45) 3px 7px)';
@@ -200,11 +200,17 @@ export default function Module5_YamazumiChart() {
                 const totalMin = total?.totalMin ?? 0;
                 const totalMax = total?.totalMax ?? 0;
                 const totalAverage = total?.totalAverage ?? 0;
-                const manMin = total?.manMin ?? 0;
-                const walkMin = total?.walkMin ?? 0;
-                const idleMin = total?.idleMin ?? 0;
                 const periodicalMin = total?.periodicalMin ?? 0;
                 const changeoverMin = total?.changeoverMin ?? 0;
+                const regularRows = hasTimeStudy
+                  ? rowsForOperatorByCategory(activeFile.timeStudy!, op, 'regular')
+                  : [];
+                const periodicalRows = hasTimeStudy
+                  ? rowsForOperatorByCategory(activeFile.timeStudy!, op, 'periodical')
+                  : [];
+                const changeoverRows = hasTimeStudy
+                  ? rowsForOperatorByCategory(activeFile.timeStudy!, op, 'changeover')
+                  : [];
                 return (
                   <div key={op} className="relative w-24 flex flex-col items-center group">
                     {/* The Stacked Bar */}
@@ -214,27 +220,27 @@ export default function Module5_YamazumiChart() {
                           className="absolute bottom-0 left-0 right-0 flex flex-col-reverse overflow-hidden rounded-t-sm"
                           style={{ height: totalMin * pxPerSec }}
                         >
-                          {manMin > 0 && (
-                            <div
-                              className="w-full bg-slate-800 border-b border-slate-700"
-                              style={{ height: manMin * pxPerSec }}
-                              title={`Manual Min: ${manMin}s`}
-                            />
-                          )}
-                          {walkMin > 0 && (
-                            <div
-                              className="w-full bg-emerald-500 border-b border-emerald-600"
-                              style={{ height: walkMin * pxPerSec }}
-                              title={`Walking Min: ${walkMin}s`}
-                            />
-                          )}
-                          {idleMin > 0 && (
-                            <div
-                              className="w-full bg-red-500 border-b border-red-600"
-                              style={{ height: idleMin * pxPerSec }}
-                              title={`Idle Min: ${idleMin}s`}
-                            />
-                          )}
+                          {regularRows.map(row => {
+                            const rowMin = computeRowStats(row).min;
+                            if (rowMin <= 0) return null;
+
+                            let className = 'w-full bg-slate-800 border-b border-slate-700';
+                            if (row.kind === 'walk') {
+                              className = 'w-full bg-emerald-500 border-b border-emerald-600';
+                            } else if (row.kind === 'idle') {
+                              className = 'w-full bg-red-500 border-b border-red-600';
+                            }
+
+                            return (
+                              <div
+                                key={row.id}
+                                data-row-id={row.id}
+                                className={className}
+                                style={{ height: rowMin * pxPerSec }}
+                                title={`${row.jobElement}: ${rowMin}s`}
+                              />
+                            );
+                          })}
                         </div>
 
                         {totalMax > totalMin && (
@@ -259,29 +265,62 @@ export default function Module5_YamazumiChart() {
 
                         {periodicalMin > 0 && (
                           <div
-                            className="absolute left-0 right-0 z-10 border border-slate-700/80"
+                            className="absolute left-0 right-0 z-10 flex flex-col-reverse overflow-hidden border border-slate-700/80"
                             style={{
                               bottom: totalMax * pxPerSec,
                               height: periodicalMin * pxPerSec,
                               backgroundColor: '#334155',
-                              backgroundImage: PERIODICAL_PATTERN,
                             }}
-                            title={`Periodical: ${periodicalMin}s`}
-                          />
+                          >
+                            {periodicalRows.map(row => {
+                              const rowMin = computeRowStats(row).min;
+                              if (rowMin <= 0) return null;
+
+                              return (
+                                <div
+                                  key={row.id}
+                                  data-row-id={row.id}
+                                  className="w-full border-b border-slate-700/80"
+                                  style={{
+                                    height: rowMin * pxPerSec,
+                                    backgroundColor: '#334155',
+                                    backgroundImage: PERIODICAL_PATTERN,
+                                  }}
+                                  title={`${row.jobElement}: ${rowMin}s`}
+                                />
+                              );
+                            })}
+                          </div>
                         )}
 
                         {changeoverMin > 0 && (
                           <div
-                            className="absolute left-0 right-0 z-10 border border-slate-700/80 rounded-t-sm"
+                            className="absolute left-0 right-0 z-10 flex flex-col-reverse overflow-hidden border border-slate-700/80 rounded-t-sm"
                             style={{
                               bottom: (totalMax + periodicalMin) * pxPerSec,
                               height: changeoverMin * pxPerSec,
-                              backgroundColor: '#334155',
-                              backgroundImage: CHANGEOVER_PATTERN,
-                              backgroundSize: '8px 8px',
                             }}
-                            title={`Changeover: ${changeoverMin}s`}
-                          />
+                          >
+                            {changeoverRows.map(row => {
+                              const rowMin = computeRowStats(row).min;
+                              if (rowMin <= 0) return null;
+
+                              return (
+                                <div
+                                  key={row.id}
+                                  data-row-id={row.id}
+                                  className="w-full border-b border-slate-700/80"
+                                  style={{
+                                    height: rowMin * pxPerSec,
+                                    backgroundColor: '#334155',
+                                    backgroundImage: CHANGEOVER_PATTERN,
+                                    backgroundSize: '8px 8px',
+                                  }}
+                                  title={`${row.jobElement}: ${rowMin}s`}
+                                />
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     ) : (

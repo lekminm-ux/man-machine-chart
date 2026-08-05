@@ -2683,3 +2683,94 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
   operators are not hidden.
 - No commit, push, deploy, migration, remote operation, or Production D1 write
   occurred.
+
+## 2026-08-05 (Codex Phase 4C-1 verification continuation)
+
+### Tool / Status
+
+- Codex / GPT implementation-only verification of the existing Phase 4C-1
+  working-tree implementation.
+- **STATUS: IMPLEMENTED** for the scoped code and automated checks; visual
+  browser smoke remains **BLOCKED** by local Pages-Functions tooling.
+
+### Scope confirmation
+
+- The only implementation scope present before this session was exactly
+  `src/lib/time-study.ts`, `src/components/modules/Module5_YamazumiChart.tsx`,
+  `tests/time-study.test.cjs`, and `CHANGELOG_AI.md`.
+- No drag, drop, pointer tracking, reassignment, Phase 4C-2 work, or unrelated
+  source/test changes were introduced.
+
+### Verification
+
+- `npm.cmd test`: **PASS, 161/161**.
+- `npm.cmd run lint`: exit 1 with the known baseline **5 errors / 23
+  warnings**; no error was reported in any Phase 4C-1 file.
+- `npm.cmd run build`: **PASS**, all 5 static routes generated and TypeScript
+  completed successfully.
+- `git diff --check`: **PASS**; only existing LF/CRLF normalization warnings.
+- `npm.cmd run dev -- -p 3000` served `/editor`, but Next dev does not serve
+  the Cloudflare Pages Functions: `/api/folders` returned 404. The editor
+  therefore showed Cloud unavailable with no chart to open. Pages Dev could
+  not be used because `wrangler` is not installed locally; no chart segment,
+  tooltip, bar-height, overlay, average-marker, or clean-console comparison
+  could be completed.
+
+### Handoff / Safety
+
+- The helper remains the single general `rowsForOperatorByCategory()` design;
+  tests cross-check regular, periodical, and changeover row Min sums against
+  the existing aggregate totals exactly.
+- No commit, push, deploy, migration, remote operation, or Production D1 write
+  occurred. Next action: return this handoff to Claude for review; do not
+  proceed to Phase 4C-2 or release action.
+
+## 2026-08-04 (Codex Phase 4C-1 M5 per-row job-element segments)
+
+### Tool / Scope
+
+- Codex / GPT implementation-only handoff for the Phase 4C-1 rendering prerequisite.
+- This is not the Phase 4C-2 drag interaction; no drag, drop, pointer tracking,
+  or reassignment behavior was added.
+
+### Changes
+
+- Changed exactly these files: `src/lib/time-study.ts`,
+  `src/components/modules/Module5_YamazumiChart.tsx`,
+  `tests/time-study.test.cjs`, and `CHANGELOG_AI.md`.
+- Added the exported general helper
+  `rowsForOperatorByCategory(study, operator, category)` rather than three
+  separate category functions. It reuses the private `rowCategory()` default,
+  applies the same `isMachineRow()` bucket rule as `computeOperatorTotals()`,
+  and sorts `man`, then `walk`, then `idle`, preserving `seq` order within a kind.
+- Refactored only M5's `hasTimeStudy` branch so Regular, Periodical, and
+  Changeover tiers contain one DOM segment per non-zero-Min job element, with
+  `data-row-id` and per-element Min tooltips. Aggregate totals still control
+  tier heights, Max overlay, Average marker, and scale; the no-`timeStudy`
+  fallback path was not changed.
+
+### Verification
+
+- `git status --short --branch`: clean before implementation
+  (`## main...origin/main`).
+- `node --test tests/time-study.test.cjs`: PASS, 20/20 tests.
+- `node --test`: PASS, 161/161 tests.
+- `npm run lint`: blocked by the machine PowerShell execution policy for
+  `npm.ps1`; equivalent `npm.cmd run lint` reported the known baseline 5
+  errors and 23 warnings, with zero errors in touched files.
+- `npm run build`: blocked by the same PowerShell execution policy; equivalent
+  `npm.cmd run build`: PASS, all 5 static routes generated.
+- `git diff --check`: PASS; only 4 LF/CRLF normalization warnings.
+- The new tests cross-check per-row Min sums against `min`,
+  `manMin + walkMin + idleMin`, `periodicalMin`, and `changeoverMin` for both
+  operators; all passed exactly.
+- Manual browser verification was blocked: the local read-only fixture proxy
+  returned HTTP 200 to PowerShell, but both the in-app Browser and Chrome kept
+  the editor on the hydration screen and did not issue the API hydration
+  requests. No M5 segment/tooltip/height comparison or clean app-console check
+  could therefore be completed.
+
+### Handoff / Safety
+
+- No commit, push, deploy, migration, remote operation, or Production D1 write
+  occurred.

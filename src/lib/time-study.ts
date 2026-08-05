@@ -63,6 +63,34 @@ function rowCategory(row: TimeStudyRow): 'regular' | 'periodical' | 'changeover'
   return row.category ?? 'regular';
 }
 
+export type TimeStudyCategory = 'regular' | 'periodical' | 'changeover';
+
+/**
+ * Select one operator's rows for one time category in the same bucket used by
+ * computeOperatorTotals, while preserving the existing kind stack order.
+ */
+export function rowsForOperatorByCategory(
+  study: TimeStudy,
+  operator: OperatorType,
+  category: TimeStudyCategory
+): TimeStudyRow[] {
+  const kindOrder: Record<TimeStudyKind, number> = {
+    man: 0,
+    walk: 1,
+    idle: 2,
+    machine: 3,
+  };
+
+  return study.rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => {
+      const bucket: OperatorType = isMachineRow(row) ? 'Auto M/C' : row.operator;
+      return bucket === operator && rowCategory(row) === category;
+    })
+    .sort((a, b) => kindOrder[a.row.kind] - kindOrder[b.row.kind] || a.row.seq - b.row.seq || a.index - b.index)
+    .map(({ row }) => row);
+}
+
 export interface TimeStudyTotals {
   /** Per reading column, machine rows excluded — `=SUM(C8:C44)-C25`. */
   perReading: number[];

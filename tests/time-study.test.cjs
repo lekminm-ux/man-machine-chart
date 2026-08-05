@@ -324,6 +324,83 @@ test('mixed regular, periodical, and changeover rows stay isolated per operator'
   );
 });
 
+test('rowsForOperatorByCategory filters, orders kinds, and buckets machine rows under Auto M/C', () => {
+  const withSeq = (entry, seq) => ({ ...entry, seq });
+  const study = {
+    readingCount: 1,
+    rows: [
+      withSeq(row('A idle', 'Worker A', 'idle', [3]), 50),
+      withSeq(row('A walk', 'Worker A', 'walk', [2]), 40),
+      withSeq(row('A man 2', 'Worker A', 'man', [5]), 20),
+      withSeq(row('A periodical', 'Worker A', 'man', [7], 'periodical'), 10),
+      withSeq(row('A man 1', 'Worker A', 'man', [4]), 5),
+      withSeq(row('B regular', 'Worker B', 'man', [9]), 1),
+      withSeq(row('machine via kind', 'Worker B', 'machine', [30]), 2),
+      withSeq(row('machine via operator', 'Auto M/C', 'man', [31]), 3),
+      withSeq(row('B changeover', 'Worker B', 'idle', [40], 'changeover'), 4),
+    ],
+  };
+
+  assert.deepEqual(
+    timeStudy.rowsForOperatorByCategory(study, 'Worker A', 'regular').map(r => r.jobElement),
+    ['A man 1', 'A man 2', 'A walk', 'A idle']
+  );
+  assert.deepEqual(
+    timeStudy.rowsForOperatorByCategory(study, 'Worker A', 'periodical').map(r => r.jobElement),
+    ['A periodical']
+  );
+  assert.deepEqual(
+    timeStudy.rowsForOperatorByCategory(study, 'Worker B', 'changeover').map(r => r.jobElement),
+    ['B changeover']
+  );
+  assert.deepEqual(
+    timeStudy.rowsForOperatorByCategory(study, 'Worker B', 'regular').map(r => r.jobElement),
+    ['B regular']
+  );
+  assert.deepEqual(
+    timeStudy.rowsForOperatorByCategory(study, 'Auto M/C', 'regular').map(r => r.jobElement),
+    ['machine via operator', 'machine via kind']
+  );
+});
+
+test('per-row category minima sum exactly to computeOperatorTotals aggregates', () => {
+  const study = {
+    readingCount: 3,
+    rows: [
+      row('A-man-1', 'Worker A', 'man', [5, 6, 7]),
+      row('A-man-2', 'Worker A', 'man', [6, 7, 8]),
+      row('A-walk', 'Worker A', 'walk', [2, 3, 4]),
+      row('A-idle', 'Worker A', 'idle', [4, 5, 6]),
+      row('A-periodical-1', 'Worker A', 'man', [10, 11, 12], 'periodical'),
+      row('A-periodical-2', 'Worker A', 'walk', [11, 12, 13], 'periodical'),
+      row('A-changeover', 'Worker A', 'idle', [20, 21, 22], 'changeover'),
+      row('B-man', 'Worker B', 'man', [9, 10, 11]),
+      row('B-walk', 'Worker B', 'walk', [3, 4, 5]),
+      row('B-periodical', 'Worker B', 'man', [30, 31, 32], 'periodical'),
+      row('B-changeover', 'Worker B', 'idle', [40, 41, 42], 'changeover'),
+    ],
+  };
+  const totals = Object.fromEntries(
+    timeStudy.computeOperatorTotals(study).map(total => [total.operator, total])
+  );
+  const sumMin = rows => rows.reduce((sum, item) => sum + timeStudy.computeRowStats(item).min, 0);
+
+  for (const operator of ['Worker A', 'Worker B']) {
+    const total = totals[operator];
+    const regularRows = timeStudy.rowsForOperatorByCategory(study, operator, 'regular');
+    const periodicalRows = timeStudy.rowsForOperatorByCategory(study, operator, 'periodical');
+    const changeoverRows = timeStudy.rowsForOperatorByCategory(study, operator, 'changeover');
+
+    assert.equal(sumMin(regularRows), total.min);
+    assert.equal(sumMin(regularRows.filter(r => r.kind === 'man')), total.manMin);
+    assert.equal(sumMin(regularRows.filter(r => r.kind === 'walk')), total.walkMin);
+    assert.equal(sumMin(regularRows.filter(r => r.kind === 'idle')), total.idleMin);
+    assert.equal(total.manMin + total.walkMin + total.idleMin, total.min);
+    assert.equal(sumMin(periodicalRows), total.periodicalMin);
+    assert.equal(sumMin(changeoverRows), total.changeoverMin);
+  }
+});
+
 test('resizing the sheet keeps existing readings and pads with blanks', () => {
   const study = { readingCount: 5, rows: [row('x', 'Worker A', 'man', [1, 2, 3, 4, 5])] };
 
