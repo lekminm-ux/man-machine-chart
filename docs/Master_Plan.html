@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.20</div>
-      <div><b>Updated</b>4 Aug 2026</div>
+      <div><b>Version</b>1.21</div>
+      <div><b>Updated</b>6 Aug 2026</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>979774a (deployed)</div>
-      <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4a+4b (M5 Yamazumi Min/Max/Avg + Periodical/Changeover) deployed to Production, read-only verified · Phase 4c (Drag &amp; Drop) not started</div>
-      <div><b>Status</b>Master Plan v1.20 · Production D1/schema remain protected · Phase 4a (Min/Max/Avg overlay) and Phase 4b (Periodical/Changeover tiers) committed, pushed, and deployed with explicit user authorization; read-only live check confirmed the existing folder tree (3 roots / 5 folders / 6 charts) and a representative chart (including the new "หมวดเวลา" column and unaffected M5 rendering) intact with zero console errors. No Production D1 write performed.</div>
+      <div><b>Baseline commit</b>49624fa (deployed)</div>
+      <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4 (M5 Yamazumi 4a Min/Max/Avg + 4b Periodical/Changeover + 4c-1 per-row segments + 4c-2 Drag &amp; Drop) complete and deployed to Production, read-only verified · Phase 4 closed end to end</div>
+      <div><b>Status</b>Master Plan v1.21 · Production D1/schema remain protected · Phase 4c-1 (per-job-element bar segments) and Phase 4c-2 (Drag &amp; Drop rebalancing) committed, pushed, and deployed with explicit user authorization; read-only live check confirmed the folder tree intact with only organic growth since 4 Aug (+1 folder "Injection", +2 charts — zero decrease) and a representative real chart (BYDSidestep Rev.00) rendering the new per-job-element Yamazumi segments correctly with zero console errors across M1/M4/M5. Live drag-and-drop was not exercised against this chart's real data (it has active time-study rows, so dragging would mutate a genuine production record) — that interaction is instead covered by passing unit tests (moveRowToOperator) and the pre-release simulated-drag verification that caught and fixed the dragend-stuck bug. No Production D1 write performed.</div>
     </div>
   </div>
 </header>
@@ -339,9 +339,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td><b>รอบนี้ไม่แก้ตามที่สั่ง</b> — งานเสริม (Symbol Library, Walking Path) เลื่อนไป Phase 6</td>
       </tr>
       <tr>
-        <td><b>M5</b></td><td><span class="b b-wip">Phase 4a+4b deployed · รอ 4c</span></td>
-        <td>แท่ง Yamazumi + เส้น Takt (แก้บั๊กเวลา 31 ก.ค.) + <b>Min/Max/Avg overlay จาก M1 (Phase 4a, 3 ส.ค.)</b> + <b>แถบ Periodical/Changeover (Phase 4b, 4 ส.ค.)</b> — deploy ขึ้น Production แล้วทั้งคู่</td>
-        <td>เหลือ Drag &amp; Drop จัดสมดุล (Phase 4c) — ยังไม่เริ่ม</td>
+        <td><b>M5</b></td><td><span class="b b-done">Phase 4 ครบ · deployed</span></td>
+        <td>แท่ง Yamazumi + เส้น Takt (แก้บั๊กเวลา 31 ก.ค.) + <b>Min/Max/Avg overlay จาก M1 (Phase 4a, 3 ส.ค.)</b> + <b>แถบ Periodical/Changeover (Phase 4b, 4 ส.ค.)</b> + <b>แบ่งแท่งเป็นชิ้นงานย่อยตาม Job Element (Phase 4c-1, 5 ส.ค.)</b> + <b>Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล (Phase 4c-2, 6 ส.ค.)</b> — deploy ขึ้น Production ครบทั้ง 4 ส่วนแล้ว</td>
+        <td>— (Phase 4 จบแล้วทั้งแผน)</td>
       </tr>
       <tr>
         <td><b>M6</b></td><td><span class="b b-todo">ยังไม่มี</span></td>
@@ -624,12 +624,13 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-wip">กำลังทำ (4a+4b เสร็จแล้ว)</span></div>
+    <div class="tag"><span class="b b-done">เสร็จแล้ว</span></div>
     <div class="body">
       <h4>Phase 4 · M5 Yamazumi ฉบับสมบูรณ์</h4>
       <p>✅ 4a (3 ส.ค., deployed): ฐาน Min จาก M1 · ทับ Max · จุด Avg · เส้น Takt<br>
          ✅ 4b (4 ส.ค., deployed): แถบ Periodical/Changeover พร้อม dropdown หมวดเวลาใน M1<br>
-         ⏳ 4c (ยังไม่เริ่ม): Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล</p>
+         ✅ 4c-1 (5 ส.ค., deployed): แบ่งแท่งแต่ละคนเป็นชิ้นงานย่อยตาม Job Element<br>
+         ✅ 4c-2 (6 ส.ค., deployed): Drag &amp; Drop ย้ายงานข้ามคนเพื่อจัดสมดุล — รวมบั๊ก drag state ค้างที่ Claude เจอและแก้ก่อนขึ้น Production</p>
     </div>
   </div>
 
@@ -853,6 +854,10 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.21</b></td><td>6 Aug 2026</td><td><code>49624fa</code> (deployed)</td>
+        <td><b>Phase 4 ปิดจบทั้งเฟส — deploy 4c-1+4c-2 ขึ้น Production</b> — user อนุมัติ deploy หลัง test 163/163 ผ่านและ build สำเร็จ (5/5 static routes) จาก commit ที่ push ไว้แล้ว (<code>49624fa</code>); <code>wrangler pages deploy</code> ไปที่ <code>https://7e9c313f.man-machine-chart.pages.dev</code>. Live read-only verification ที่ <code>man-machine-chart.pages.dev</code>: folder tree เดิมอยู่ครบไม่มีลดลง (เพิ่มขึ้นตามการใช้งานจริง — โฟลเดอร์ "Injection" ใหม่ +2 chart ใหม่นับตั้งแต่ 4 Aug), เปิดชาร์ตจริง <code>BYDSidestep Rev.00</code> แล้ว M1/M4/M5 render ถูกต้อง console ไม่มี error, และเห็นแท่ง Yamazumi แบ่งเป็นชิ้นงานย่อยตาม Job Element จริง (ยืนยันว่า bundle ใหม่ขึ้นจริง ไม่ใช่ cache เก่า) ไม่ได้ทดสอบลาก-วางจริงกับชาร์ตนี้เพราะมีข้อมูล time-study จริงอยู่ (จะกลายเป็นการแก้ไขข้อมูล production จริง) — ใช้ unit test <code>moveRowToOperator</code> และการจำลองลาก-วางที่ทำไว้ก่อน release (ซึ่งเจอและแก้บั๊ก drag state ค้างไปแล้ว) เป็นหลักฐานแทน ไม่มีการเขียนข้อมูลลง Production D1</td>
+      </tr>
       <tr>
         <td><b>1.15</b></td><td>3 Aug 2026</td><td><code>working tree</code></td>
         <td><b>Phase 0C GPT review — APPROVED_FOR_CLAUDE_FIX</b> — complete payload/read-back, covered <code>_unsynced</code> mutation guards, hydration safety, nested-tree preservation, 133/133 tests, build, diff check, and recorded local Pages Dev browser smoke evidence passed. Fixes remain required for unloaded placeholder writes, unsynced folderId checks, active-file selection after failed/unverified loads, and exact save-response identity validation. No Production write, commit, push, or deploy.</td>

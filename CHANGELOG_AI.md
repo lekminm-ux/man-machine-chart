@@ -2,6 +2,88 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-06 (Update 15 — Phase 4 deploy: 4c-1+4c-2 to Production)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized, via structured choice, deploying the already
+committed/pushed Phase 4c-1+4c-2 code (commit `49624fa`) to Cloudflare Pages
+Production, and separately chose Phase 5 (M6 Kaizen) as the next planning
+focus.
+
+### Actions taken
+
+1. Fresh `npm test` from the working tree at `1c6bfb6`: 163/163 pass. (The
+   two "Cloud load failed" / "File cloud load failed" console lines in the
+   output are simulated-network-failure test fixtures, not real failures.)
+2. Fresh `npm run build`: exit 0, 5/5 static routes.
+3. Deployed: `npx wrangler pages deploy out --project-name=man-machine-chart
+   --branch=main --commit-dirty=true` -> deployment URL
+   `https://7e9c313f.man-machine-chart.pages.dev`.
+
+### Live verification (read-only — no Production D1 write performed)
+
+- Opened `https://man-machine-chart.pages.dev/editor` fresh. Zero console
+  errors throughout.
+- Folder tree vs. the 4 Aug baseline (3 roots / 5 folders / 6 charts): now 3
+  roots / 6 folders / 8 charts — one new folder (`Injection`, under `P703`)
+  and two new charts (`Front MudFlaps SV`, `Front MudFlaps`); all six
+  previously-known charts still present by name. Growth only, no decrease —
+  consistent with real team usage between 4 and 6 Aug, not a regression.
+- Opened `BYDSidestep Rev.00` (real production chart with active M1
+  time-study rows). M1 renders the "หมวดเวลา" category dropdown per row
+  (defaulting to "ปกติ"). M4 StepTable/Timeline/Layout/Summary render
+  correctly (Cycle Time 2106s, Worker B — consistent between M4's Line Total
+  Summary and M5's per-operator totals). M5 Yamazumi renders **per-job-element
+  bar segments** (Phase 4c-1) with real labelled segments (e.g. "Work
+  Unloading and Insert nu: 62s", "Cutting scrap: 213s", ...) — this by itself
+  confirms the new bundle is live, not a stale cache of the pre-4c build.
+- Confirmed via source inspection (`Module5_YamazumiChart.tsx`) that the
+  deployed drag-and-drop wiring (`draggable`, `onDragStart`/`onDragEnd`/
+  `onDragOver`/`onDrop`, gated behind `hasTimeStudy`) matches the reviewed
+  source. Did **not** perform a live drag-and-drop against `BYDSidestep
+  Rev.00` itself: this chart has real `timeStudy` rows, so `hasTimeStudy` is
+  true and a real drag would call `moveRowToOperator`/`updateTimeStudy`,
+  mutating an actual production record's in-memory state for no verification
+  benefit beyond what was already proven pre-release. Relied instead on the
+  passing `moveRowToOperator` unit tests (part of the 163/163 total) and the
+  pre-release simulated-drag verification recorded in the 6 Aug `49624fa`
+  commit message (which caught and fixed the dragend-stuck bug).
+- No file was created, renamed, moved, duplicated, deleted, saved, or
+  categorized against Production during this verification — view-only
+  navigation plus one read-only DOM/source inspection.
+
+### Rollback target
+
+The Cloudflare Pages deployment immediately prior to this one (the 4 Aug
+Phase 4a+4b release, `https://c121d9b3.man-machine-chart.pages.dev`) in the
+project's own deployment history. No schema or data migration accompanied
+this release.
+
+### Docs updated
+
+`docs/Master_Plan.html` bumped to v1.21: module-status table (M5 now shows
+Phase 4 fully done/deployed), Roadmap Phase 4 entry (tag now "เสร็จแล้ว",
+4c-1/4c-2 rows added with dates), header status block, and a new Change Log
+table row — all added only after this session's fresh test/build/deploy/
+live-verification evidence, per the Master Plan update rule.
+
+### Database Safety Gate / Production statement
+
+- **No Production D1 write occurred.** Verification was strictly read-only
+  browsing plus one local source-code read; the one interactive feature that
+  could have written data (Drag & Drop) was deliberately not exercised
+  against real chart data.
+- Commit/push of the application code (`49624fa`) had already happened in a
+  prior session; deployment is the only git/release action that occurred in
+  this session, explicitly authorized by the user. This session's own
+  changes (`docs/Master_Plan.html`, this changelog entry) are docs-only and
+  are committed/pushed next.
+
 ## 2026-08-06 (Update 14 — New-chat token-efficiency checkpoint rule)
 
 ### Tool
