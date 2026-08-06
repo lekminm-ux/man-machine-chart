@@ -42,7 +42,14 @@ Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
 [Phase 4c-1 — per-job-element bar segments](PROMPT_CODEX_PHASE4C1_M5_PER_ROW_SEGMENTS.md) (shipped, commit 2ea7df5),
 [Phase 4c-2 — Drag & Drop rebalancing](PROMPT_CODEX_PHASE4C2_M5_DRAG_DROP.md) (shipped, commit 49624fa, after [a follow-up fix](PROMPT_CODEX_04_FIX_PHASE4C2_DRAGEND_STUCK.md) for a drag-state-stuck bug Claude found on review).
 
-**Phase 4 (M5 Yamazumi) is now complete end to end** — committed and pushed, not yet deployed to Production pending explicit authorization. Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
+**Phase 4 (M5 Yamazumi) is now complete end to end** — committed, pushed, deployed to Production, and read-only live-verified (6 Aug 2026, commit `7a43c09`). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
+
+Phase 5 (M6 Kaizen + Before/After), first sub-phase:
+[Phase 5a-1 — Revision Snapshot mechanism](PROMPT_CODEX_PHASE5A1_REVISION_SNAPSHOT.md)
+(schema + API + store guard + minimal HeaderForm UI for close/open-revision;
+written 6 Aug 2026, not yet handed to Codex). Phase 5a-2 (read-only UI
+gating across M1/M2/M4/M5) and Phase 5b (the Before/After comparison page
+itself) are separately scoped after this round ships and is reviewed.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.
