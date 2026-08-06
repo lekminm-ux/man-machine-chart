@@ -46,10 +46,16 @@ Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
 
 Phase 5 (M6 Kaizen + Before/After), first sub-phase:
 [Phase 5a-1 — Revision Snapshot mechanism](PROMPT_CODEX_PHASE5A1_REVISION_SNAPSHOT.md)
-(schema + API + store guard + minimal HeaderForm UI for close/open-revision;
-written 6 Aug 2026, not yet handed to Codex). Phase 5a-2 (read-only UI
-gating across M1/M2/M4/M5) and Phase 5b (the Before/After comparison page
-itself) are separately scoped after this round ships and is reviewed.
+implemented by Codex the same day (6 Aug 2026), reviewed diff-by-diff by
+Claude (no bugs found), one out-of-scope test-mock conflict fixed by Claude
+directly with explicit authorization, and verified live against a real local
+Pages Dev + D1 environment (close/lock, blocked save, open/unlock, save
+resumes — full cycle, zero data loss). `node --test` 184/184, build/lint/
+diff-check all clean. Not yet committed, pushed, or deployed — the actual
+Production D1 schema migration is a separate step requiring its own
+Database Safety preflight and explicit user authorization. Phase 5a-2
+(read-only UI gating across M1/M2/M4/M5) and Phase 5b (the Before/After
+comparison page itself) are separately scoped next.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.

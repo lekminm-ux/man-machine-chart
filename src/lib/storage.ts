@@ -4,6 +4,8 @@
 // ============================================================
 
 import type { AppDatabase, ChartFile, ChartFolder } from '@/types';
+import type { RevisionSnapshotContent, RevisionSnapshotMeta } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 
 const LS_KEY = 'mm_chart_db_v2';
 
@@ -171,7 +173,7 @@ export async function deleteFolderCloud(id: string): Promise<void> {
 // useChartStore's read-back comparison uses this exact same field list —
 // two independently-maintained copies of "what persists" is exactly how a
 // field gets missed again.
-export function chartFileContent(file: ChartFile) {
+export function chartFileContent(file: ChartFile): RevisionSnapshotContent {
   return {
     header: file.header,
     steps: file.steps,
@@ -216,6 +218,79 @@ export async function saveFileCloud(file: ChartFile, updatedAt: string): Promise
       return { ok: false, error: 'save did not return an explicit confirmed response' };
     }
     return { ok: true, id: file.id, updatedAt: res.updatedAt };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type CloseRevisionResult =
+  | { ok: true; snapshot: RevisionSnapshotMeta }
+  | { ok: false; error: string };
+
+export async function closeRevisionCloud(chartFileId: string, revNo: string): Promise<CloseRevisionResult> {
+  const id = uuidv4();
+  try {
+    const res = await apiFetch('/api/revisions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, chartFileId, revNo }),
+    });
+    const snapshot = res?.snapshot;
+    if (
+      res?.success !== true ||
+      !snapshot ||
+      snapshot.id !== id ||
+      snapshot.chartFileId !== chartFileId ||
+      snapshot.revNo !== revNo ||
+      !snapshot.closedAt
+    ) {
+      return { ok: false, error: 'close revision did not return an explicit confirmed response' };
+    }
+    return {
+      ok: true,
+      snapshot: {
+        id: snapshot.id,
+        chartFileId: snapshot.chartFileId,
+        revNo: snapshot.revNo,
+        closedAt: snapshot.closedAt,
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type OpenRevisionResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function openRevisionCloud(chartFileId: string): Promise<OpenRevisionResult> {
+  try {
+    const res = await apiFetch('/api/revisions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chartFileId }),
+    });
+    if (res?.success !== true || res.chartFileId !== chartFileId) {
+      return { ok: false, error: 'open revision did not return an explicit confirmed response' };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type ListRevisionsResult =
+  | { ok: true; snapshots: RevisionSnapshotMeta[] }
+  | { ok: false; error: string };
+
+export async function listRevisionSnapshotsCloud(chartFileId: string): Promise<ListRevisionsResult> {
+  try {
+    const res = await apiFetch(`/api/revisions?chartFileId=${encodeURIComponent(chartFileId)}`);
+    if (!Array.isArray(res)) {
+      return { ok: false, error: 'list revisions did not return an explicit confirmed response' };
+    }
+    return { ok: true, snapshots: res as RevisionSnapshotMeta[] };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

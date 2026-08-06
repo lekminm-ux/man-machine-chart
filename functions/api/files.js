@@ -60,6 +60,16 @@ export async function onRequestPut(context) {
     const file = await request.json();
     const { id, name, folderId, updatedAt, content } = file;
     if (!id) return badRequest('id required');
+    const existing = await env.DB.prepare(
+      'SELECT lockedAt FROM chart_files WHERE id = ?'
+    ).bind(id).first();
+    if (existing && existing.lockedAt != null) {
+      return json({
+        error: 'this revision is locked — open a new revision to keep editing',
+        id,
+        locked: true,
+      }, 409);
+    }
     if (folderId != null) {
       const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(folderId).first();
       if (!folder) return badRequest('folderId does not reference an existing folder');

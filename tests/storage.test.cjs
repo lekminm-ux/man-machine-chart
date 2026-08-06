@@ -398,3 +398,130 @@ test('a synthetic multi-level tree survives hydration alongside a local-only uns
     restoreGlobals();
   }
 });
+
+// ── Phase 5a-1: revision snapshot cloud actions ────────────────────────────
+
+test('closeRevisionCloud sends a fresh snapshot id and accepts only a matching confirmed snapshot', async () => {
+  let requestBody;
+  installGlobals({
+    local: undefined,
+    fetchImpl: async (url, opts) => {
+      assert.equal(url, '/api/revisions');
+      assert.equal(opts.method, 'POST');
+      requestBody = JSON.parse(opts.body);
+      return mockResponse({
+        success: true,
+        snapshot: {
+          id: requestBody.id,
+          chartFileId: requestBody.chartFileId,
+          revNo: requestBody.revNo,
+          closedAt: '2026-08-06T05:00:00.000Z',
+        },
+      });
+    },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.closeRevisionCloud('file-1', 'A');
+    assert.equal(result.ok, true);
+    assert.match(requestBody.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    assert.deepEqual(requestBody, { id: requestBody.id, chartFileId: 'file-1', revNo: 'A' });
+    assert.deepEqual(result.snapshot, {
+      id: requestBody.id, chartFileId: 'file-1', revNo: 'A', closedAt: '2026-08-06T05:00:00.000Z',
+    });
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('closeRevisionCloud converts API and network failures into ok:false', async () => {
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => mockResponse({ error: 'already locked' }, 409),
+  });
+  try {
+    const storage = loadStorage();
+    const apiFailure = await storage.closeRevisionCloud('file-1', 'A');
+    assert.equal(apiFailure.ok, false);
+    assert.match(apiFailure.error, /API \/api\/revisions/);
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => { throw new TypeError('network unreachable'); },
+  });
+  try {
+    const storage = loadStorage();
+    const networkFailure = await storage.closeRevisionCloud('file-1', 'A');
+    assert.deepEqual(networkFailure, { ok: false, error: 'network unreachable' });
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('openRevisionCloud sends the chart id and accepts/rejects explicit results', async () => {
+  let requestBody;
+  installGlobals({
+    local: undefined,
+    fetchImpl: async (url, opts) => {
+      assert.equal(url, '/api/revisions');
+      assert.equal(opts.method, 'PUT');
+      requestBody = JSON.parse(opts.body);
+      return mockResponse({ success: true, chartFileId: requestBody.chartFileId });
+    },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.openRevisionCloud('file-1');
+    assert.deepEqual(requestBody, { chartFileId: 'file-1' });
+    assert.deepEqual(result, { ok: true });
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => { throw new TypeError('network unreachable'); },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.openRevisionCloud('file-1');
+    assert.deepEqual(result, { ok: false, error: 'network unreachable' });
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('listRevisionSnapshotsCloud returns metadata on success and ok:false on API failure', async () => {
+  const snapshots = [{ id: 'snapshot-1', chartFileId: 'file-1', revNo: 'A', closedAt: '2026-08-06T05:00:00.000Z' }];
+  installGlobals({
+    local: undefined,
+    fetchImpl: async (url, opts) => {
+      assert.equal(opts, undefined);
+      assert.equal(url, '/api/revisions?chartFileId=file-1');
+      return mockResponse(snapshots);
+    },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.listRevisionSnapshotsCloud('file-1');
+    assert.deepEqual(result, { ok: true, snapshots });
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => mockResponse({ error: 'not found' }, 404),
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.listRevisionSnapshotsCloud('file-1');
+    assert.equal(result.ok, false);
+    assert.match(result.error, /API \/api\/revisions/);
+  } finally {
+    restoreGlobals();
+  }
+});

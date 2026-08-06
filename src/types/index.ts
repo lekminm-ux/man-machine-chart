@@ -186,6 +186,8 @@ export interface ChartFile {
   folderId: string;
   createdAt: string;
   updatedAt: string;
+  /** Locked charts' content is read-only until openNewRevision clears this. */
+  lockedAt?: string | null;
   header: ChartHeader;
   steps: ChartStep[];
   layoutDiagram: LayoutDiagram;
@@ -195,6 +197,20 @@ export interface ChartFile {
   timeStudy?: TimeStudy;
   /** Module 2 machine capacity sheet. */
   machineCapacity?: MachineCapacity;
+}
+
+export type RevisionSnapshotContent = Pick<ChartFile,
+  'header' | 'steps' | 'layoutDiagram' | 'timeMeasurement' | 'timeStudy' | 'machineCapacity'>;
+
+export interface RevisionSnapshotMeta {
+  id: string;
+  chartFileId: string;
+  revNo: string;
+  closedAt: string;
+}
+
+export interface RevisionSnapshot extends RevisionSnapshotMeta {
+  content: RevisionSnapshotContent;
 }
 
 export interface ChartFolder {

@@ -65,6 +65,13 @@ function makeMockD1(initial = {}) {
     if (sql === 'SELECT 1 FROM chart_files WHERE folderId = ? LIMIT 1') {
       return state.chart_files.some(f => f.folderId === binds[0]) ? [{ '1': 1 }] : [];
     }
+    if (sql === 'SELECT lockedAt FROM chart_files WHERE id = ?') {
+      // Phase 5a-1: files.js's PUT guard checks this before every update.
+      // None of this file's fixtures are ever locked, so this always reports
+      // unlocked — existing behavior for every test in this file is unchanged.
+      const f = state.chart_files.find(x => x.id === binds[0]);
+      return f ? [{ lockedAt: f.lockedAt ?? null }] : [];
+    }
     throw new Error('mock D1: unhandled SELECT: ' + sql);
   }
 

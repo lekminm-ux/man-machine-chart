@@ -12,6 +12,7 @@ import {
   loadDatabaseFromCloud, loadFileFromCloud,
   createFolderCloud, updateFolderCloud, deleteFolderCloud,
   createFileCloud, saveFileCloud, deleteFileCloud,
+  closeRevisionCloud, openRevisionCloud,
   chartFileContent,
 } from '@/lib/storage';
 import { computeCycleTime } from '@/lib/chart-utils';
@@ -64,6 +65,8 @@ interface ChartState extends AppDatabase {
   renameFile: (id: string, name: string) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
   saveActiveFile: () => Promise<void>;
+  closeRevision: (revNo: string) => Promise<void>;
+  openNewRevision: () => Promise<void>;
   duplicateFile: (id: string) => Promise<void>;
 
   // Header actions
@@ -211,6 +214,15 @@ function blockUnconfirmedFile(set: Setter, actionName: string, file: ChartFile):
   if ((file as ChartFile & { _unconfirmed?: boolean })._unconfirmed) {
     set({ syncStatus: 'error' });
     console.warn(`${actionName} blocked: this file has an unconfirmed save pending — retry Save first.`);
+    return true;
+  }
+  return false;
+}
+
+function blockLockedFile(set: Setter, actionName: string, file: ChartFile): boolean {
+  if (file.lockedAt) {
+    set({ syncStatus: 'error' });
+    console.warn(`${actionName} blocked: this revision is locked — open a new revision to keep editing.`);
     return true;
   }
   return false;
@@ -545,6 +557,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     if (!file) return;
     if (blockCloudMutation(set, get(), 'saveActiveFile', file.id, file.folderId)) return;
     if (blockUnloadedFile(set, 'saveActiveFile', file)) return;
+    if (blockLockedFile(set, 'saveActiveFile', file)) return;
     const savedAt = new Date().toISOString();
     // Marked _unconfirmed up front, optimistically, before we know the
     // outcome — the safe default. It's only cleared once a fresh read-back
@@ -591,6 +604,72 @@ export const useChartStore = create<ChartState>((set, get) => ({
     });
     set({ syncStatus: 'saved' });
     setTimeout(() => set(s => s.syncStatus === 'saved' ? { syncStatus: 'idle' } : {}), 3000);
+  },
+
+  async closeRevision(revNo) {
+    const file = get().activeFile();
+    if (!file) return;
+    if (blockCloudMutation(set, get(), 'closeRevision', file.id, file.folderId)) return;
+    if (blockUnloadedFile(set, 'closeRevision', file)) return;
+    if (blockUnconfirmedFile(set, 'closeRevision', file)) return;
+    if (blockLockedFile(set, 'closeRevision', file)) return;
+    if (!revNo.trim()) {
+      set({ syncStatus: 'error' });
+      console.warn('closeRevision blocked: Rev No. is required.');
+      return;
+    }
+
+    await get().saveActiveFile();
+    const savedFile = get().files.find(f => f.id === file.id) as (ChartFile & { _loaded?: boolean; _unconfirmed?: boolean }) | undefined;
+    if (!savedFile || savedFile._unconfirmed || savedFile._loaded === false) {
+      set({ syncStatus: 'error' });
+      console.warn('closeRevision blocked: the save before closing did not get confirmed — retry Save first.');
+      return;
+    }
+
+    const result = await closeRevisionCloud(savedFile.id, revNo.trim());
+    if (!result.ok) {
+      set({ syncStatus: 'error' });
+      console.warn('closeRevision: cloud close failed:', result.error);
+      return;
+    }
+
+    set(s => {
+      const next = {
+        ...s,
+        files: s.files.map(f => f.id === savedFile.id ? { ...f, lockedAt: result.snapshot.closedAt } : f),
+      };
+      persistLocal(next);
+      return { ...next, syncStatus: 'idle' };
+    });
+  },
+
+  async openNewRevision() {
+    const file = get().activeFile();
+    if (!file) return;
+    if (blockCloudMutation(set, get(), 'openNewRevision', file.id, file.folderId)) return;
+    if (blockUnloadedFile(set, 'openNewRevision', file)) return;
+    if (!file.lockedAt) {
+      set({ syncStatus: 'error' });
+      console.warn('openNewRevision blocked: this chart is not currently locked.');
+      return;
+    }
+
+    const result = await openRevisionCloud(file.id);
+    if (!result.ok) {
+      set({ syncStatus: 'error' });
+      console.warn('openNewRevision: cloud open failed:', result.error);
+      return;
+    }
+
+    set(s => {
+      const next = {
+        ...s,
+        files: s.files.map(f => f.id === file.id ? { ...f, lockedAt: null } : f),
+      };
+      persistLocal(next);
+      return { ...next, syncStatus: 'idle' };
+    });
   },
 
   // ── Header (local only — auto-saved on saveActiveFile) ───────────────────────

@@ -28,3 +28,19 @@ CREATE TABLE IF NOT EXISTS chart_files (
 -- Indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_files_folder ON chart_files(folderId);
 CREATE INDEX IF NOT EXISTS idx_files_updated ON chart_files(updatedAt DESC);
+
+-- Revision Snapshots (Phase 5a) — immutable history of closed revisions
+ALTER TABLE chart_files ADD COLUMN lockedAt TEXT DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS revision_snapshots (
+  id          TEXT PRIMARY KEY,
+  chartFileId TEXT NOT NULL,
+  revNo       TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  closedAt    TEXT NOT NULL,
+  FOREIGN KEY (chartFileId) REFERENCES chart_files(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_revision_snapshots_unique
+  ON revision_snapshots(chartFileId, revNo);
+CREATE INDEX IF NOT EXISTS idx_revision_snapshots_file
+  ON revision_snapshots(chartFileId);

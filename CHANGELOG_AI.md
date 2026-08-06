@@ -2,6 +2,89 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-06 (Update 16 — Claude review + fix + local verification: Phase 5a-1)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Context
+
+Follow-up to Codex's own entry below ("Codex Phase 5a-1 revision snapshot
+implementation") — that entry has this round's full implementation detail;
+this entry covers only what Codex's report didn't: Claude's diff review
+verdict, the one fix applied, and a real local Pages Dev/D1 verification
+Codex's environment couldn't run.
+
+### Review verdict
+
+Read every changed file in full (schema.sql, functions/api/revisions.js,
+functions/api/files.js, types/index.ts, storage.ts, useChartStore.ts,
+HeaderForm.tsx, and all three test files). Logic matches the handoff spec
+precisely — guard ordering in `closeRevision`/`openNewRevision`, the
+atomic close batch, and `files.js`'s new lock check falling through to
+existing behavior exactly when a row doesn't exist. No bugs found.
+
+### Fix applied (Claude, explicit user authorization for this one change)
+
+The one blocker Codex correctly flagged and correctly left alone (out of its
+allowed scope): `tests/data-safety.test.cjs`'s own mock D1 didn't recognize
+`files.js`'s new `SELECT lockedAt FROM chart_files WHERE id = ?` query,
+failing 3 pre-existing `PUT /api/files` tests. Fixed by adding the same
+4-line handler Codex had already written in its own
+`tests/revisions.test.cjs` mock — a mechanical copy, no design decision.
+`node --test`: **184/184 pass**. `npm run build`: PASS (5/5 static routes).
+`npm run lint`: 5 errors / 15 warnings, unchanged pre-existing baseline,
+zero in any touched file. `git diff --check`: PASS (line-ending warnings
+only).
+
+### Local Pages Dev verification (Claude — Codex's environment lacks wrangler)
+
+Applied `schema.sql` to the pre-existing local D1 under `.wrangler/state`
+(confirmed the `lockedAt` column was absent beforehand; the additive
+migration applied cleanly, 8/8 statements, zero conflict with the existing
+local test data — 1 folder, 2 charts, left over from earlier Phase 0B/0C
+sessions). Started the existing `mm-chart-pages-dev` launch config
+(`wrangler pages dev out`), confirmed `env.DB` bound in **local** mode on
+every command (`Resource location: local`, never `--remote`). Against the
+existing local test chart ("Side Step LH, RH (QA renamed)"):
+
+- Close Revision → `PUT /api/files` (save) → `GET /api/files` (read-back) →
+  `POST /api/revisions`, all 200. Verified directly against D1:
+  `revision_snapshots.closedAt` and `chart_files.lockedAt` are byte-identical
+  (`2026-08-06T09:01:18.954Z` both places) — the atomic guarantee holds
+  against real D1, not just the test mocks.
+- Rev No. field became disabled, lock badge appeared, Close Revision was
+  replaced by Open New Revision.
+- Edited Process Name while locked, clicked Save: blocked entirely
+  client-side (zero new network calls, console warning fired), confirmed via
+  direct D1 query that the stored content was completely untouched.
+- Open New Revision → `PUT /api/revisions` 200; D1 confirmed
+  `chart_files.lockedAt` back to `NULL`; the edited-but-unsaved Process Name
+  text was still present in the UI, unchanged.
+- Saved again: `PUT`/`GET /api/files` succeeded; D1 now shows the edited
+  content persisted.
+- Zero console errors through the entire cycle.
+
+### Database Safety Gate / Production statement
+
+Every command in this segment (schema apply, Pages Dev, D1 queries) targeted
+the pre-existing **local** `.wrangler` D1 state only — `Resource location:
+local` confirmed on every wrangler invocation, `--remote` never used, no
+Production D1 access of any kind. The local test data present before this
+session (1 folder, 2 charts) was preserved and extended, not reset or
+replaced. No commit, push, or deploy occurred in this segment.
+
+### Next
+
+Phase 5a-1 is implementation-complete, fully reviewed, and now verified live
+end-to-end against a real local D1/Pages Dev environment. Still separately
+required before Production: the actual schema migration against Production
+D1 needs its own Database Safety preflight and explicit user authorization
+— this local verification does not substitute for that. Phase 5a-2
+(read-only UI gating beyond HeaderForm) and Phase 5b (the Before/After page)
+remain separately scoped next.
+
 ## 2026-08-06 (Update 15 — Phase 4 deploy: 4c-1+4c-2 to Production)
 
 ### Tool
@@ -3028,3 +3111,57 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
 - STATUS: **FIXED**. Return to Claude for independent re-verification before
   any commit, push, deploy, or Phase 4C-2 closure.
 - No commit, push, deploy, or Production D1 write occurred.
+
+## 2026-08-06 (Codex Phase 5a-1 revision snapshot implementation)
+
+### Scope / Implementation
+
+- Implemented Phase 5a-1 of Phase 5 (M6 Kaizen + Before/After): additive
+  revision snapshots, server-side chart locking, cloud storage clients, store
+  actions, the minimal Rev No. UI controls, and direct/storage/store tests.
+- Added to `schema.sql` exactly:
+  `ALTER TABLE chart_files ADD COLUMN lockedAt TEXT DEFAULT NULL;`, the
+  `revision_snapshots` table with `id`, `chartFileId`, `revNo`, `content`, and
+  `closedAt`, the unique `(chartFileId, revNo)` index, and the
+  `chartFileId` lookup index. Existing folder/chart_files definitions and
+  indexes were not changed.
+- Added `/api/revisions`: GET by snapshot id returns parsed full content; GET
+  by chartFileId returns metadata ordered by `closedAt DESC`; POST copies the
+  existing raw chart content and atomically inserts the snapshot plus sets
+  `chart_files.lockedAt`; PUT clears the lock. Missing, locked, duplicate, and
+  already-unlocked cases return explicit 4xx responses.
+- Added the `lockedAt`, `RevisionSnapshotContent`, `RevisionSnapshotMeta`, and
+  `RevisionSnapshot` types; `closeRevisionCloud`, `openRevisionCloud`, and
+  `listRevisionSnapshotsCloud`; `blockLockedFile`; `closeRevision`; and
+  `openNewRevision`. `saveActiveFile` now refuses locked files before any PUT.
+- `HeaderForm.tsx` now disables only the Rev No. field while locked and shows
+  the locked timestamp/Open New Revision control or Close Revision control;
+  no Phase 5a-2 field gating or Phase 5b page was added.
+
+### Verification / Handoff
+
+- `tests/revisions.test.cjs`, `tests/storage.test.cjs`, and
+  `tests/store.test.cjs` pass, including atomic close, duplicate protection,
+  locked PUT rejection, complete content preservation, save confirmation
+  gating, open/close actions, and hydrate lock persistence.
+- Full `node --test`: **TESTS_FAILED, 181/184 passed**. The three failures are
+  the pre-existing direct `tests/data-safety.test.cjs` mock's PUT cases: that
+  out-of-scope mock does not recognize the new required
+  `SELECT lockedAt FROM chart_files WHERE id = ?` lookup, so it returns the
+  mock's 500 instead of exercising the existing unlocked behavior. The mock
+  was intentionally not edited because the prompt's allowed scope explicitly
+  excludes `tests/data-safety.test.cjs`; this is the remaining handoff blocker.
+- `npm.cmd run lint`: exit 1 with the known baseline 5 errors and 15 warnings;
+  no new error was reported in a Phase 5a-1 source file.
+- `npm.cmd run build`: **PASS**; TypeScript completed and `/`, `/_not-found`,
+  and `/editor` generated successfully.
+- `git diff --check`: **PASS**; only LF/CRLF normalization warnings.
+- Local Pages Dev/manual close -> blocked Save -> Open New Revision -> Save
+  verification was unavailable because `wrangler` is not installed and the
+  project has no Pages Dev script. No local D1 or Production D1 write was
+  attempted.
+- Phase 5a-2 (read-only UI gating beyond HeaderForm) and Phase 5b
+  (Before/After page) remain separately scoped. Return this handoff to Claude
+  for review and direction on the out-of-scope test-harness conflict.
+- No commit, push, deploy, migration, `--remote` operation, or Production D1
+  write occurred.

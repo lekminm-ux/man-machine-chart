@@ -62,6 +62,9 @@ function makeStorageMock(overrides = {}) {
     createFileCloud: async () => {},
     saveFileCloud: async () => ({ ok: false, error: 'not implemented (default test mock — override saveFileCloud per test)' }),
     deleteFileCloud: async () => {},
+    closeRevisionCloud: async () => ({ ok: false, error: 'not implemented (default test mock — override closeRevisionCloud per test)' }),
+    openRevisionCloud: async () => ({ ok: false, error: 'not implemented (default test mock — override openRevisionCloud per test)' }),
+    listRevisionSnapshotsCloud: async () => ({ ok: true, snapshots: [] }),
     // Real (not stubbed) implementation — it's a pure field-picker with no
     // side effects, and useChartStore's read-back comparison depends on it
     // matching the real one exactly, field-for-field.
@@ -665,6 +668,7 @@ test('hydrate keeps a confirmed, fully-loaded file as the active file (non-regre
     header: { ...blankHeader, processName: 'CONFIRMED' },
     steps: [], layoutDiagram: { elements: [], connections: [] },
     _loaded: true,
+    lockedAt: '2026-08-06T05:00:00.000Z',
   };
   const store = freshStore({
     loadDatabaseFromCloud: async () => ({
@@ -677,6 +681,7 @@ test('hydrate keeps a confirmed, fully-loaded file as the active file (non-regre
 
   assert.equal(store.getState().activeFileId, 'file-1', 'a confirmed, already-loaded active file must stay active across hydration');
   assert.ok(store.getState().activeFile(), 'the editor must still show the confirmed file, not an empty state');
+  assert.equal(store.getState().activeFile().lockedAt, '2026-08-06T05:00:00.000Z', 'a confirmed lock must survive hydration unchanged');
 });
 
 // ── GPT review Round 3 fix: unloaded placeholders must never reach a full-payload mutation ──
@@ -1137,4 +1142,172 @@ test('hydrate also clears activeFileId for a raw _unconfirmed active file, even 
   const stillThere = store.getState().files.find(f => f.id === 'file-1');
   assert.ok(stillThere, 'preserved for recovery');
   assert.equal(stillThere.header.processName, 'RAW UNCONFIRMED');
+});
+
+// ── Phase 5a-1: revision close/open and locked-save guards ──────────────────
+
+test('closeRevision saves and confirms first, then locks the file locally', async () => {
+  let saved;
+  let saveCalls = 0;
+  let closeCalls = 0;
+  const closedAt = '2026-08-06T06:00:00.000Z';
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => {
+      saveCalls++;
+      saved = { ...file, updatedAt };
+      return { ok: true, id: file.id, updatedAt };
+    },
+    loadFileFromCloud: async id => ({ ok: true, file: { ...saved, id } }),
+    closeRevisionCloud: async (chartFileId, revNo) => {
+      closeCalls++;
+      return { ok: true, snapshot: { id: 'snapshot-1', chartFileId, revNo, closedAt } };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  const fileId = store.getState().activeFileId;
+
+  await store.getState().closeRevision('  A  ');
+
+  assert.equal(saveCalls, 1, 'close must perform the existing save flow first');
+  assert.equal(closeCalls, 1);
+  assert.equal(store.getState().files.find(file => file.id === fileId).lockedAt, closedAt);
+  assert.equal(store.getState().syncStatus, 'idle');
+});
+
+test('closeRevision does not call the close API when the preceding save is unconfirmed', async () => {
+  let closeCalls = 0;
+  const store = await freshReadyStore({
+    saveFileCloud: async (file, updatedAt) => ({ ok: true, id: file.id, updatedAt }),
+    loadFileFromCloud: async () => ({ ok: false, error: 'read-back unavailable' }),
+    closeRevisionCloud: async () => {
+      closeCalls++;
+      return { ok: true, snapshot: { id: 'should-not-exist', chartFileId: 'file-1', revNo: 'A', closedAt: 'x' } };
+    },
+  });
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  await store.getState().closeRevision('A');
+
+  assert.equal(closeCalls, 0, 'an unconfirmed preceding save must block the close API');
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files[0]._unconfirmed, true);
+});
+
+test('closeRevision on an already-locked file is blocked before save or close API calls', async () => {
+  let saveCalls = 0;
+  let closeCalls = 0;
+  const store = await freshReadyStore({
+    saveFileCloud: async () => { saveCalls++; return { ok: true, id: 'file-1', updatedAt: 'x' }; },
+    closeRevisionCloud: async () => {
+      closeCalls++;
+      return { ok: true, snapshot: { id: 'snapshot-1', chartFileId: 'file-1', revNo: 'B', closedAt: 'x' } };
+    },
+  });
+  const lockedFile = {
+    id: 'file-1', name: 'Locked', folderId: 'folder-1',
+    createdAt: '2026-08-06T00:00:00.000Z', updatedAt: '2026-08-06T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    lockedAt: '2026-08-06T06:00:00.000Z',
+  };
+  store.setState({ files: [lockedFile], activeFileId: 'file-1' });
+
+  await store.getState().closeRevision('B');
+
+  assert.equal(saveCalls, 0);
+  assert.equal(closeCalls, 0);
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('closeRevision rejects a blank Rev No before any save or close API call', async () => {
+  let saveCalls = 0;
+  let closeCalls = 0;
+  const store = await freshReadyStore({
+    saveFileCloud: async () => { saveCalls++; return { ok: true, id: 'file-1', updatedAt: 'x' }; },
+    closeRevisionCloud: async () => {
+      closeCalls++;
+      return { ok: true, snapshot: { id: 'snapshot-1', chartFileId: 'file-1', revNo: 'A', closedAt: 'x' } };
+    },
+  });
+  const file = {
+    id: 'file-1', name: 'Chart', folderId: 'folder-1',
+    createdAt: '2026-08-06T00:00:00.000Z', updatedAt: '2026-08-06T00:00:00.000Z',
+    header: { ...blankHeader, revNo: 'A' }, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  store.setState({ files: [file], activeFileId: 'file-1' });
+
+  await store.getState().closeRevision('   ');
+
+  assert.equal(saveCalls, 0);
+  assert.equal(closeCalls, 0);
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
+test('saveActiveFile is blocked on a locked file and does not call the save API', async () => {
+  let saveCalls = 0;
+  const store = await freshReadyStore({
+    saveFileCloud: async () => { saveCalls++; return { ok: true, id: 'file-1', updatedAt: 'x' }; },
+  });
+  const lockedFile = {
+    id: 'file-1', name: 'Locked', folderId: 'folder-1',
+    createdAt: '2026-08-06T00:00:00.000Z', updatedAt: '2026-08-06T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+    lockedAt: '2026-08-06T06:00:00.000Z',
+  };
+  store.setState({ files: [lockedFile], activeFileId: 'file-1' });
+
+  await store.getState().saveActiveFile();
+
+  assert.equal(saveCalls, 0);
+  assert.equal(store.getState().syncStatus, 'error');
+  assert.equal(store.getState().files[0].lockedAt, '2026-08-06T06:00:00.000Z');
+});
+
+test('openNewRevision clears a confirmed lock and leaves the file content intact', async () => {
+  let openCalls = 0;
+  const store = await freshReadyStore({
+    openRevisionCloud: async chartFileId => {
+      openCalls++;
+      assert.equal(chartFileId, 'file-1');
+      return { ok: true };
+    },
+  });
+  const lockedFile = {
+    id: 'file-1', name: 'Locked', folderId: 'folder-1',
+    createdAt: '2026-08-06T00:00:00.000Z', updatedAt: '2026-08-06T00:00:00.000Z',
+    header: { ...blankHeader, processName: 'KEEP THIS CONTENT' },
+    steps: [{ id: 'step-1', no: 1, description: 'keep' }], layoutDiagram: { elements: [], connections: [] },
+    lockedAt: '2026-08-06T06:00:00.000Z',
+  };
+  store.setState({ files: [lockedFile], activeFileId: 'file-1' });
+
+  await store.getState().openNewRevision();
+
+  assert.equal(openCalls, 1);
+  const file = store.getState().files[0];
+  assert.equal(file.lockedAt, null);
+  assert.equal(file.header.processName, 'KEEP THIS CONTENT');
+  assert.equal(file.steps[0].description, 'keep');
+  assert.equal(store.getState().syncStatus, 'idle');
+});
+
+test('openNewRevision on an already-unlocked file is blocked before the API call', async () => {
+  let openCalls = 0;
+  const store = await freshReadyStore({
+    openRevisionCloud: async () => { openCalls++; return { ok: true }; },
+  });
+  const file = {
+    id: 'file-1', name: 'Unlocked', folderId: 'folder-1',
+    createdAt: '2026-08-06T00:00:00.000Z', updatedAt: '2026-08-06T00:00:00.000Z',
+    header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] },
+  };
+  store.setState({ files: [file], activeFileId: 'file-1' });
+
+  await store.getState().openNewRevision();
+
+  assert.equal(openCalls, 0);
+  assert.equal(store.getState().syncStatus, 'error');
 });

@@ -10,9 +10,13 @@ const LABEL_CLASS = 'block text-sm font-bold text-slate-700 uppercase tracking-w
 export default function HeaderForm() {
   const activeFile   = useChartStore(s => s.activeFile());
   const updateHeader = useChartStore(s => s.updateHeader);
+  const closeRevision = useChartStore(s => s.closeRevision);
+  const openNewRevision = useChartStore(s => s.openNewRevision);
+  const syncStatus = useChartStore(s => s.syncStatus);
 
   if (!activeFile) return null;
   const h = activeFile.header;
+  const isLocked = Boolean(activeFile.lockedAt);
 
   // Cycle Time = busiest actor's total time (max of Worker/Auto M/C sums)
   const cycleTime = computeCycleTime(activeFile.steps) || 0;
@@ -119,8 +123,37 @@ export default function HeaderForm() {
               value={h.revNo}
               onChange={e => updateHeader({ revNo: e.target.value })}
               placeholder="A"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={isLocked ? `${FIELD_CLASS} bg-slate-100 cursor-not-allowed` : FIELD_CLASS}
             />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {isLocked ? (
+                <>
+                  <span className="text-xs text-slate-600">
+                    🔒 Locked {new Date(activeFile.lockedAt!).toLocaleString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void openNewRevision()}
+                    className="px-2.5 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    Open New Revision
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void closeRevision(h.revNo)}
+                  disabled={h.revNo.trim() === ''}
+                  className="px-2.5 py-1 text-xs font-medium rounded border border-slate-400 text-slate-700 bg-slate-50 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Close Revision
+                </button>
+              )}
+              {syncStatus === 'error' && (
+                <span className="text-xs text-red-600">Revision action failed — please retry.</span>
+              )}
+            </div>
           </div>
 
           {/* Prepared By */}
