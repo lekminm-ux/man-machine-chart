@@ -8,15 +8,25 @@ This project uses the same separation of responsibilities as the Technical Injec
 
 | Role | Responsibility | Coding authority |
 |---|---|---|
-| Claude | Review, root-cause analysis, fix/feature planning, Acceptance Criteria, Debug/QA, Final Review after Codex implements | Does not write application source code unless the user explicitly authorizes that specific instance |
-| GPT/Codex | Implement application source code per Claude's plan, write/adjust automated tests, run test/lint/build/diff-check | Implements only the approved scope; must not expand scope on its own |
+| Claude | Review, root-cause analysis, fix/feature planning, Acceptance Criteria, resolving design ambiguity, reading every diff for logic correctness, git commit/push/deploy, Final Review, and Production/live verification | Does not write application source code unless the user explicitly authorizes that specific instance |
+| GPT/Codex | Implement application source code per Claude's plan; write/adjust automated tests; **run `node --test`/lint/build/`git diff --check` as the primary source of truth for those results** | Implements only the approved scope; must not expand scope on its own |
 | User | Approves scope, starts coding, decides unresolved business choices, and authorizes deployment/escalation | Final decision maker |
 
 (Role split updated 2026-08-03 — the user reversed the original GPT/Claude split above it replaced: Claude now owns review/plan/QA, Codex now owns implementation. Prompts 1-4 below predate this change and describe the old GPT-reviews/Claude-implements loop; treat their *content* as historical reference for what each phase covered, not as the current role assignment.)
 
+**Verification-depth split, refined 2026-08-06** (token-usage rebalance after the Phase 4 rounds — Claude was independently re-running every automated check Codex had already run, which is pure duplication with no added confidence since those commands are deterministic):
+
+- **Trust Codex's own `node --test` / lint / build / `git diff --check` output by default.** Claude re-runs them independently only when something looks off (file scope doesn't match the plan, numbers look inconsistent, or the diff itself raises a question) — not as a routine step every round.
+- **Claude still reads every diff in full for logic correctness.** This is cheap and has caught real bugs purely from reading code (e.g. the Phase 0C `_unconfirmed`/hydration findings) — do not cut this.
+- **Browser/live verification stays with Claude, but scoped to risk, not applied uniformly.** New interactive/UI-facing features (e.g. Phase 4c-2's drag-and-drop) get full manual/simulated verification — this has caught real bugs automated tests couldn't (the Phase 4c-2 `dragend`-never-fires state-leak was only found by simulating a real drag sequence and inspecting the resulting DOM). Low-risk additive or backend-only changes can skip this step.
+- **CHANGELOG_AI.md entries should not be duplicated.** Codex writes its own detailed implementation entry; Claude's follow-up entry (if any) should be a short verdict plus whatever Codex's report didn't cover (e.g. Claude's own browser-verification findings), not a restatement.
+- **Future improvement to consider:** if Codex's own environment gains a working local Wrangler/Pages Dev setup (it currently reports `/api/folders` 404s and cannot exercise a real chart), Codex could self-verify more UI work directly, further reducing how often Claude needs to do it. This is a tooling/environment change for the user to set up, not something Claude can arrange from inside a chat.
+- **New-chat checkpoint, added 2026-08-06:** a `PreCompact` hook in `.claude/settings.json` notifies the user when this conversation is about to auto-compact (the real signal that context has grown large — Claude cannot poll its own token usage, so this had to be a hook, not a memory note). Claude should treat that notification, or its own read of a natural phase/milestone boundary, as a cue to proactively refresh Prompt 0B's dated sections and offer a new chat rather than waiting to be asked. Full rule text lives in `PROJECT_CONTEXT.md`'s "New-chat / token-efficiency checkpoint" section — this is a pointer, not a duplicate.
+
 ## Prompt order
 
-0. [Claude read-only project onboarding](PROMPT_CLAUDE_00_START_HERE_READ_ONLY.md) — optional first step
+0. [Claude read-only project onboarding](PROMPT_CLAUDE_00_START_HERE_READ_ONLY.md) — heavyweight, exhaustive; use only for true zero-context onboarding
+0B. [Claude fresh-session continuation](PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md) — lightweight, reusable; use this instead of Prompt 00 when starting a new chat to continue an already-established project (this is the normal case going forward — update its dated status section before pasting). Per the new-chat checkpoint rule above, Claude should keep this file's dated sections current proactively, not only when the user asks.
 0A. [Claude database inventory and recovery export](PROMPT_CLAUDE_01A_DATABASE_SAFETY_PREFLIGHT_READ_ONLY.md) — required before persistence, schema, deployment, or data-recovery work
 1. [GPT project audit and Master Plan](PROMPT_GPT_01_PROJECT_AUDIT_AND_MASTER_PLAN.md)
 2. [Claude implementation of an approved plan](PROMPT_CLAUDE_02_IMPLEMENT_APPROVED_PLAN.md)
@@ -30,8 +40,9 @@ Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
 [Phase 4a — Min/Max/Avg overlay](PROMPT_CODEX_PHASE4A_M5_YAMAZUMI_MINMAXAVG.md) (shipped, commit 06898ea),
 [Phase 4b — Periodical/Changeover tiers](PROMPT_CODEX_PHASE4B_M5_PERIODICAL_CHANGEOVER.md) (shipped, commit 979774a),
 [Phase 4c-1 — per-job-element bar segments](PROMPT_CODEX_PHASE4C1_M5_PER_ROW_SEGMENTS.md) (shipped, commit 2ea7df5),
-[Phase 4c-2 — Drag & Drop rebalancing](PROMPT_CODEX_PHASE4C2_M5_DRAG_DROP.md) (implemented, one bug found on review — see fix prompt below).
-[Phase 4c-2 fix — drag state stuck after a successful move](PROMPT_CODEX_04_FIX_PHASE4C2_DRAGEND_STUCK.md). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
+[Phase 4c-2 — Drag & Drop rebalancing](PROMPT_CODEX_PHASE4C2_M5_DRAG_DROP.md) (shipped, commit 49624fa, after [a follow-up fix](PROMPT_CODEX_04_FIX_PHASE4C2_DRAGEND_STUCK.md) for a drag-state-stuck bug Claude found on review).
+
+**Phase 4 (M5 Yamazumi) is now complete end to end** — committed and pushed, not yet deployed to Production pending explicit authorization. Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.

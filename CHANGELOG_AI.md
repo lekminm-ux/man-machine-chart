@@ -2,6 +2,84 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-06 (Update 14 — New-chat token-efficiency checkpoint rule)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Session goal
+
+User reported that Claude's token usage was burning fast across 1-2 days of
+this Claude-plans/Codex-codes workflow and asked for two things: (1) a
+rebalanced verification split so Claude stops re-running checks Codex
+already ran (done in a prior session — see the "Verification-depth split,
+refined 2026-08-06" note in `docs/AI_PROMPTS/README.md`), and (2) a standing
+rule so Claude proactively notices a good moment to start a new chat and
+automatically prepares the continuation prompt, instead of the user having
+to remember to ask for it every time.
+
+### Root cause / design constraint
+
+Claude cannot poll its own context/token usage mid-conversation, and a
+memory/preference note alone cannot trigger automated behavior — the harness
+executes hooks, not Claude's own recall. `PreCompact` is the one real,
+harness-fired event tied to "this conversation's context has grown large"
+(it fires right before the system auto-compacts). The design therefore
+splits the request into (a) a genuine automated hook for the detectable
+part, and (b) a documented standing behavior for the part that requires
+judgment/synthesis and so cannot live in a shell command.
+
+### Actions taken
+
+1. Added `.claude/settings.json` with a `PreCompact` hook (command type,
+   PowerShell) that emits a `systemMessage` notifying the user the moment
+   auto-compaction is about to run. Pipe-tested the raw command directly and
+   via a Node `spawnSync` argv-array invocation (the way a harness actually
+   spawns hook commands) before adding it, and validated the resulting
+   `settings.json` with `ConvertFrom-Json`.
+2. Added a "New-chat / token-efficiency checkpoint" subsection to
+   `PROJECT_CONTEXT.md`'s Important Working Rules: when the hook fires, or
+   Claude judges a natural phase/milestone boundary was just reached, Claude
+   should proactively refresh `docs/AI_PROMPTS/PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md`'s
+   dated sections and offer a new chat, without waiting to be asked.
+3. Cross-referenced the new rule in `docs/AI_PROMPTS/README.md` (pointer
+   only, next to the existing verification-depth-split notes and the Prompt
+   0B listing) to avoid duplicating rule text across files.
+4. Filled in Prompt 0B's own "IMMEDIATE QUESTION FOR THE USER" placeholder
+   (previously blank) so the file is immediately usable, applying the rule
+   just written.
+5. Re-verified actual repo state with `git status`/`git log` before touching
+   anything, since the conversation had just been compacted and the
+   pre-compaction summary's commit claims needed checking against reality
+   (they turned out to be accurate: HEAD was already `49624fa`, in sync with
+   `origin/main`).
+
+### Files changed
+
+- `.claude/settings.json` (new)
+- `PROJECT_CONTEXT.md`
+- `docs/AI_PROMPTS/README.md`
+- `docs/AI_PROMPTS/PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md`
+- `CHANGELOG_AI.md` (this entry)
+
+### Verification
+
+Docs/config-only session — no `src/`, `functions/`, or test files touched,
+so `node --test`/lint/build do not apply. Verified instead by: reading every
+edited file back, validating `.claude/settings.json` JSON syntax with
+PowerShell `ConvertFrom-Json`, and executing the hook's exact command through
+a Node `spawnSync` call to confirm it produces valid parseable JSON when
+invoked the way a real hook runner spawns child processes.
+
+### Database Safety Gate / Production statement
+
+No application code, schema, API, or test file was touched. No dev server,
+Wrangler, or D1 access of any kind occurred. No commit, push, or deploy of
+Phase 4 application code happened in this session — Phase 4 (`49624fa`)
+remains pushed but not yet deployed to Production, unchanged from before
+this session, pending separate user authorization.
+
 ## 2026-08-04 (Update 13 — Phase 4a+4b release: commit, push, deploy)
 
 ### Tool

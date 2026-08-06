@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "Write-Output '{\"systemMessage\": \"Context is about to auto-compact - this chat has grown large. Good checkpoint to start a fresh chat: ask Claude to refresh docs/AI_PROMPTS/PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md first, then paste it into a new chat.\"}'",
+            "shell": "powershell",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

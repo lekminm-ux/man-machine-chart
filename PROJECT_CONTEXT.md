@@ -1,6 +1,6 @@
 ﻿# PROJECT_CONTEXT
 
-Last updated: 2026-08-02
+Last updated: 2026-08-06
 
 ## Project Name
 
@@ -414,6 +414,32 @@ garbage. Check the live site with the browser tools instead.
 - Keep user data and chart JSON backward-compatible where possible.
 - Never overwrite local storage loaded files during hydration. Always merge files and keep unsynced local changes to prevent data loss.
 - Always guard cloud save operations (saveActiveFile) to prevent overwriting cloud data with empty steps/layouts if lazy-loading has not completed (_loaded === false).
+
+### New-chat / token-efficiency checkpoint (added 2026-08-06)
+
+Long single-chat sessions (many rounds of Codex handoff/review/verification
+stacked in one conversation) burn tokens fast. `.claude/settings.json` has a
+`PreCompact` hook that fires a `systemMessage` the moment this conversation
+is about to auto-compact — the real, automatic signal that context has grown
+large. (This has to be a hook, not a memory/preference note: Claude cannot
+poll its own token usage mid-conversation, and only a harness-executed hook
+actually fires on that event. See `docs/AI_PROMPTS/README.md`'s
+verification-depth-split notes for the token-usage rebalance this belongs to.)
+
+- When that notification appears, OR when Claude judges on its own that a
+  natural milestone/phase boundary was just reached in a long session (e.g.
+  a phase just shipped and got committed), Claude should proactively offer
+  to move to a new chat — do not wait for the user to ask first.
+- Before making that offer, Claude must first update the two dated sections
+  of `docs/AI_PROMPTS/PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md` (CURRENT
+  STATUS and IMMEDIATE QUESTION) so the prompt reflects reality and is ready
+  to paste immediately — do this before telling the user it's ready, not
+  after.
+- Finish or checkpoint whatever step is currently in progress first; do not
+  interrupt mid-task just because the hook fired.
+- The hook's `systemMessage` text is in English on purpose (PowerShell
+  stdout on this machine can mangle non-ASCII text); this does not change
+  the standing preference for Thai in normal chat responses.
 
 ## Multi-Device Workflow
 
