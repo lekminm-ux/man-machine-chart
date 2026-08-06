@@ -401,6 +401,56 @@ test('per-row category minima sum exactly to computeOperatorTotals aggregates', 
   }
 });
 
+test('moveRowToOperator changes only the target row operator', () => {
+  const target = { ...row('move me', 'Worker A', 'walk', [5, 6, 7], 'periodical'), seq: 7 };
+  const untouched = { ...row('stay here', 'Worker B', 'idle', [8, 9, 10]), seq: 8 };
+  const study = { readingCount: 3, rows: [target, untouched] };
+
+  assert.strictEqual(
+    timeStudy.moveRowToOperator(study, target.id, 'Worker A'),
+    study,
+    'moving to the current operator is a no-op'
+  );
+
+  const moved = timeStudy.moveRowToOperator(study, target.id, 'Worker C');
+
+  assert.notStrictEqual(moved, study);
+  assert.notStrictEqual(moved.rows[0], target);
+  assert.deepEqual(moved.rows[0], { ...target, operator: 'Worker C' });
+  assert.strictEqual(moved.rows[1], untouched, 'rows other than the target keep their original object');
+  assert.equal(moved.rows[0].kind, target.kind);
+  assert.equal(moved.rows[0].category, target.category);
+  assert.deepEqual(moved.rows[0].readings, target.readings);
+  assert.equal(moved.rows[0].id, target.id);
+  assert.equal(moved.rows[0].seq, target.seq);
+  assert.equal(moved.rows[0].jobElement, target.jobElement);
+});
+
+test('moveRowToOperator safely handles missing rows and rebalances operator totals', () => {
+  const source = row('source work', 'Worker A', 'man', [5, 6, 7]);
+  const destination = row('existing work', 'Worker B', 'walk', [9, 10, 11]);
+  const unaffected = row('unaffected work', 'Worker C', 'idle', [2, 3, 4]);
+  const study = { readingCount: 3, rows: [source, destination, unaffected] };
+
+  assert.doesNotThrow(() => timeStudy.moveRowToOperator(study, 'missing-row', 'Worker B'));
+  assert.strictEqual(
+    timeStudy.moveRowToOperator(study, 'missing-row', 'Worker B'),
+    study,
+    'a missing row leaves the study unchanged'
+  );
+
+  const moved = timeStudy.moveRowToOperator(study, source.id, 'Worker B');
+  const totals = Object.fromEntries(
+    timeStudy.computeOperatorTotals(moved).map(total => [total.operator, total])
+  );
+
+  assert.equal(totals['Worker A'], undefined, 'the source operator no longer has a row');
+  assert.equal(totals['Worker B'].min, 14, 'destination total includes the moved row');
+  assert.equal(totals['Worker B'].manMin, 5);
+  assert.equal(totals['Worker B'].walkMin, 9);
+  assert.equal(totals['Worker C'].min, 2, 'an unrelated operator is unchanged');
+});
+
 test('resizing the sheet keeps existing readings and pads with blanks', () => {
   const study = { readingCount: 5, rows: [row('x', 'Worker A', 'man', [1, 2, 3, 4, 5])] };
 

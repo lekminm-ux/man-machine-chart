@@ -2774,3 +2774,97 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
 
 - No commit, push, deploy, migration, remote operation, or Production D1 write
   occurred.
+
+## 2026-08-05 (Codex Phase 4C-2 M5 native HTML5 drag/drop)
+
+### Tool / Scope
+
+- Codex / GPT implementation-only handoff for the Phase 4C-2 M5 operator
+  reassignment interaction. No schema, API, Module 4, store-action, or
+  drag-library change was introduced.
+- Changed exactly these implementation files plus this changelog:
+  `src/lib/time-study.ts`, `src/components/modules/Module5_YamazumiChart.tsx`,
+  `tests/time-study.test.cjs`, and `CHANGELOG_AI.md`.
+
+### Changes
+
+- Added pure `moveRowToOperator(study, rowId, newOperator)`. It changes only
+  the matching row's `operator`, preserves every other row and field, and
+  safely returns the original study for a missing row or same-operator move.
+- Added native HTML5 drag/drop to all Module 5 time-study row segments
+  (Regular, Periodical, and Changeover). Drop uses the existing
+  `updateTimeStudy()` local action only; it does not change Module 4 steps or
+  push to the cloud.
+- During a drag, every `ALL_WORKERS` operator is rendered. Operators with no
+  current work receive a dashed empty drop-target placeholder; placeholders
+  disappear when the drag ends. The existing no-`timeStudy` fallback remains
+  unchanged.
+- Added helper tests covering target-only mutation, preservation of row
+  fields/other rows, missing-row no-op behavior, and source/destination
+  aggregate rebalance.
+
+### Verification
+
+- `npm.cmd test`: **PASS, 163/163**.
+- `npm.cmd run lint`: exit 1 with the known baseline **5 errors / 7 warnings**;
+  no error was reported in any Phase 4C-2 file. Existing baseline errors remain
+  in `StepTable.tsx`, `Sidebar.tsx`, and `TopBar.tsx`.
+- `npm.cmd run build`: **PASS**, TypeScript completed and all 5 static routes
+  generated.
+- `git diff --check`: **PASS**; only LF/CRLF normalization warnings.
+- Local browser check reached `http://localhost:3000/editor`, but Next dev
+  does not serve the Cloudflare Pages Functions: `/api/folders` returned 404.
+  The editor showed Cloud unavailable with no chart ID/data, so no safe
+  drag/drop, PUT, fresh GET, hard-refresh, or chart-console acceptance claim
+  is made. Pages Dev was not available because local `wrangler` is absent.
+
+### Handoff / Safety
+
+- Review status: return to Claude for review; do not close Phase 4C-2 or
+  release from this local-only evidence.
+- No commit, push, deploy, migration, remote operation, or Production D1 write
+  occurred.
+
+## 2026-08-05 (Codex Phase 4C-2 targeted drag-state fix)
+
+### Tool / Scope
+
+- Codex / GPT targeted bug-fix and retest only. The fix scope changed exactly
+  these two files: `src/components/modules/Module5_YamazumiChart.tsx` and
+  `CHANGELOG_AI.md`. The existing Phase 4C-2 changes in the other files and
+  the pre-existing prompt/document changes were preserved.
+
+### Finding / Root Cause
+
+- After a successful cross-operator drop, React moved the dragged segment to
+  the destination before native `dragend` fired on the source. The detached
+  source therefore never reached `handleRowDragEnd()`, leaving
+  `draggingRowId` set and permanently showing placeholders/drag styling.
+
+### Fix
+
+- Added `setDraggingRowId(null);` directly inside `handleOperatorDrop`, next
+  to the existing `setDraggingOverOperator(null);`. This clears both drag
+  state values at drop time while retaining `handleRowDragEnd()` for no-op,
+  cancelled, and outside-target drags.
+
+### Retest
+
+- `node --test`: **PASS, 163/163**.
+- `npm run lint`: blocked by the machine PowerShell execution policy for
+  `npm.ps1`; equivalent `npm.cmd run lint`: exit 1 with the known baseline
+  **5 errors / 11 warnings**, with no error in the two changed files.
+- `npm run build`: blocked by the same PowerShell execution policy;
+  equivalent `npm.cmd run build`: **PASS**, TypeScript completed and the
+  static routes generated successfully (`/`, `/_not-found`, `/editor`).
+- `git diff --check`: **PASS**; only LF/CRLF normalization warnings.
+- Manual browser verification was not possible for this retest: local
+  `wrangler`/Pages Dev is unavailable, and Next dev does not serve the Pages
+  Functions fixture (`/api/folders` returns 404). No real drag sequence or
+  post-drop DOM inspection is claimed; Claude will independently re-verify.
+
+### Handoff / Safety
+
+- STATUS: **FIXED**. Return to Claude for independent re-verification before
+  any commit, push, deploy, or Phase 4C-2 closure.
+- No commit, push, deploy, or Production D1 write occurred.

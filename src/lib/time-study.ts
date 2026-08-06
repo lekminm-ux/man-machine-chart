@@ -91,6 +91,21 @@ export function rowsForOperatorByCategory(
     .map(({ row }) => row);
 }
 
+/** Move one Module 1 job element to another operator without changing anything else. */
+export function moveRowToOperator(
+  study: TimeStudy,
+  rowId: string,
+  newOperator: OperatorType
+): TimeStudy {
+  const row = study.rows.find(item => item.id === rowId);
+  if (!row || row.operator === newOperator) return study;
+
+  return {
+    ...study,
+    rows: study.rows.map(item => item.id === rowId ? { ...item, operator: newOperator } : item),
+  };
+}
+
 export interface TimeStudyTotals {
   /** Per reading column, machine rows excluded — `=SUM(C8:C44)-C25`. */
   perReading: number[];

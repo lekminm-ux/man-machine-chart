@@ -2,9 +2,14 @@
 
 import React, { useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
-import { ALL_WORKERS } from '@/types';
+import { ALL_WORKERS, type OperatorType } from '@/types';
 import { getCalculatedSteps, type CalculatedStep } from '@/lib/chart-utils';
-import { computeOperatorTotals, computeRowStats, rowsForOperatorByCategory } from '@/lib/time-study';
+import {
+  computeOperatorTotals,
+  computeRowStats,
+  moveRowToOperator,
+  rowsForOperatorByCategory,
+} from '@/lib/time-study';
 import { BarChart3 } from 'lucide-react';
 
 const PERIODICAL_PATTERN = 'repeating-linear-gradient(45deg, rgba(30, 41, 59, 0.7) 0 3px, rgba(148, 163, 184, 0.45) 3px 7px)';
@@ -13,10 +18,13 @@ const CHANGEOVER_PATTERN = 'linear-gradient(90deg, rgba(30, 41, 59, 0.6) 0 1px, 
 export default function Module5_YamazumiChart() {
   const activeFile = useChartStore(s => s.activeFile());
   const updateTimeMeasurement = useChartStore(s => s.updateTimeMeasurement);
+  const updateTimeStudy = useChartStore(s => s.updateTimeStudy);
 
   const [localTaktTime, setLocalTaktTime] = useState<number>(
     activeFile?.timeMeasurement?.taktTime || 60
   );
+  const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
+  const [draggingOverOperator, setDraggingOverOperator] = useState<OperatorType | null>(null);
 
   if (!activeFile) {
     return <div className="p-8 text-center text-slate-500">Please open a file from the sidebar to use Module 5.</div>;
@@ -48,6 +56,43 @@ export default function Module5_YamazumiChart() {
   const activeOperators = hasTimeStudy
     ? ALL_WORKERS.filter(operator => timeStudyByOperator.has(operator))
     : ALL_WORKERS.filter(w => operatorSteps[w].length > 0);
+
+  const handleRowDragStart = (event: React.DragEvent<HTMLDivElement>, rowId: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', rowId);
+    setDraggingRowId(rowId);
+  };
+
+  const handleRowDragEnd = () => {
+    setDraggingRowId(null);
+    setDraggingOverOperator(null);
+  };
+
+  const handleOperatorDragOver = (event: React.DragEvent<HTMLDivElement>, operator: OperatorType) => {
+    if (!hasTimeStudy) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDraggingOverOperator(operator);
+  };
+
+  const handleOperatorDrop = (event: React.DragEvent<HTMLDivElement>, newOperator: OperatorType) => {
+    event.preventDefault();
+    setDraggingRowId(null);
+    setDraggingOverOperator(null);
+    if (!hasTimeStudy || !activeFile.timeStudy) return;
+
+    const rowId = event.dataTransfer.getData('text/plain') || draggingRowId;
+    if (!rowId) return;
+
+    const row = activeFile.timeStudy.rows.find(item => item.id === rowId);
+    if (!row || row.operator === newOperator) return;
+
+    updateTimeStudy(moveRowToOperator(activeFile.timeStudy, rowId, newOperator));
+  };
+
+  const displayedOperators = hasTimeStudy && draggingRowId !== null
+    ? ALL_WORKERS
+    : activeOperators;
 
   const operatorTotals = activeOperators.map(op => {
     if (hasTimeStudy) {
@@ -194,7 +239,31 @@ export default function Module5_YamazumiChart() {
 
             {/* Bars Container */}
             <div className="absolute left-10 right-0 bottom-[40px] h-full flex justify-around items-end pt-10">
-              {activeOperators.map(op => {
+              {displayedOperators.map(op => {
+                const hasRowsForOperator = activeOperators.includes(op);
+                const isDropTarget = draggingRowId !== null && draggingOverOperator === op;
+
+                if (hasTimeStudy && !hasRowsForOperator) {
+                  return (
+                    <div
+                      key={op}
+                      onDragOver={event => handleOperatorDragOver(event, op)}
+                      onDrop={event => handleOperatorDrop(event, op)}
+                      className={`relative w-24 flex flex-col items-center ${isDropTarget ? 'rounded-lg bg-blue-50/70 ring-2 ring-blue-400' : ''}`}
+                    >
+                      <div
+                        className="w-16 relative flex items-center justify-center border-2 border-dashed border-slate-300 rounded-t-sm text-xs text-slate-400"
+                        style={{ height: maxTotalTime * pxPerSec }}
+                      >
+                        No work yet
+                      </div>
+                      <div className="absolute -bottom-8 font-bold text-sm text-slate-600 whitespace-nowrap">
+                        {op}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const steps = operatorSteps[op];
                 const total = operatorTotals.find(t => t.op === op);
                 const totalMin = total?.totalMin ?? 0;
@@ -212,7 +281,12 @@ export default function Module5_YamazumiChart() {
                   ? rowsForOperatorByCategory(activeFile.timeStudy!, op, 'changeover')
                   : [];
                 return (
-                  <div key={op} className="relative w-24 flex flex-col items-center group">
+                  <div
+                    key={op}
+                    onDragOver={hasTimeStudy ? event => handleOperatorDragOver(event, op) : undefined}
+                    onDrop={hasTimeStudy ? event => handleOperatorDrop(event, op) : undefined}
+                    className={`relative w-24 flex flex-col items-center group ${isDropTarget ? 'rounded-lg bg-blue-50/70 ring-2 ring-blue-400' : ''}`}
+                  >
                     {/* The Stacked Bar */}
                     {hasTimeStudy ? (
                       <div className="w-16 relative shadow-sm rounded-t-sm" style={{ height: maxTotalTime * pxPerSec }}>
@@ -235,9 +309,12 @@ export default function Module5_YamazumiChart() {
                               <div
                                 key={row.id}
                                 data-row-id={row.id}
-                                className={className}
+                                className={`${className} ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
                                 style={{ height: rowMin * pxPerSec }}
                                 title={`${row.jobElement}: ${rowMin}s`}
+                                draggable={hasTimeStudy}
+                                onDragStart={event => handleRowDragStart(event, row.id)}
+                                onDragEnd={handleRowDragEnd}
                               />
                             );
                           })}
@@ -280,13 +357,16 @@ export default function Module5_YamazumiChart() {
                                 <div
                                   key={row.id}
                                   data-row-id={row.id}
-                                  className="w-full border-b border-slate-700/80"
+                                  className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
                                   style={{
                                     height: rowMin * pxPerSec,
                                     backgroundColor: '#334155',
                                     backgroundImage: PERIODICAL_PATTERN,
                                   }}
                                   title={`${row.jobElement}: ${rowMin}s`}
+                                  draggable={hasTimeStudy}
+                                  onDragStart={event => handleRowDragStart(event, row.id)}
+                                  onDragEnd={handleRowDragEnd}
                                 />
                               );
                             })}
@@ -309,7 +389,7 @@ export default function Module5_YamazumiChart() {
                                 <div
                                   key={row.id}
                                   data-row-id={row.id}
-                                  className="w-full border-b border-slate-700/80"
+                                  className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
                                   style={{
                                     height: rowMin * pxPerSec,
                                     backgroundColor: '#334155',
@@ -317,6 +397,9 @@ export default function Module5_YamazumiChart() {
                                     backgroundSize: '8px 8px',
                                   }}
                                   title={`${row.jobElement}: ${rowMin}s`}
+                                  draggable={hasTimeStudy}
+                                  onDragStart={event => handleRowDragStart(event, row.id)}
+                                  onDragEnd={handleRowDragEnd}
                                 />
                               );
                             })}
@@ -381,7 +464,7 @@ export default function Module5_YamazumiChart() {
                 );
               })}
               
-              {activeOperators.length === 0 && (
+              {displayedOperators.length === 0 && (
                 <div className="w-full h-full flex items-center justify-center text-slate-400 italic">
                   No operator tasks defined yet. Add steps in Module 4.
                 </div>
