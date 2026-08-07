@@ -2,6 +2,71 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-07 (Update 17 — Phase 5a-1 Production schema migration)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized, after reviewing the exact 4 SQL statements
+verbatim: (1) a fresh Database Safety Preflight, then (2) running exactly
+those statements against Production `mm-chart-db`. User also confirmed the
+sequencing recommendation this migration follows: migrate the additive
+schema now, but hold application-code deployment until Phase 5a-2 (read-only
+UI gating) is ready, so the live team never sees a half-implemented lock UI
+while continuing to work in the app.
+
+### Preflight (Prompt 01A)
+
+Read-only inventory of Production found **7 folders (4 roots) / 12 charts**
+— growth only versus every prior recorded baseline (a new root folder
+`P703SSB` with 4 new charts, created the same day, plus the `Injection`
+folder/2 charts already seen earlier this session). All previously-known
+folders and charts present by name, zero decrease. Exported the complete
+`folders`/`chart_files` rows (with full chart content) and a live-schema
+introspection to
+`D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-08-06_091954\`;
+re-read the export back and confirmed row counts and JSON validity for all
+12 charts. STATUS: `DATA_SAFE_READ_ONLY_COMPLETE`.
+
+**New finding:** beyond the already-documented `folders.parentId` foreign-key
+drift, this preflight found that `schema.sql`'s `idx_files_folder` and
+`idx_files_updated` indexes on `chart_files` have never actually existed on
+Production — `schema.sql` has never been applied there as a complete file.
+Not a data-safety risk at current scale, but it meant the migration below
+had to run only its own 4 statements, never the full `schema.sql` file
+(which would have silently created those two long-missing indexes as an
+unplanned side effect).
+
+### Migration
+
+Ran exactly:
+`ALTER TABLE chart_files ADD COLUMN lockedAt TEXT DEFAULT NULL;` plus
+`CREATE TABLE revision_snapshots (...)` and its two indexes, via
+`wrangler d1 execute mm-chart-db --remote --file=...`. Wrangler reported
+`success: true`, 4 queries executed. Immediately re-verified: folder/root/
+chart counts unchanged (7/4/12), `chart_files.lockedAt` column present and
+nullable, `revision_snapshots` present with 0 rows, **0 of the 12 existing
+charts have `lockedAt` set** (zero behavior change for any real chart), and
+`sqlite_master` confirms only the 4 intended objects were added — the two
+long-missing indexes are still absent, exactly as scoped. Full before/after
+detail recorded in `MIGRATION_RESULT.md` next to the preflight export.
+
+### Database Safety Gate / Production statement
+
+**This is a Production D1 write** — the schema is now live. It is purely
+additive and currently inert: no existing chart is locked, no application
+code that reads/writes `lockedAt` or `revision_snapshots` is deployed yet.
+Rollback, if ever needed before any real snapshot exists, would be a trivial
+additive-only reversal (`ALTER TABLE` cannot drop a column in SQLite, but an
+unused nullable column with no reads/writes is harmless indefinitely).
+Verified recovery export exists and was checked before the write, per the
+Database Safety Gate. No application code was committed, pushed, or
+deployed in this entry — that already happened in Update 16/commit
+`b982cc3`, separately from this schema step.
+
 ## 2026-08-06 (Update 16 — Claude review + fix + local verification: Phase 5a-1)
 
 ### Tool
