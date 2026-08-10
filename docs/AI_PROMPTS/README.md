@@ -22,11 +22,13 @@ This project uses the same separation of responsibilities as the Technical Injec
 - **CHANGELOG_AI.md entries should not be duplicated.** Codex writes its own detailed implementation entry; Claude's follow-up entry (if any) should be a short verdict plus whatever Codex's report didn't cover (e.g. Claude's own browser-verification findings), not a restatement.
 - **Future improvement to consider:** if Codex's own environment gains a working local Wrangler/Pages Dev setup (it currently reports `/api/folders` 404s and cannot exercise a real chart), Codex could self-verify more UI work directly, further reducing how often Claude needs to do it. This is a tooling/environment change for the user to set up, not something Claude can arrange from inside a chat.
 - **New-chat checkpoint, added 2026-08-06:** a `PreCompact` hook in `.claude/settings.json` notifies the user when this conversation is about to auto-compact (the real signal that context has grown large — Claude cannot poll its own token usage, so this had to be a hook, not a memory note). Claude should treat that notification, or its own read of a natural phase/milestone boundary, as a cue to proactively refresh Prompt 0B's dated sections and offer a new chat rather than waiting to be asked. Full rule text lives in `PROJECT_CONTEXT.md`'s "New-chat / token-efficiency checkpoint" section — this is a pointer, not a duplicate.
+- **GPT-5.6 context checkpoint, added 2026-08-10:** the official API model docs list a 1,050,000-token context window for GPT-5.6 Sol/Terra/Luna; at 70% (735,000 tokens), alert the user and prepare the filled-in [GPT-5.6 new-chat checkpoint prompt](PROMPT_NEW_CHAT_GPT56_CONTEXT_CHECKPOINT.md). Use the model/harness usage report when available; if it is unavailable, label the exact usage as unknown and use the PreCompact/system warning as the fallback. Full operational rules live in `PROJECT_CONTEXT.md`.
 
 ## Prompt order
 
 0. [Claude read-only project onboarding](PROMPT_CLAUDE_00_START_HERE_READ_ONLY.md) — heavyweight, exhaustive; use only for true zero-context onboarding
 0B. [Claude fresh-session continuation](PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md) — lightweight, reusable; use this instead of Prompt 00 when starting a new chat to continue an already-established project (this is the normal case going forward — update its dated status section before pasting). Per the new-chat checkpoint rule above, Claude should keep this file's dated sections current proactively, not only when the user asks.
+Context checkpoint: [GPT-5.6 context checkpoint / new-chat handoff](PROMPT_NEW_CHAT_GPT56_CONTEXT_CHECKPOINT.md) — fill and paste when the 70% GPT-5.6 threshold is reached.
 0A. [Claude database inventory and recovery export](PROMPT_CLAUDE_01A_DATABASE_SAFETY_PREFLIGHT_READ_ONLY.md) — required before persistence, schema, deployment, or data-recovery work
 1. [GPT project audit and Master Plan](PROMPT_GPT_01_PROJECT_AUDIT_AND_MASTER_PLAN.md)
 2. [Claude implementation of an approved plan](PROMPT_CLAUDE_02_IMPLEMENT_APPROVED_PLAN.md)
@@ -73,13 +75,24 @@ scoped next, after 5a-2 ships and both are deployed together.
 Phase 5a-1 and 5a-2 shipped together (commit `4b40648`, deployed 10 Aug
 2026 — see CHANGELOG_AI.md Update 19). Phase 5b, sub-phases:
 [Phase 5b-1 — M6 Before/After comparison](PROMPT_CODEX_PHASE5B1_BEFORE_AFTER_COMPARISON.md)
-(planned by Claude 10 Aug 2026, not yet implemented) — adds a 6th "Kaizen"
-module tab that compares two closed Revision snapshots (Cycle Time + %
-change, worker count, walk/idle time, capacity/shift, and an overlaid
-Yamazumi chart), per docs/Master_Plan.html section 6. Comparison is
-restricted to two closed Revisions only — never the live/editable current
-state — an explicit user decision, since the whole point of "always
-re-measure after Kaizen" is comparing two frozen, trustworthy numbers.
+(implemented by Codex 10 Aug 2026) — adds a 6th "Kaizen" module tab that
+compares two closed Revision snapshots (Cycle Time + % change, worker count,
+walk/idle time, capacity/shift, and an overlaid Yamazumi chart), per
+docs/Master_Plan.html section 6. Comparison is restricted to two closed
+Revisions only — never the live/editable current state — an explicit user
+decision, since the whole point of "always re-measure after Kaizen" is
+comparing two frozen, trustworthy numbers. Claude's diff review found the
+scope and calculation logic correct, but live verification against a real
+local D1 chart with two closed Revisions found the component enters an
+infinite React re-render loop (~1,850 effect runs/sec, confirmed by a
+temporary counter) the moment two valid snapshots are actually selected —
+invisible to automated tests (no React component-rendering tests exist in
+this project) and to Codex's own environment check (no chart with 2+ closed
+Revisions was available there). Root cause: `snapshotCache` state was both a
+dependency of, and written by, the same effect. Fix handoff:
+[Phase 5b-1 fix — M6 infinite loop](PROMPT_CODEX_05_FIX_PHASE5B1_M6_INFINITE_LOOP.md)
+(state → ref, removed from the effect's dependency array), sent back to
+Codex 10 Aug 2026 — not yet re-verified.
 Phase 5b-2 (the Kaizen problem/countermeasure form — Problem, list of
 countermeasures, responsible person, due date, per Master Plan section 6 —
 its exact field structure is based on that document's summary, not the raw
