@@ -44,18 +44,31 @@ Phase 4 (M5 Yamazumi completion), under the new Claude-plans/Codex-codes split:
 
 **Phase 4 (M5 Yamazumi) is now complete end to end** — committed, pushed, deployed to Production, and read-only live-verified (6 Aug 2026, commit `7a43c09`). Codex reports back to Claude (not the user) for review before any further phase, commit, push, or deploy.
 
-Phase 5 (M6 Kaizen + Before/After), first sub-phase:
+Phase 5 (M6 Kaizen + Before/After), sub-phases:
 [Phase 5a-1 — Revision Snapshot mechanism](PROMPT_CODEX_PHASE5A1_REVISION_SNAPSHOT.md)
-implemented by Codex the same day (6 Aug 2026), reviewed diff-by-diff by
+(shipped, commit b982cc3) — implemented by Codex, reviewed diff-by-diff by
 Claude (no bugs found), one out-of-scope test-mock conflict fixed by Claude
 directly with explicit authorization, and verified live against a real local
 Pages Dev + D1 environment (close/lock, blocked save, open/unlock, save
 resumes — full cycle, zero data loss). `node --test` 184/184, build/lint/
-diff-check all clean. Not yet committed, pushed, or deployed — the actual
-Production D1 schema migration is a separate step requiring its own
-Database Safety preflight and explicit user authorization. Phase 5a-2
-(read-only UI gating across M1/M2/M4/M5) and Phase 5b (the Before/After
-comparison page itself) are separately scoped next.
+diff-check all clean. Committed and pushed. Its additive Production D1
+schema (`chart_files.lockedAt`, `revision_snapshots`) was migrated
+separately on 7 Aug 2026 after its own Database Safety preflight (commit
+11ce2f8) — zero data loss, zero existing chart affected. Application code
+deployment is deliberately held back until Phase 5a-2 ships, so the
+continuously-active team never sees a half-locked UI (Rev No. disabled while
+every other field stays freely editable).
+[Phase 5a-2 — read-only UI gating](PROMPT_CODEX_PHASE5A2_READONLY_UI_GATING.md)
+(planned by Claude 9 Aug 2026, not yet implemented) — extends the same
+`isLocked` pattern HeaderForm's Rev No. field already uses to every other
+input across HeaderForm, M1, M2, M4 (StepTable/LayoutDiagram/SummaryTable),
+and M5; M3 is confirmed to need no changes (no write path into chart
+content). Also fixes a latent `duplicateFile` bug found while planning this
+phase: duplicating a locked chart copied `lockedAt` into the new file
+client-side even though the server never persists it on create, leaving the
+duplicate stuck showing "locked" with no way to unlock it via UI.
+Phase 5b (the Before/After comparison page itself) remains separately
+scoped next, after 5a-2 ships and both are deployed together.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.

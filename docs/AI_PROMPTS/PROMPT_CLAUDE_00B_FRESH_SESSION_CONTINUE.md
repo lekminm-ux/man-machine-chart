@@ -32,14 +32,33 @@ is for, not this one)
 5. Run: git status --short --branch
 6. Run: git log --oneline -10
 
-CURRENT STATUS AS OF 2026-08-06 — verify against the files above before
+CURRENT STATUS AS OF 2026-08-10 — verify against the files above before
 trusting this, it will drift out of date
 - Phase 0A/0B/0C (database safety + save-to-cloud persistence): complete, deployed, live-verified.
 - Phase 4 (M5 Yamazumi completion — 4a Min/Max/Avg overlay, 4b Periodical/
   Changeover tiers, 4c-1 per-row segments, 4c-2 Drag & Drop): complete,
-  committed and pushed (commit 49624fa), NOT yet deployed to Production.
-- Nothing else in the numbered roadmap (Phase 5 M6 Kaizen, Phase 6 M4
-  supplementary work, Phase 7+ TPS Activity 4M) has started yet.
+  committed, pushed, deployed to Production, and read-only live-verified
+  (commit 7a43c09).
+- Phase 5a-1 (M6 Revision Snapshot mechanism — schema, /api/revisions,
+  store guards, minimal HeaderForm close/open-revision UI): implemented,
+  reviewed, and locally verified. Committed and pushed (commit b982cc3).
+  Its additive Production D1 schema (chart_files.lockedAt,
+  revision_snapshots) has been migrated and verified live (zero data loss,
+  zero existing chart affected) — see CHANGELOG_AI.md Update 17.
+- Phase 5a-2 (read-only UI gating across HeaderForm's remaining fields +
+  M1/M2/M4/M5): implemented by Codex, reviewed diff-by-diff by Claude (two
+  low-severity, non-blocking UX findings noted — a LayoutDiagram
+  element-selection/panel-visibility asymmetry and a minor M5 drag-guard
+  ordering nitpick, neither a data-safety issue), and verified live
+  end-to-end against a real local D1/Pages Dev — every module's controls
+  confirmed `disabled` in the actual rendered DOM (not just the source
+  diff), full close→verify-every-module-blocked→open→editable-again cycle
+  held with zero data loss. See CHANGELOG_AI.md Update 18. Being committed
+  and pushed this session; **application code (both 5a-1 and 5a-2 together)
+  is still NOT deployed** — deploying them together was always the plan,
+  since 5a-1 was deliberately held back until 5a-2 was ready.
+- Not started: Phase 5b (Before/After comparison page + Kaizen sheet +
+  export), Phase 6 (M4 supplementary work), Phase 7+ (TPS Activity 4M).
 
 ROLE SPLIT — summary only, docs/AI_PROMPTS/README.md is authoritative
 - Claude: planning, root-cause analysis, resolving design ambiguity, Acceptance
@@ -71,10 +90,13 @@ full text)
   restore/clean without checking with the user first.
 
 IMMEDIATE QUESTION FOR THE USER
-Phase 4 (M5 Yamazumi — 4a/4b/4c-1/4c-2) is fully committed and pushed
-(commit 49624fa, in sync with origin/main) but NOT yet deployed to
-Production. Ask the user to decide: (a) authorize deploying it to
-https://man-machine-chart.pages.dev now, and/or (b) what to plan next —
-Phase 5 (M6 Kaizen + Before/After) or another docs/Master_Plan.html roadmap
-item.
+Both Phase 5a-1 and Phase 5a-2 application code are now implemented,
+reviewed, and locally verified — the one thing the team has been waiting
+for before deploying the lock feature at all. Ask the user to confirm:
+(a) authorize deploying both together to
+https://man-machine-chart.pages.dev now (this is the moment the original
+sequencing plan was building toward), (b) address the two minor Phase 5a-2
+findings first (LayoutDiagram element-selection gap, M5 drag-guard
+ordering) before deploying, or (c) something else — e.g. start planning
+Phase 5b (Before/After comparison page) instead.
 ```
