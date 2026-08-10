@@ -70,6 +70,23 @@ duplicate stuck showing "locked" with no way to unlock it via UI.
 Phase 5b (the Before/After comparison page itself) remains separately
 scoped next, after 5a-2 ships and both are deployed together.
 
+Phase 5a-1 and 5a-2 shipped together (commit `4b40648`, deployed 10 Aug
+2026 — see CHANGELOG_AI.md Update 19). Phase 5b, sub-phases:
+[Phase 5b-1 — M6 Before/After comparison](PROMPT_CODEX_PHASE5B1_BEFORE_AFTER_COMPARISON.md)
+(planned by Claude 10 Aug 2026, not yet implemented) — adds a 6th "Kaizen"
+module tab that compares two closed Revision snapshots (Cycle Time + %
+change, worker count, walk/idle time, capacity/shift, and an overlaid
+Yamazumi chart), per docs/Master_Plan.html section 6. Comparison is
+restricted to two closed Revisions only — never the live/editable current
+state — an explicit user decision, since the whole point of "always
+re-measure after Kaizen" is comparing two frozen, trustworthy numbers.
+Phase 5b-2 (the Kaizen problem/countermeasure form — Problem, list of
+countermeasures, responsible person, due date, per Master Plan section 6 —
+its exact field structure is based on that document's summary, not the raw
+source Excel's `kaizen` sheet directly, since this machine currently has no
+working Python interpreter to open it) is separately scoped next, to be
+added to the same `Module6_Kaizen.tsx` file 5b-1 creates.
+
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.
 
