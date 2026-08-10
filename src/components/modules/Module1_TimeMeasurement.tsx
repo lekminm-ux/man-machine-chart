@@ -57,6 +57,7 @@ export default function Module1_TimeMeasurement() {
   if (!activeFile) {
     return <div className="p-8 text-center text-slate-500">เปิดไฟล์จากแถบด้านซ้ายก่อน จึงจะใช้ Module 1 ได้</div>;
   }
+  const isLocked = Boolean(activeFile.lockedAt);
 
   const say = (msg: string) => {
     setFlash(msg);
@@ -116,6 +117,7 @@ export default function Module1_TimeMeasurement() {
 
   /** Paste a block copied from Excel starting at the focused cell. */
   const handlePaste = (e: React.ClipboardEvent, rowIndex: number, colIndex: number) => {
+    if (isLocked) return;
     const text = e.clipboardData.getData('text/plain');
     if (!text.includes('\t') && !text.includes('\n')) return; // single value — let the browser handle it
     e.preventDefault();
@@ -190,7 +192,8 @@ export default function Module1_TimeMeasurement() {
               <select
                 value={study.readingCount}
                 onChange={e => setReadingCount(Number(e.target.value))}
-                className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                disabled={isLocked}
+                className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -199,7 +202,8 @@ export default function Module1_TimeMeasurement() {
 
             <button
               onClick={handleImport}
-              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              disabled={isLocked}
+              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               title="นำ step ที่กรอกไว้ใน M4 มาตั้งต้นในตารางนี้"
             >
               <Download size={14} /> ดึงข้อมูลจาก M4
@@ -207,7 +211,8 @@ export default function Module1_TimeMeasurement() {
 
             <button
               onClick={handlePush}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors"
+              disabled={isLocked}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               title="ส่งค่า Min ของทุกแถวไปเป็นเวลามาตรฐานให้ M2–M5"
             >
               <Send size={14} /> ส่งข้อมูลไป M2–M5
@@ -257,12 +262,14 @@ export default function Module1_TimeMeasurement() {
                       <div className="flex gap-0.5 justify-center">
                         <button
                           onClick={() => insertRow(rowIndex, 'above')}
-                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                          disabled={isLocked}
+                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                           title="แทรกแถวเปล่าด้านบน"
                         >+▲</button>
                         <button
                           onClick={() => insertRow(rowIndex, 'below')}
-                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                          disabled={isLocked}
+                          className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                           title="แทรกแถวเปล่าด้านล่าง"
                         >+▼</button>
                       </div>
@@ -273,7 +280,8 @@ export default function Module1_TimeMeasurement() {
                         value={row.jobElement}
                         onChange={e => patchRow(row.id, { jobElement: e.target.value })}
                         placeholder="รายละเอียดงาน…"
-                        className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                        disabled={isLocked}
+                        className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </td>
 
@@ -287,7 +295,8 @@ export default function Module1_TimeMeasurement() {
                             ...(operator === 'Auto M/C' ? { kind: 'machine' as TimeStudyKind } : {}),
                           });
                         }}
-                        className="w-full bg-transparent text-slate-700 font-semibold focus:outline-none focus:bg-white rounded px-0.5"
+                        disabled={isLocked}
+                        className="w-full bg-transparent text-slate-700 font-semibold focus:outline-none focus:bg-white rounded px-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {ALL_OPERATORS.map(op => <option key={op} value={op}>{op}</option>)}
                       </select>
@@ -299,7 +308,8 @@ export default function Module1_TimeMeasurement() {
                         onChange={e => patchRow(row.id, { kind: e.target.value as TimeStudyKind })}
                         className={`w-full bg-transparent font-semibold focus:outline-none focus:bg-white rounded px-0.5 ${
                           KIND_OPTIONS.find(k => k.value === row.kind)?.cls ?? ''
-                        }`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        disabled={isLocked}
                       >
                         {KIND_OPTIONS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
                       </select>
@@ -313,7 +323,8 @@ export default function Module1_TimeMeasurement() {
                         })}
                         className={`w-full bg-transparent font-semibold focus:outline-none focus:bg-white rounded px-0.5 ${
                           CATEGORY_OPTIONS.find(c => c.value === (row.category ?? ''))?.cls ?? ''
-                        }`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        disabled={isLocked}
                       >
                         {CATEGORY_OPTIONS.map(c => <option key={c.value || 'regular'} value={c.value}>{c.label}</option>)}
                       </select>
@@ -327,7 +338,8 @@ export default function Module1_TimeMeasurement() {
                           value={val ?? ''}
                           onChange={e => setReading(row.id, col, e.target.value)}
                           onPaste={e => handlePaste(e, rowIndex, col)}
-                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                          disabled={isLocked}
+                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
                     ))}
@@ -347,16 +359,16 @@ export default function Module1_TimeMeasurement() {
 
                     <td className="border border-slate-200 px-1 py-1">
                       <div className="flex items-center justify-center gap-0.5">
-                        <button onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}
-                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30" title="เลื่อนขึ้น">
+                        <button onClick={() => moveRow(rowIndex, -1)} disabled={isLocked || rowIndex === 0}
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30 disabled:cursor-not-allowed" title="เลื่อนขึ้น">
                           <ArrowUp size={12} />
                         </button>
-                        <button onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === study.rows.length - 1}
-                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30" title="เลื่อนลง">
+                        <button onClick={() => moveRow(rowIndex, 1)} disabled={isLocked || rowIndex === study.rows.length - 1}
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded disabled:opacity-30 disabled:cursor-not-allowed" title="เลื่อนลง">
                           <ArrowDown size={12} />
                         </button>
-                        <button onClick={() => deleteRow(row.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="ลบแถว">
+                        <button onClick={() => deleteRow(row.id)} disabled={isLocked}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="ลบแถว">
                           <Trash2 size={12} />
                         </button>
                       </div>
@@ -399,7 +411,8 @@ export default function Module1_TimeMeasurement() {
         <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center gap-3">
           <button
             onClick={addRow}
-            className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            disabled={isLocked}
+            className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
             <Plus size={14} /> เพิ่มแถว
           </button>

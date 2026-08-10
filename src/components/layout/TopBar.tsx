@@ -10,6 +10,7 @@ export default function TopBar() {
   const activeModule   = useChartStore(s => s.activeModule);
   const setActiveModule= useChartStore(s => s.setActiveModule);
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
+  const isLocked = Boolean(activeFile?.lockedAt);
 
   const handleSave = () => {
     saveActiveFile();
@@ -237,14 +238,14 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
         {/* Save */}
         <button
           onClick={handleSave}
-          disabled={!activeFile || syncStatus === 'syncing'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+          disabled={!activeFile || syncStatus === 'syncing' || isLocked}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
             syncStatus === 'saved'
               ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-              : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 shadow-sm'
+              : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
           }`}
         >
-          {syncStatus === 'saved' ? '✓ Saved' : '☁ Save'}
+          {isLocked ? '🔒 Locked' : syncStatus === 'saved' ? '✓ Saved' : '☁ Save'}
         </button>
 
         {/* Export PNG */}

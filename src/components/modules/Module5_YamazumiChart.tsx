@@ -29,6 +29,7 @@ export default function Module5_YamazumiChart() {
   if (!activeFile) {
     return <div className="p-8 text-center text-slate-500">Please open a file from the sidebar to use Module 5.</div>;
   }
+  const isLocked = Boolean(activeFile.lockedAt);
 
   const handleSaveTaktTime = () => {
     updateTimeMeasurement({ taktTime: localTaktTime });
@@ -76,6 +77,7 @@ export default function Module5_YamazumiChart() {
   };
 
   const handleOperatorDrop = (event: React.DragEvent<HTMLDivElement>, newOperator: OperatorType) => {
+    if (isLocked) return;
     event.preventDefault();
     setDraggingRowId(null);
     setDraggingOverOperator(null);
@@ -157,12 +159,14 @@ export default function Module5_YamazumiChart() {
                 type="number"
                 value={localTaktTime}
                 onChange={e => setLocalTaktTime(Number(e.target.value))}
-                className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                disabled={isLocked}
+                className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
             </div>
             <button
               onClick={handleSaveTaktTime}
-              className="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm"
+              disabled={isLocked}
+              className="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
             >
               Update Benchmark
             </button>
@@ -309,10 +313,10 @@ export default function Module5_YamazumiChart() {
                               <div
                                 key={row.id}
                                 data-row-id={row.id}
-                                className={`${className} ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
+                                 className={`${className} ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}`}
                                 style={{ height: rowMin * pxPerSec }}
                                 title={`${row.jobElement}: ${rowMin}s`}
-                                draggable={hasTimeStudy}
+                                 draggable={hasTimeStudy && !isLocked}
                                 onDragStart={event => handleRowDragStart(event, row.id)}
                                 onDragEnd={handleRowDragEnd}
                               />
@@ -357,14 +361,14 @@ export default function Module5_YamazumiChart() {
                                 <div
                                   key={row.id}
                                   data-row-id={row.id}
-                                  className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
+                                   className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}`}
                                   style={{
                                     height: rowMin * pxPerSec,
                                     backgroundColor: '#334155',
                                     backgroundImage: PERIODICAL_PATTERN,
                                   }}
                                   title={`${row.jobElement}: ${rowMin}s`}
-                                  draggable={hasTimeStudy}
+                                   draggable={hasTimeStudy && !isLocked}
                                   onDragStart={event => handleRowDragStart(event, row.id)}
                                   onDragEnd={handleRowDragEnd}
                                 />
@@ -389,7 +393,7 @@ export default function Module5_YamazumiChart() {
                                 <div
                                   key={row.id}
                                   data-row-id={row.id}
-                                  className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : 'cursor-grab'}`}
+                                   className={`w-full border-b border-slate-700/80 ${draggingRowId === row.id ? 'cursor-grabbing opacity-60' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}`}
                                   style={{
                                     height: rowMin * pxPerSec,
                                     backgroundColor: '#334155',
@@ -397,7 +401,7 @@ export default function Module5_YamazumiChart() {
                                     backgroundSize: '8px 8px',
                                   }}
                                   title={`${row.jobElement}: ${rowMin}s`}
-                                  draggable={hasTimeStudy}
+                                   draggable={hasTimeStudy && !isLocked}
                                   onDragStart={event => handleRowDragStart(event, row.id)}
                                   onDragEnd={handleRowDragEnd}
                                 />

@@ -9,6 +9,7 @@ export default function SummaryTable() {
   const updateOperatorPosition = useChartStore(s => s.updateOperatorPosition);
 
   if (!activeFile) return null;
+  const isLocked = Boolean(activeFile.lockedAt);
 
   const { steps, header } = activeFile;
 
@@ -57,7 +58,8 @@ export default function SummaryTable() {
                       value={currentPos}
                       onChange={e => updateOperatorPosition(row.operator, e.target.value)}
                       placeholder="e.g. OP-1"
-                      className="w-24 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 text-sm font-bold placeholder:text-slate-400"
+                      disabled={isLocked}
+                      className="w-24 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 text-sm font-bold placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </td>
                   <td className="px-4 py-2 font-bold text-slate-800 flex items-center gap-2">

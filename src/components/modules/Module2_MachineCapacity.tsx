@@ -60,6 +60,7 @@ export default function Module2_MachineCapacity() {
   if (!activeFile) {
     return <div className="p-8 text-center text-slate-500">เปิดไฟล์จากแถบด้านซ้ายก่อน จึงจะใช้ Module 2 ได้</div>;
   }
+  const isLocked = Boolean(activeFile.lockedAt);
 
   const say = (msg: string) => {
     setFlash(msg);
@@ -108,7 +109,8 @@ export default function Module2_MachineCapacity() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleImport}
-              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              disabled={isLocked}
+              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               title="นำแถวเครื่องจักรจากตารางจับเวลา M1 มาตั้งต้น"
             >
               <Download size={14} /> ดึงข้อมูลจาก M1
@@ -129,7 +131,8 @@ export default function Module2_MachineCapacity() {
                 min={0}
                 value={mc[f.key]}
                 onChange={e => commit({ ...mc, [f.key]: num(e.target.value) })}
-                className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                disabled={isLocked}
+                className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
               <p className="text-[10px] text-slate-500 mt-1">{f.hint}</p>
             </div>
@@ -189,7 +192,8 @@ export default function Module2_MachineCapacity() {
                           value={row.processName}
                           onChange={e => patchRow(row.id, { processName: e.target.value })}
                           placeholder="ชื่อกระบวนการ…"
-                          className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                          disabled={isLocked}
+                          className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
                     </td>
@@ -199,7 +203,8 @@ export default function Module2_MachineCapacity() {
                         value={row.machineNo}
                         onChange={e => patchRow(row.id, { machineNo: e.target.value })}
                         placeholder="—"
-                        className="w-full bg-transparent px-1 py-0.5 text-center text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                        disabled={isLocked}
+                        className="w-full bg-transparent px-1 py-0.5 text-center text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </td>
 
@@ -212,7 +217,8 @@ export default function Module2_MachineCapacity() {
                           type="number" step="0.01" min={0}
                           value={row[f.key] || ''}
                           onChange={e => patchRow(row.id, { [f.key]: num(e.target.value) })}
-                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                          disabled={isLocked}
+                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
                     ))}
@@ -231,7 +237,8 @@ export default function Module2_MachineCapacity() {
                           value={row[f.key] || ''}
                           onChange={e => patchRow(row.id, { [f.key]: num(e.target.value) })}
                           placeholder="—"
-                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                          disabled={isLocked}
+                          className="w-full bg-transparent px-1 py-1 text-right font-mono text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
                     ))}
@@ -247,8 +254,8 @@ export default function Module2_MachineCapacity() {
                     </td>
 
                     <td className="border border-slate-200 px-1 py-1 text-center">
-                      <button onClick={() => deleteRow(row.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="ลบแถว">
+                      <button onClick={() => deleteRow(row.id)} disabled={isLocked}
+                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="ลบแถว">
                         <Trash2 size={12} />
                       </button>
                     </td>
@@ -270,7 +277,8 @@ export default function Module2_MachineCapacity() {
         <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center gap-3">
           <button
             onClick={addRow}
-            className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            disabled={isLocked}
+            className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
             <Plus size={14} /> เพิ่มแถว
           </button>

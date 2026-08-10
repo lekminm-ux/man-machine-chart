@@ -536,6 +536,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       name: `${file.name} - Copy`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      lockedAt: null,
       steps: newSteps,
       layoutDiagram: {
         elements: newElements,

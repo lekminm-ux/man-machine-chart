@@ -304,13 +304,15 @@ export default function LayoutDiagram() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const isLocked = Boolean(activeFile?.lockedAt);
+      if (isLocked) return;
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       if (selectedId) { deleteEl(selectedId); setSelectedId(null); }
       else if (selectedConnId) { deleteConn(selectedConnId); setSelectedConnId(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [deleteEl, deleteConn, selectedId, selectedConnId]);
+  }, [deleteEl, deleteConn, selectedId, selectedConnId, activeFile?.lockedAt]);
 
   const pointer = useCallback((clientX: number, clientY: number): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -318,6 +320,7 @@ export default function LayoutDiagram() {
   }, []);
 
   if (!activeFile) return null;
+  const isLocked = Boolean(activeFile.lockedAt);
   const { elements, connections } = activeFile.layoutDiagram;
   const getEl = (id: string) => elements.find(e => e.id === id);
   const selectedEl = selectedId ? getEl(selectedId) : null;
@@ -326,6 +329,7 @@ export default function LayoutDiagram() {
 
   // ── Element pointer down (move / connect) ──────────────────────────────────
   const onElementPointerDown = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    if (isLocked) return;
     e.stopPropagation();
     if (connectMode) {
       if (!connectFrom) {
@@ -345,6 +349,7 @@ export default function LayoutDiagram() {
   };
 
   const onResizeStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement, corner: Corner) => {
+    if (isLocked) return;
     e.stopPropagation();
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
@@ -352,12 +357,14 @@ export default function LayoutDiagram() {
   };
 
   const onRotateStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    if (isLocked) return;
     e.stopPropagation();
     rotateRef.current = { id: el.id, cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
   };
 
   // ── Start an Excel-style connection drag from an element ────────────────────
   const onLinkStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
+    if (isLocked) return;
     e.stopPropagation();
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
@@ -378,6 +385,7 @@ export default function LayoutDiagram() {
 
   // ── Free-floating arrow (belongs to no element) ─────────────────────────────
   const addFreeArrow = () => {
+    if (isLocked) return;
     const id = uuidv4();
     addConn({
       id,
@@ -390,11 +398,13 @@ export default function LayoutDiagram() {
   };
 
   const onConnEndpointDown = (e: React.MouseEvent | React.TouchEvent, id: string, end: 'from' | 'to') => {
+    if (isLocked) return;
     e.stopPropagation();
     connDragRef.current = { id, end };
   };
 
   const onConnBodyDown = (e: React.MouseEvent | React.TouchEvent, conn: LayoutConnection) => {
+    if (isLocked) return;
     // Only free arrows (both ends floating) can be moved as a whole.
     if (conn.fromId || conn.toId || !conn.fromPt || !conn.toPt) return;
     const c = 'touches' in e ? e.touches[0] : e;
@@ -476,6 +486,7 @@ export default function LayoutDiagram() {
   };
 
   const addFromPalette = (type: string) => {
+    if (isLocked) return;
     const p = ELEMENT_PALETTE.find(x => x.type === type)!;
     addEl({ type: p.type, label: p.label, x: 70, y: 70, width: p.w, height: p.h, color: p.color, shape: p.shape });
   };
@@ -491,14 +502,16 @@ export default function LayoutDiagram() {
         <div className="flex items-center gap-2">
           <button
             onClick={addFreeArrow}
-            className="px-2 py-1 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition-colors cursor-pointer shadow-sm"
+            disabled={isLocked}
+            className="px-2 py-1 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
             title="Add a free-floating arrow you can place anywhere"
           >
             ➘ Free Arrow
           </button>
           <button
             onClick={() => { setConnectMode(m => !m); setConnectFrom(null); }}
-            className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer shadow-sm border ${
+            disabled={isLocked}
+            className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer shadow-sm border disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 ${
               connectMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
             }`}
             title="Alternative: click this, then click two boxes"
@@ -516,7 +529,8 @@ export default function LayoutDiagram() {
             <button
               key={p.type}
               onClick={() => addFromPalette(p.type)}
-              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer shadow-sm"
+              disabled={isLocked}
+              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               title={`Add ${p.label}`}
             >
               <span>{p.icon}</span> {p.label}
@@ -529,7 +543,8 @@ export default function LayoutDiagram() {
             <button
               key={p.type}
               onClick={() => addFromPalette(p.type)}
-              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer shadow-sm"
+              disabled={isLocked}
+              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               title={`Add ${p.label}`}
             >
               <span>{p.icon}</span> {p.label}
@@ -545,7 +560,7 @@ export default function LayoutDiagram() {
           id="layout-diagram-svg"
           width="100%"
           height={600}
-          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: 'default', touchAction: 'none' }}
+          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: isLocked ? 'not-allowed' : 'default', opacity: isLocked ? 0.7 : 1, touchAction: 'none' }}
           onMouseMove={onMouseMove}
           onTouchMove={onTouchMove}
           onMouseUp={endPointer}
@@ -638,6 +653,7 @@ export default function LayoutDiagram() {
             el={selectedEl}
             onChange={(patch) => updateEl(selectedEl.id, patch)}
             onDelete={() => { deleteEl(selectedEl.id); setSelectedId(null); }}
+            disabled={isLocked}
           />
         )}
 
@@ -647,6 +663,7 @@ export default function LayoutDiagram() {
             conn={selectedConn}
             onChange={(patch) => updateConn(selectedConn.id, patch)}
             onDelete={() => { deleteConn(selectedConn.id); setSelectedConnId(null); }}
+            disabled={isLocked}
           />
         )}
 
@@ -673,14 +690,15 @@ const ROW = 'flex items-center gap-2 flex-wrap';
 const LBL = 'text-[10px] font-bold text-slate-600 uppercase tracking-wider w-16 shrink-0';
 const INPUT = 'bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none';
 
-function Swatches({ value, onPick }: { value?: string; onPick: (c: string) => void }) {
+function Swatches({ value, onPick, disabled }: { value?: string; onPick: (c: string) => void; disabled: boolean }) {
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {COLOR_PRESETS.map(c => (
         <button
           key={c}
           onClick={() => onPick(c)}
-          className="w-5 h-5 rounded border cursor-pointer"
+          disabled={disabled}
+          className="w-5 h-5 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: c, borderColor: value === c ? '#fff' : 'rgba(255,255,255,0.2)', outline: value === c ? '2px solid #2563eb' : 'none' }}
           title={c}
         />
@@ -689,7 +707,8 @@ function Swatches({ value, onPick }: { value?: string; onPick: (c: string) => vo
         type="color"
         value={value ?? '#64748b'}
         onChange={e => onPick(e.target.value)}
-        className="w-6 h-6 bg-transparent border border-slate-300 rounded cursor-pointer p-0"
+        disabled={disabled}
+        className="w-6 h-6 bg-transparent border border-slate-300 rounded cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Custom colour"
       />
     </div>
@@ -697,17 +716,18 @@ function Swatches({ value, onPick }: { value?: string; onPick: (c: string) => vo
 }
 
 function ElementPanel({
-  el, onChange, onDelete,
+  el, onChange, onDelete, disabled,
 }: {
   el: LayoutElement;
   onChange: (patch: Partial<LayoutElement>) => void;
   onDelete: () => void;
+  disabled: boolean;
 }) {
   return (
     <div className={PANEL}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-slate-800">Element</span>
-        <button onClick={onDelete} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm">✕ Delete</button>
+        <button onClick={onDelete} disabled={disabled} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100">✕ Delete</button>
       </div>
 
       <div className={ROW}>
@@ -716,24 +736,26 @@ function ElementPanel({
           type="text"
           value={el.label}
           onChange={e => onChange({ label: e.target.value })}
-          className={`${INPUT} flex-1 min-w-[140px]`}
+          disabled={disabled}
+          className={`${INPUT} flex-1 min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
           placeholder="Name…"
         />
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Colour</span>
-        <Swatches value={el.color} onPick={c => onChange({ color: c })} />
+        <Swatches value={el.color} onPick={c => onChange({ color: c })} disabled={disabled} />
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Font</span>
-        <select value={el.fontSize ?? 11} onChange={e => onChange({ fontSize: Number(e.target.value) })} className={INPUT}>
+        <select value={el.fontSize ?? 11} onChange={e => onChange({ fontSize: Number(e.target.value) })} disabled={disabled} className={`${INPUT} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}>
           {[9, 10, 11, 12, 14, 16, 18, 22].map(s => <option key={s} value={s}>{s}px</option>)}
         </select>
         <button
           onClick={() => onChange({ fontBold: el.fontBold === false })}
-          className={`px-2 py-1 text-xs rounded border cursor-pointer ${el.fontBold === false ? 'bg-white border-slate-300 text-slate-600' : 'bg-blue-600 border-blue-600 text-white shadow-sm'}`}
+          disabled={disabled}
+          className={`px-2 py-1 text-xs rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 ${el.fontBold === false ? 'bg-white border-slate-300 text-slate-600' : 'bg-blue-600 border-blue-600 text-white shadow-sm'}`}
         >
           <b>B</b> Bold
         </button>
@@ -741,9 +763,9 @@ function ElementPanel({
 
       <div className={ROW}>
         <span className={LBL}>Size</span>
-        <input type="number" min={MIN_SIZE} value={Math.round(el.width)} onChange={e => onChange({ width: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} className={`${INPUT} w-16`} title="Width" />
+        <input type="number" min={MIN_SIZE} value={Math.round(el.width)} onChange={e => onChange({ width: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} disabled={disabled} className={`${INPUT} w-16 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`} title="Width" />
         <span className="text-slate-500 text-xs">×</span>
-        <input type="number" min={MIN_SIZE} value={Math.round(el.height)} onChange={e => onChange({ height: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} className={`${INPUT} w-16`} title="Height" />
+        <input type="number" min={MIN_SIZE} value={Math.round(el.height)} onChange={e => onChange({ height: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) })} disabled={disabled} className={`${INPUT} w-16 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`} title="Height" />
       </div>
 
       <div className={ROW}>
@@ -752,24 +774,26 @@ function ElementPanel({
           type="range" min={0} max={360} step={5}
           value={el.rotation ?? 0}
           onChange={e => onChange({ rotation: Number(e.target.value) })}
-          className="flex-1 min-w-[100px] accent-blue-600 cursor-pointer"
+          disabled={disabled}
+          className="flex-1 min-w-[100px] accent-blue-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <span className="text-xs text-slate-600 font-mono w-10 text-right">{el.rotation ?? 0}°</span>
-        <button onClick={() => onChange({ rotation: 0 })} className="px-2 py-1 text-xs rounded bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer shadow-sm">Reset</button>
+        <button onClick={() => onChange({ rotation: 0 })} disabled={disabled} className="px-2 py-1 text-xs rounded bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100">Reset</button>
       </div>
     </div>
   );
 }
 
 function ConnectionPanel({
-  conn, onChange, onDelete,
+  conn, onChange, onDelete, disabled,
 }: {
   conn: LayoutConnection;
   onChange: (patch: Partial<LayoutConnection>) => void;
   onDelete: () => void;
+  disabled: boolean;
 }) {
   const seg = (active: boolean) =>
-    `px-2 py-1 text-xs rounded border cursor-pointer ${active ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'}`;
+    `px-2 py-1 text-xs rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 ${active ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'}`;
   const isFree = !conn.fromId || !conn.toId;
 
   return (
@@ -779,7 +803,7 @@ function ConnectionPanel({
           {isFree ? 'Free Arrow' : 'Connection'}
           {isFree && <span className="ml-2 font-normal text-slate-500">drag the blue endpoints to reposition</span>}
         </span>
-        <button onClick={onDelete} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm">✕ Delete</button>
+        <button onClick={onDelete} disabled={disabled} className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100">✕ Delete</button>
       </div>
 
       <div className={ROW}>
@@ -788,34 +812,35 @@ function ConnectionPanel({
           type="text"
           value={conn.label ?? ''}
           onChange={e => onChange({ label: e.target.value })}
-          className={`${INPUT} flex-1 min-w-[140px]`}
+          disabled={disabled}
+          className={`${INPUT} flex-1 min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
           placeholder="e.g. Walk 5s"
         />
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Colour</span>
-        <Swatches value={conn.color} onPick={c => onChange({ color: c })} />
+        <Swatches value={conn.color} onPick={c => onChange({ color: c })} disabled={disabled} />
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Line</span>
         {(['solid', 'dashed', 'dotted'] as ConnStyle[]).map(s => (
-          <button key={s} onClick={() => onChange({ style: s })} className={seg((conn.style ?? 'solid') === s)}>{s}</button>
+          <button key={s} onClick={() => onChange({ style: s })} disabled={disabled} className={seg((conn.style ?? 'solid') === s)}>{s}</button>
         ))}
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Arrow</span>
         {([['end', 'End →'], ['both', '↔ Both'], ['none', 'None']] as [ConnArrow, string][]).map(([v, t]) => (
-          <button key={v} onClick={() => onChange({ arrow: v })} className={seg((conn.arrow ?? 'end') === v)}>{t}</button>
+          <button key={v} onClick={() => onChange({ arrow: v })} disabled={disabled} className={seg((conn.arrow ?? 'end') === v)}>{t}</button>
         ))}
       </div>
 
       <div className={ROW}>
         <span className={LBL}>Path</span>
         {([['straight', 'Straight'], ['orthogonal', 'Right-angle']] as [ConnRouting, string][]).map(([v, t]) => (
-          <button key={v} onClick={() => onChange({ routing: v })} className={seg((conn.routing ?? 'straight') === v)}>{t}</button>
+          <button key={v} onClick={() => onChange({ routing: v })} disabled={disabled} className={seg((conn.routing ?? 'straight') === v)}>{t}</button>
         ))}
       </div>
     </div>

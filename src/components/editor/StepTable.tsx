@@ -80,6 +80,7 @@ export default function StepTable() {
   }, []);
 
   if (!activeFile) return null;
+  const isLocked = Boolean(activeFile.lockedAt);
   const { steps, header } = activeFile;
 
   // Process calculated values on-the-fly
@@ -175,7 +176,8 @@ export default function StepTable() {
           <h3 className="text-slate-700 font-bold text-sm tracking-wide">STANDARD WORK SHEET (STEP-BY-STEP)</h3>
           <button
             onClick={addStep}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer"
+            disabled={isLocked}
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
             + Add Step
           </button>
@@ -197,7 +199,8 @@ export default function StepTable() {
           </button>
           <button
             onClick={addStep}
-            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer"
+            disabled={isLocked}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
             <span className="text-base leading-none">+</span> Add Step
           </button>
@@ -315,12 +318,14 @@ export default function StepTable() {
                         <div className="flex gap-1 justify-center">
                           <button
                             onClick={() => insertStep(i, 'above')}
-                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                            disabled={isLocked}
+                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                             title="Insert blank step above"
                           >+▲</button>
                           <button
                             onClick={() => insertStep(i, 'below')}
-                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold"
+                            disabled={isLocked}
+                            className="px-1 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 font-mono text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                             title="Insert blank step below"
                           >+▼</button>
                         </div>
@@ -331,14 +336,14 @@ export default function StepTable() {
                         <div className="flex gap-0.5 justify-center">
                           <button
                             onClick={() => moveUp(i)}
-                            disabled={i === 0}
-                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                            disabled={isLocked || i === 0}
+                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                             title="Move up"
                           >▲</button>
                           <button
                             onClick={() => moveDown(i)}
-                            disabled={i === steps.length - 1}
-                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 transition-colors"
+                            disabled={isLocked || i === steps.length - 1}
+                            className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                             title="Move down"
                           >▼</button>
                         </div>
@@ -348,7 +353,8 @@ export default function StepTable() {
                       <td className="px-2 py-1.5 text-center">
                         <button
                           onClick={() => deleteStep(step.id)}
-                          className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none"
+                          disabled={isLocked}
+                          className="text-red-500 hover:text-red-400 transition-colors text-sm leading-none disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete step"
                         >✕</button>
                       </td>
@@ -362,7 +368,8 @@ export default function StepTable() {
                       value={step.description}
                       onChange={e => handleChange(step.id, 'description', e.target.value)}
                       placeholder="Enter process description…"
-                      className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 font-medium transition-colors placeholder:text-slate-400 truncate"
+                      disabled={isLocked}
+                      className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-0.5 text-slate-800 font-medium transition-colors placeholder:text-slate-400 truncate disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </td>
 
@@ -371,7 +378,8 @@ export default function StepTable() {
                     <select
                       value={step.operator}
                       onChange={e => handleChange(step.id, 'operator', e.target.value as ChartStep['operator'])}
-                      className={`w-full text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${getWorkerBgClass(step.operator)}`}
+                      disabled={isLocked}
+                      className={`w-full text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${getWorkerBgClass(step.operator)} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
                     >
                       {OPERATORS.map(op => (
                         <option key={op} value={op}>{op}</option>
@@ -384,10 +392,10 @@ export default function StepTable() {
                     <input
                       type="text"
                       value={currentPos}
-                      disabled={isMachine}
+                      disabled={isMachine || isLocked}
                       onChange={e => updateOperatorPosition(step.operator, e.target.value)}
                       placeholder="e.g. OP-1"
-                      className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400 disabled:opacity-55 disabled:bg-slate-100"
+                      className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400 disabled:opacity-55 disabled:bg-slate-100 disabled:cursor-not-allowed"
                     />
                   </td>
 
@@ -401,7 +409,8 @@ export default function StepTable() {
                           value={step.startTime === undefined || step.startTime === null || step.startTime === 0 ? '' : step.startTime}
                           onChange={e => handleChange(step.id, 'startTime', parseFloat(e.target.value) || 0)}
                           placeholder="Auto"
-                          className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400"
+                          disabled={isLocked}
+                          className="w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-slate-800 bg-white placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                         />
                       </td>
 
@@ -414,7 +423,8 @@ export default function StepTable() {
                             value={step[col.key] === 0 ? '' : step[col.key]}
                             onChange={e => handleChange(step.id, col.key, parseFloat(e.target.value) || 0)}
                             placeholder="0"
-                            className={`w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-white`}
+                            disabled={isLocked}
+                            className={`w-full text-center border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono ${col.color} bg-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
                           />
                         </td>
                       ))}

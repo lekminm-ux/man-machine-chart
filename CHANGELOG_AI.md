@@ -2,6 +2,156 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-10 (Update 18 — Claude review + live verification: Phase 5a-2)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Context
+
+Follow-up to Codex's own entry below ("Codex Phase 5a-2 locked-chart
+read-only UI gating") — that entry has this round's full implementation
+detail; this entry covers only what Codex's report didn't: Claude's diff
+review verdict, two minor findings, and live verification against real
+local D1/Pages Dev (Codex's environment cannot run Wrangler).
+
+### Review verdict
+
+Read all 11 changed files in full against the Phase 5a-2 handoff. Scope
+matches `REQUIRED SCOPE` exactly; `useChartStore.ts`'s diff is `+1/-0`
+(only the `duplicateFile` fix — confirmed no other action changed);
+`Module3_CombinationTable.tsx` has zero diff, correctly. Every control
+listed in the handoff (HeaderForm's 8 remaining fields, all of M1/M2,
+StepTable/LayoutDiagram/SummaryTable, M5's Takt input/benchmark
+button/draggable rows, TopBar's Save button) is gated as specified.
+Independently re-ran `node --test` (185/185), `npm run lint` (5 errors/15
+warnings — traced all 5 to lines that predate this round, using Claude's
+own full-file reads from earlier in this session, not just Codex's claim),
+and `npm run build` (PASS) — all match Codex's reported numbers exactly.
+
+Two low-severity, non-blocking findings from reading the diff. Neither is a
+data-safety issue — nothing can be edited via either path, both are UX
+polish:
+
+1. `LayoutDiagram.tsx`'s `onElementPointerDown` guard (`if (isLocked)
+   return;`) runs before `setSelectedId`, so a layout element cannot be
+   *selected* — not just edited — while locked. `ElementPanel` is therefore
+   unreachable on a freshly-opened locked chart (only reachable if an
+   element was already selected before the chart got locked).
+   `ConnectionPanel` doesn't have this gap — `ConnectionShape`'s `onSelect`
+   isn't gated, only its body-drag (`onConnBodyDown`) is, so connections
+   stay selectable/inspectable while locked. Optional fix: move the guard
+   to after `setSelectedId(el.id); setSelectedConnId(null);`, before
+   `dragRef.current = ...`.
+2. `Module5_YamazumiChart.tsx`'s `handleOperatorDrop` guard runs before
+   `event.preventDefault()` and the `setDraggingRowId(null)` /
+   `setDraggingOverOperator(null)` cleanup. Harmless in the vast majority of
+   cases since every row's `draggable` is already `false` when locked (no
+   in-app drag can start to reach this handler at all), but a stray
+   external (non-app) drag dropped on the zone could leave the drop-target
+   ring visually stuck. Optional fix: move the guard after those three
+   lines.
+
+### Live verification (real local Pages Dev + D1, not mocks)
+
+Hit an unrelated local-only startup crash first: `wrangler pages dev`
+defaults to today's system date as its compatibility date, but the
+installed workerd binary only supports up to 2026-08-08 — a local
+tooling/clock drift, unrelated to any application code. Worked around it by
+temporarily adding `--compatibility-date=2026-08-08` to
+`.claude/launch.json`'s `mm-chart-pages-dev` entry, then reverted that file
+to its original committed state immediately after verification (confirmed
+via `git status` — zero diff on `launch.json`). Flagging as a possible
+separate, later fix to `wrangler.toml`; not part of this change.
+
+Against the existing local test chart ("Side Step LH, RH (QA renamed)",
+`.wrangler` local D1 only — `Resource location: local` confirmed on every
+command, `--remote` never used):
+
+- Closed a revision for real (`revNo` set to a fresh value to avoid the
+  existing unique-index collision from a prior session's "A" snapshot —
+  confirmed that collision itself correctly 409'd first, proving the
+  duplicate-revNo guard from Phase 5a-1 still holds). TopBar's Save button
+  correctly changed to disabled **"🔒 Locked"**.
+- Checked every module's actual rendered DOM (`.disabled` property, not
+  just the source diff) via the browser's own JS console: HeaderForm's 8
+  fields, M1 (readingCount select, import/push buttons, all per-row
+  selects/inputs), M2 (import button, shift inputs, all per-row inputs),
+  M4 (both Add Step buttons, StepTable's per-row controls, LayoutDiagram's
+  Free Arrow/Connect/palette buttons all disabled, canvas `cursor:
+  not-allowed`, zero draggable elements), M5 (Takt input, Update Benchmark
+  button, `draggable="false"` on the row bar) — every one reported
+  `disabled: true`, zero false negatives. The one "enabled" input each
+  sweep initially flagged was always HeaderForm's pre-existing `readOnly`
+  Cycle Time field (a different attribute than `disabled`, unrelated to
+  this phase, correctly never gated).
+- Investigated an apparent styling anomaly (disabled fields showed
+  `opacity: 1` instead of the expected `0.5`) before accepting it: traced
+  it conclusively to the automated browser tab being backgrounded
+  (`document.hidden === true`), which stops CSS transitions from
+  completing — proven with an isolated probe element carrying the exact
+  same classes, which resolved to `opacity: 0.5` immediately when created
+  already-disabled (no transition needed), while a *fresh*
+  enabled→disabled transition on another probe stayed stuck at `1` even
+  after 300ms in the same hidden tab. This is a testing-tool artifact, not
+  an application bug — the `disabled:opacity-50` utility itself is correct
+  and would render normally for a real user in a foregrounded tab.
+- Clicked **Open New Revision**: local D1 confirmed `lockedAt` back to
+  `null`; Process Name and Save both became enabled again in the live DOM.
+  Full close → verify-every-module-blocked → open → editable-again cycle
+  held, zero console errors introduced by any step in it (the only console
+  errors present were leftovers from the unrelated wrangler startup crash
+  above, before the workaround took effect).
+
+### Database Safety Gate / Production statement
+
+No Production D1 access of any kind occurred. Every command targeted the
+pre-existing **local** `.wrangler` D1 state only (`Resource location:
+local` confirmed on every wrangler invocation). No commit, push, or deploy
+occurred in this entry.
+
+### Next
+
+Phase 5a-2 is implementation-complete, fully reviewed, and now verified
+live end-to-end across every module. The two findings above are optional
+follow-ups, not blockers. Still pending: explicit user authorization to
+commit + push, and — separately — to deploy (which would ship Phase 5a-1
+and 5a-2's application code together, since 5a-1's code was deliberately
+held back until this phase was ready). Phase 5b (the Before/After
+comparison page) remains separately scoped next.
+
+## 2026-08-10 (Codex Phase 5a-2 locked-chart read-only UI gating)
+
+### Scope / Implementation
+
+- Added `activeFile.lockedAt`-driven disabled/read-only treatment to the eight
+  non-Rev-No. HeaderForm fields and all persisted-content editing controls in
+  Modules 1, 2, and 5, the M4 StepTable/SummaryTable, and LayoutDiagram.
+- LayoutDiagram now blocks locked-chart drag, resize, rotate, connect, palette,
+  keyboard-delete, and property-panel mutations while continuing to display the
+  selected content. Module 3 was intentionally unchanged.
+- TopBar Save is disabled for a locked chart and shows `🔒 Locked`.
+- `duplicateFile` now explicitly sets `lockedAt: null`; added one regression test
+  proving a locked source remains locked while its copy starts open.
+- No calculation library, store setter guard, API/function, schema, Sidebar,
+  rename/move action, or Phase 5b comparison page was changed.
+
+### Verification / Safety
+
+- `node --test`: **PASS, 185/185**.
+- `npm.cmd run build`: **PASS**; TypeScript compiled and `/`, `/_not-found`,
+  and `/editor` generated successfully.
+- `npm.cmd run lint`: exit 1 with the known baseline **5 errors / 15 warnings**;
+  the reported errors remain the existing StepTable, Sidebar, and TopBar
+  baseline findings, with `.wrangler` warnings. No new lint category was added.
+- `git diff --check`: **PASS**; Git reports only existing LF/CRLF normalization
+  warnings for touched working-copy files.
+- Database Safety Gate: **READ-ONLY COMPLETE** for this implementation. No
+  local D1 or Production D1 write, migration, reset, seed, commit, push, or
+  deploy was run. Production data remains untouched; release and live
+  verification require separate authorization.
+
 ## 2026-08-07 (Update 17 — Phase 5a-1 Production schema migration)
 
 ### Tool

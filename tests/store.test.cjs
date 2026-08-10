@@ -194,6 +194,27 @@ test('duplicateFile deep-copies steps and remaps layout connections', async () =
 
 // ── Phase 0B: runtime data-safety guards ─────────────────────────────────────
 
+test('duplicateFile starts a copied locked chart as an open revision', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('Test', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Locked Original');
+
+  const originalId = store.getState().activeFileId;
+  const lockedAt = '2026-08-10T00:00:00.000Z';
+  store.setState({
+    files: store.getState().files.map(file => file.id === originalId ? { ...file, lockedAt } : file),
+  });
+
+  await store.getState().duplicateFile(originalId);
+
+  const copy = store.getState().activeFile();
+  const original = store.getState().files.find(file => file.id === originalId);
+  assert.ok(copy, 'the duplicate should become the active file');
+  assert.equal(original.lockedAt, lockedAt, 'the source revision must stay locked');
+  assert.equal(copy.lockedAt, null, 'the duplicate must start unlocked without a snapshot');
+});
+
 test('cloud load failure produces an unsafe/unavailable state, not a silent success', async () => {
   const store = freshStore({
     loadDatabaseFromCloud: async () => ({

@@ -37,7 +37,8 @@ export default function HeaderForm() {
               value={h.processName}
               onChange={e => updateHeader({ processName: e.target.value })}
               placeholder="e.g. Blow Molding"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -49,7 +50,8 @@ export default function HeaderForm() {
               value={h.partNumber}
               onChange={e => updateHeader({ partNumber: e.target.value })}
               placeholder="e.g. BM-SS-001"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -61,7 +63,8 @@ export default function HeaderForm() {
               value={h.partName || ''}
               onChange={e => updateHeader({ partName: e.target.value })}
               placeholder="e.g. Side Step Bar"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -73,7 +76,8 @@ export default function HeaderForm() {
               value={h.model}
               onChange={e => updateHeader({ model: e.target.value })}
               placeholder="e.g. Side Step LH, RH"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -85,7 +89,8 @@ export default function HeaderForm() {
               value={h.moldNo || ''}
               onChange={e => updateHeader({ moldNo: e.target.value })}
               placeholder="e.g. M-1025"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -111,7 +116,8 @@ export default function HeaderForm() {
               type="date"
               value={h.issueDate}
               onChange={e => updateHeader({ issueDate: e.target.value })}
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -164,7 +170,8 @@ export default function HeaderForm() {
               value={h.preparedBy}
               onChange={e => updateHeader({ preparedBy: e.target.value })}
               placeholder="IE Dept."
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
 
@@ -176,7 +183,8 @@ export default function HeaderForm() {
               value={h.approvedBy}
               onChange={e => updateHeader({ approvedBy: e.target.value })}
               placeholder="Manager"
-              className={FIELD_CLASS}
+              disabled={isLocked}
+              className={`${FIELD_CLASS} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
             />
           </div>
         </div>
