@@ -2,6 +2,87 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-10 (Update 19 — Phase 5a-1+5a-2 release: push + Production deploy)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized, via two separate direct confirmations: (1) push
+the two pending commits to GitHub, and (2) deploy to Production — noting
+this deploy ships Phase 5a-1 and Phase 5a-2's application code together for
+the first time, which was always the plan (5a-1's code was deliberately
+held back only until 5a-2 was ready).
+
+### Actions taken
+
+1. Pushed `11ce2f8..4b40648` (two commits: `c0c839e` docs, `4b40648` the
+   Phase 5a-2 implementation) to `origin/main`.
+2. Fresh `node --test` from the pushed commit: 185/185 pass. Fresh
+   `npm run build`: exit 0, 3/3 static routes (`/`, `/editor`,
+   `/_not-found`).
+3. Deployed: `npx wrangler pages deploy out --project-name=man-machine-chart
+   --branch=main --commit-dirty=true` → deployment URL
+   `https://12c86496.man-machine-chart.pages.dev`.
+
+### Live verification (read-only — no Production D1 write performed)
+
+- Opened `https://man-machine-chart.pages.dev/editor` fresh. Folder tree:
+  **7 folders / 4 roots / 12 charts** — counted every folder and chart name
+  in the rendered sidebar and confirmed an exact match to the last recorded
+  Database Safety baseline (Update 17, 7 Aug 2026). Zero decrease.
+- Opened `BYDSidestep Rev.00` (real Production chart, real M1 time-study
+  data). Clicked through all 5 module tabs (Time Sheet, Capacity, Gantt,
+  Layout, Yamazumi): zero console errors on every one. M1 rendered real
+  per-row Min/Max/Fluc/Aver stats; M4 rendered LayoutDiagram (30 SVG element
+  groups) and StepTable (18 rows); M5 rendered 13 job-element bars, each
+  correctly `draggable="true"` (this chart is unlocked, so Phase 4c-2's
+  existing drag-and-drop remains fully functional — confirms Phase 5a-2
+  did not regress normal/unlocked behavior).
+- Confirmed the deployed bundle is the new one, directly: inspected the
+  live DOM's `Process Name` field and found its rendered `className` now
+  contains `disabled:opacity-50 disabled:cursor-not-allowed
+  disabled:bg-slate-100` — classes that did not exist on this field before
+  Phase 5a-2. The `Rev No.` field's className correctly does *not* carry
+  those classes unconditionally (it only gains them when actually locked,
+  per its existing Phase 5a-1 ternary) — confirming the new per-field
+  static classes and the pre-existing conditional one both behave exactly
+  as reviewed.
+- Did not close a Revision, save, lock, rename, move, duplicate, or delete
+  any real chart. Creating a throwaway test chart to observe live locked-
+  state rendering was deliberately avoided: this app's Delete action is
+  disabled by design (Phase 0B — no server-side authorization system
+  exists yet), so a Production test artifact could not be cleaned up
+  afterward and would sit as permanent clutter. The DOM-inspection method
+  above proves the new bundle is live without needing to trigger the
+  locked state on Production.
+
+### Docs updated
+
+`docs/Master_Plan.html` bumped to v1.23: header status block, module-status
+table (M6 now shows Phase 5a-1+5a-2 done/deployed, including a pointer to
+the two open low-severity findings), Roadmap Phase 5 entry, and a new
+Change Log table row — all added only after this session's fresh
+test/build/deploy/live-verification evidence, per the Master Plan update
+rule.
+
+### Database Safety Gate / Production statement
+
+- **No Production D1 write occurred.** Verification was strictly read-only
+  browsing plus one live DOM/class inspection.
+- Push and deploy did occur this round, explicitly authorized by the user
+  for each action. This entry and the `docs/Master_Plan.html` update are
+  committed and pushed next.
+
+### Next
+
+Phase 5a-1 and 5a-2 are both complete, reviewed, deployed, and live-
+verified. Two low-severity, non-blocking findings from Phase 5a-2's review
+remain as optional follow-ups (not scheduled). Phase 5b (Before/After
+comparison page + Kaizen sheet + export) is the next planning target.
+
 ## 2026-08-10 (Update 18 — Claude review + live verification: Phase 5a-2)
 
 ### Tool
