@@ -193,7 +193,8 @@ function withPatchedStylesheets<T>(fn: () => Promise<T>): Promise<T> {
           { id: 2, name: '2: Capacity' },
           { id: 3, name: '3: Gantt' },
           { id: 4, name: '4: Layout' },
-          { id: 5, name: '5: Yamazumi' }
+          { id: 5, name: '5: Yamazumi' },
+          { id: 6, name: '6: Kaizen' }
         ] as const).map(m => (
           <button
             key={m.id}

@@ -12,6 +12,7 @@ import Module1_TimeMeasurement from '@/components/modules/Module1_TimeMeasuremen
 import Module2_MachineCapacity from '@/components/modules/Module2_MachineCapacity';
 import Module3_CombinationTable from '@/components/modules/Module3_CombinationTable';
 import Module5_YamazumiChart from '@/components/modules/Module5_YamazumiChart';
+import Module6_Kaizen from '@/components/modules/Module6_Kaizen';
 
 export default function EditorPage() {
   const hydrate      = useChartStore(s => s.hydrate);
@@ -75,6 +76,7 @@ export default function EditorPage() {
                         {activeModule === 3 && 'MODULE 3: DYNAMIC COMBINATION TABLE'}
                         {activeModule === 4 && 'MODULE 4: STANDARDIZED WORK CHART'}
                         {activeModule === 5 && 'MODULE 5: AUTO-YAMAZUMI CHART'}
+                        {activeModule === 6 && 'MODULE 6: KAIZEN — BEFORE/AFTER COMPARISON'}
                       </h1>
                     </div>
                   </div>
@@ -111,6 +113,7 @@ export default function EditorPage() {
               {activeModule === 2 && <Module2_MachineCapacity />}
               {activeModule === 3 && <Module3_CombinationTable />}
               {activeModule === 5 && <Module5_YamazumiChart />}
+              {activeModule === 6 && <Module6_Kaizen />}
 
               {/* ── Approval section ───────────────────────────────── */}
               <div className="rounded-xl shadow-md border border-slate-200 p-4 bg-white">

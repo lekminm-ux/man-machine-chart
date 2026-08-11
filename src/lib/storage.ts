@@ -4,7 +4,7 @@
 // ============================================================
 
 import type { AppDatabase, ChartFile, ChartFolder } from '@/types';
-import type { RevisionSnapshotContent, RevisionSnapshotMeta } from '@/types';
+import type { RevisionSnapshot, RevisionSnapshotContent, RevisionSnapshotMeta } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const LS_KEY = 'mm_chart_db_v2';
@@ -291,6 +291,31 @@ export async function listRevisionSnapshotsCloud(chartFileId: string): Promise<L
       return { ok: false, error: 'list revisions did not return an explicit confirmed response' };
     }
     return { ok: true, snapshots: res as RevisionSnapshotMeta[] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type GetRevisionSnapshotResult =
+  | { ok: true; snapshot: RevisionSnapshot }
+  | { ok: false; error: string };
+
+export async function getRevisionSnapshotCloud(id: string): Promise<GetRevisionSnapshotResult> {
+  try {
+    const res = await apiFetch(`/api/revisions?id=${encodeURIComponent(id)}`);
+    if (!res?.id || !res?.chartFileId || typeof res?.revNo !== 'string' || !res?.closedAt || !res?.content) {
+      return { ok: false, error: 'get revision snapshot did not return an explicit confirmed response' };
+    }
+    return {
+      ok: true,
+      snapshot: {
+        id: res.id,
+        chartFileId: res.chartFileId,
+        revNo: res.revNo,
+        closedAt: res.closedAt,
+        content: res.content,
+      },
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

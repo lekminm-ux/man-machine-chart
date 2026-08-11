@@ -525,3 +525,77 @@ test('listRevisionSnapshotsCloud returns metadata on success and ok:false on API
     restoreGlobals();
   }
 });
+
+test('getRevisionSnapshotCloud returns the confirmed snapshot shape', async () => {
+  const snapshot = {
+    id: 'snapshot-1',
+    chartFileId: 'file-1',
+    revNo: 'A',
+    closedAt: '2026-08-06T05:00:00.000Z',
+    content: {
+      header: blankHeader,
+      steps: [],
+      layoutDiagram: { elements: [], connections: [] },
+    },
+  };
+  installGlobals({
+    local: undefined,
+    fetchImpl: async (url, opts) => {
+      assert.equal(url, '/api/revisions?id=snapshot-1');
+      assert.equal(opts, undefined);
+      return mockResponse(snapshot);
+    },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.getRevisionSnapshotCloud('snapshot-1');
+    assert.deepEqual(result, { ok: true, snapshot });
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('getRevisionSnapshotCloud rejects API failures and malformed responses without throwing', async () => {
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => mockResponse({ error: 'not found' }, 404),
+  });
+  try {
+    const storage = loadStorage();
+    const apiFailure = await storage.getRevisionSnapshotCloud('missing-id');
+    assert.equal(apiFailure.ok, false);
+    assert.match(apiFailure.error, /API \/api\/revisions/);
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => mockResponse({
+      id: 'snapshot-1', chartFileId: 'file-1', revNo: 'A', closedAt: '2026-08-06T05:00:00.000Z',
+      // A response without content is not proof that the full immutable snapshot was fetched.
+    }),
+  });
+  try {
+    const storage = loadStorage();
+    const malformed = await storage.getRevisionSnapshotCloud('snapshot-1');
+    assert.deepEqual(malformed, {
+      ok: false,
+      error: 'get revision snapshot did not return an explicit confirmed response',
+    });
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => { throw new TypeError('network unreachable'); },
+  });
+  try {
+    const storage = loadStorage();
+    const networkFailure = await storage.getRevisionSnapshotCloud('snapshot-1');
+    assert.deepEqual(networkFailure, { ok: false, error: 'network unreachable' });
+  } finally {
+    restoreGlobals();
+  }
+});

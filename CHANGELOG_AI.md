@@ -2,6 +2,120 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-10 (Update 20 — Claude re-verification: Phase 5b-1 infinite-loop fix)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Context
+
+Follow-up to the Phase 5b-1 fix handoff (`PROMPT_CODEX_05_FIX_PHASE5B1_M6_INFINITE_LOOP.md`)
+a prior Claude session wrote after finding the M6 Kaizen comparison component stuck in an
+infinite re-render loop (~1,850 effect runs/sec) the moment two valid closed-Revision
+snapshots were selected. Codex applied the fix (state → ref for `snapshotCache`, removed
+from the second effect's dependency array) but it had not yet been re-verified. This
+session's job was exactly that re-verification, per
+`PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md`'s immediate-next-step instructions.
+
+### Fix confirmed on disk
+
+Read `src/components/modules/Module6_Kaizen.tsx` in full: `snapshotCacheRef =
+useRef<Record<string, RevisionSnapshot>>({})` replaces the old `useState`, and the second
+`useEffect`'s dependency array is `[activeFileId, revisionFileId, beforeId, afterId]` —
+`snapshotCache` is no longer in it, and nothing the effect does writes to any of its own
+four dependencies. Matches the fix handoff exactly.
+
+### Automated checks (fresh, working tree)
+
+`node --test`: **193/193 pass** (up from 185 — includes the new `kaizen-compare.test.cjs`
+and extended `storage.test.cjs`). `npm run lint`: exit 1, **5 errors** — identical to the
+documented pre-existing baseline (StepTable.tsx x3, Sidebar.tsx x1, TopBar.tsx x1), zero in
+any Phase 5b-1 file; warning count varies only with stale `.wrangler/tmp` bundle folders
+(git-ignored, not a code issue). `npx tsc --noEmit`: clean. `npm run build`: PASS, 3/3
+static routes.
+
+### Live verification (real local Pages Dev + D1, not mocks)
+
+Started `mm-chart-pages-dev` and opened "Side Step LH, RH (QA renamed)" (2 closed
+Revisions: `A`, `TEST-5A2`). Repeated the exact technique that originally found the bug — a
+temporary render counter injected into the second effect
+(`window.__kaizenEffect2Runs`), rebuilt, reloaded, then removed and rebuilt again
+afterward (confirmed via `git diff`/`git status` that both `Module6_Kaizen.tsx`, which is
+untracked, and the temporarily-touched `.claude/launch.json`, which is tracked, ended the
+session with zero unintended change):
+
+- Opening the "6: Kaizen" tab (auto-selects the two most recent snapshots): counter went
+  to **2** and stayed at 2 after a further 3s wait — no climb.
+- Changing "After" to the same snapshot as "Before" (exercises the effect's early-return
+  guard): counter went to **3**, stayed there.
+- Changing "Before" to the other snapshot, producing a new genuinely distinct pair
+  (`TEST-5A2` → `A`, swapped from the initial `A` → `TEST-5A2`): counter went to **4**,
+  stayed there after a further 3s wait.
+- Every state transition advanced the counter by exactly 1 and then stopped — the opposite
+  of the original ~1,850/sec runaway. `read_network_requests` showed each snapshot fetched
+  via `GET /api/revisions?id=...` exactly once each (ref-based cache working as designed,
+  no duplicate fetches). Zero console errors from the app itself. The comparison UI
+  rendered correctly both times (Revision Metrics table + Overlaid Yamazumi chart, with
+  Before/After correctly swapped on the second selection).
+
+### Environment note (not an application bug)
+
+The Browser-pane preview tool's own process supervisor (`preview_start`) could not keep
+`wrangler pages dev` alive in this environment across five attempts — it kept losing track
+of the process seconds after a clean start with no port conflict, while the identical
+command launched directly stayed up and served real D1-backed API routes without issue.
+Worked around it by launching the server directly and pointing the browser tab at it
+manually; found and cleaned up several orphaned `wrangler`/`workerd` process trees left
+behind by the failed `preview_start` attempts (confirmed port 8788 fully free and no stray
+processes before finishing). This is local tooling behavior, unrelated to any code in this
+repository.
+
+### Database Safety Gate / Production statement
+
+No Production D1 access of any kind. Every command targeted the pre-existing **local**
+`.wrangler` D1 state only. No new revision was closed and no chart content was modified —
+only existing closed Revisions were read. No commit, push, or deploy occurred in this
+entry.
+
+### Next
+
+The Phase 5b-1 fix holds. Phase 5b-1's application code (fix + original implementation,
+never separately shipped) is ready to commit and push, pending user authorization; deploy
+timing is a separate question for the user.
+
+## 2026-08-10 (Codex — GPT-5.6 context checkpoint / new-chat handoff rule)
+
+### Session goal
+
+Add a standing project rule for the current GPT-5.6 API context limit and make
+the required new-chat handoff prompt ready to use when a long session reaches
+the checkpoint.
+
+### Actions taken
+
+- Verified against the official OpenAI API model documentation that GPT-5.6
+  Sol/Terra/Luna currently list a 1,050,000-token context window. Defined the
+  operational threshold as 70% = 735,000 tokens.
+- Added the rule to `PROJECT_CONTEXT.md`: finish the current atomic step,
+  alert the user in Thai, fill the handoff prompt with real status/evidence/
+  risks, and offer a new chat. If the client does not expose reliable usage,
+  the assistant must label exact usage as unknown and use the system/
+  `PreCompact` warning as fallback.
+- Added `docs/AI_PROMPTS/PROMPT_NEW_CHAT_GPT56_CONTEXT_CHECKPOINT.md`, a
+  reusable ready-to-fill continuation prompt, and linked it from
+  `docs/AI_PROMPTS/README.md`.
+
+### Verification / Safety
+
+- Documentation-only change; no application source, schema, API, D1 data, or
+  deployment behavior changed.
+- No test/lint/build run was necessary for Markdown-only changes.
+- No commit, push, deploy, Production D1 write, migration, reset, or seed was
+  performed in this session.
+- Source checked: `https://developers.openai.com/api/docs/models` on
+  2026-08-10; re-check the vendor page before changing the threshold.
+
 ## 2026-08-10 (Update 19 — Phase 5a-1+5a-2 release: push + Production deploy)
 
 ### Tool
@@ -3461,3 +3575,101 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
   for review and direction on the out-of-scope test-harness conflict.
 - No commit, push, deploy, migration, `--remote` operation, or Production D1
   write occurred.
+
+## 2026-08-10 (Codex Phase 5b-1 M6 Before/After comparison implementation)
+
+### Scope / Implementation
+
+- Implemented Phase 5b-1 of Phase 5b (M6 Kaizen page): a read-only client
+  comparison of two closed Revision snapshots. Phase 5b-2 (the Kaizen
+  problem/countermeasure form) remains separately scoped next.
+- Changed exactly these files, matching the prompt's REQUIRED SCOPE:
+  `src/lib/kaizen-compare.ts`, `src/lib/storage.ts`,
+  `src/store/useChartStore.ts`, `src/components/modules/Module6_Kaizen.tsx`,
+  `src/components/layout/TopBar.tsx`, `src/app/editor/page.tsx`,
+  `tests/kaizen-compare.test.cjs`, `tests/storage.test.cjs`, and
+  `CHANGELOG_AI.md`.
+- Added `getRevisionSnapshotCloud(id)` with the exact contract:
+  `Promise<{ ok: true; snapshot: RevisionSnapshot } | { ok: false; error: string }>`.
+  It calls `GET /api/revisions?id=...`, requires `id`, `chartFileId`, string
+  `revNo`, `closedAt`, and full `content`, and fails closed on malformed/API/
+  network responses.
+- Added the pure `kaizen-compare.ts` API: `OperatorBar`,
+  `OperatorComparisonRow`, `RevisionMetrics`, `ComparisonResult`,
+  `computeRevisionMetrics(content)`, and
+  `buildComparison(before, after)`. It uses Module 1 Min totals when a
+  time-study has rows, falls back to calculated Module 4 steps otherwise,
+  keeps Cycle Time on the existing step-based longest-operator-loop rule,
+  excludes `Auto M/C`, preserves `ALL_WORKERS` order, and returns a null
+  reduction percentage for a zero baseline. `capacityPerShift` uses the real
+  `CapacitySummary.bottleneckCapacity` field; no field-name deviation was
+  required.
+- Added the sixth `Kaizen` navigator tab and Module 6 UI with two closed-
+  Revision pickers, cached snapshot reads, metric change direction colours,
+  and a shared-axis overlaid Manual/Walk/Idle Yamazumi chart. It never reads
+  or compares the live editable active-file content and adds no Phase 5b-2
+  persistence.
+
+### Verification / Handoff
+
+- `git status --short --branch`: implementation files listed above were the
+  only new source/test changes; pre-existing documentation changes remained
+  untouched.
+- `node --test`: **PASS, 193/193**.
+- `npm run lint`: blocked by the machine PowerShell execution policy for
+  `npm.ps1`; equivalent `npm.cmd run lint`: exit 1 with the known baseline
+  **5 errors / 11 warnings** (StepTable, Sidebar, and TopBar only); zero new
+  errors in Phase 5b-1 files.
+- `npx tsc --noEmit`: blocked by the same policy for `npx.ps1`; equivalent
+  `npx.cmd tsc --noEmit`: **PASS**.
+- `npm run build`: blocked by the same policy for `npm.ps1`; equivalent
+  `npm.cmd run build`: **PASS**, all 5 static routes generated.
+- `git diff --check`: **PASS**; only existing LF/CRLF normalization warnings.
+- Best-effort manual check: Next dev served `/editor`, and the in-app Browser
+  confirmed the visible `6: Kaizen` tab with no console errors. Next dev does
+  not serve the Cloudflare Pages Functions, so `/api/folders` and `/api/files`
+  returned 404; the UI correctly showed Cloud unavailable and no active chart
+  was available from cached state. Therefore this environment had **no chart
+  with 2+ closed Revisions** to render against; pickers, metrics, and the
+  overlaid chart could not be exercised with real snapshot data. The local
+  dev server was stopped after the check.
+- Final UI consistency pass kept snapshot selection tied to the active chart
+  and treated a zero-baseline Cycle Time change as not applicable/neutral;
+  these are client-only safeguards and do not alter the comparison contract.
+- No commit, push, deploy, schema change, API/function change, migration,
+  Production D1 read/write, or other Production change occurred. This phase
+  only adds a new read-only client module and its tests.
+- **Next action:** return this handoff to Claude for full diff and live-data
+  review. Do not proceed to Phase 5b-2 or any release/migration action here.
+
+## 2026-08-10 (Codex Phase 5b-1 M6 infinite render-loop fix)
+
+### Scope / Root Cause / Fix
+
+- Fixed the infinite render loop found by Claude during live Phase 5b-1
+  verification when two distinct closed Revision snapshots were selected.
+- Root cause: `snapshotCache` was React state and was both a dependency of the
+  snapshot-loading effect and written by that same effect; spreading it always
+  created a new object reference, retriggering the effect indefinitely.
+- Changed only the cache mechanism in
+  `src/components/modules/Module6_Kaizen.tsx`: `useState` → `useRef`, reset/
+  reads/writes use `snapshotCacheRef.current`, and the cache was removed from
+  the effect dependency array. Picker behavior, metrics, chart rendering,
+  snapshot fetch semantics, and all other files remain unchanged.
+
+### Verification / Handoff
+
+- `node --test`: **PASS, 193/193**.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build`: direct PowerShell
+  wrappers were blocked by the machine execution policy; equivalent
+  `npm.cmd run lint` reported the known baseline **5 errors / 11 warnings**,
+  `npx.cmd tsc --noEmit` **PASS**, and `npm.cmd run build` **PASS**.
+- `git diff --check`: **PASS**; only existing LF/CRLF normalization warnings.
+- Manual local Next dev check reached `/editor`, showed the `6: Kaizen` tab,
+  and had no console errors. Plain Next dev returned 404 for Pages Functions,
+  so no chart with two closed Revisions was available; the infinite-loop
+  reproduction could not be reached in this environment. Claude should rerun
+  the real local Pages Dev + D1 reproduction.
+- No commit, push, deploy, Production/schema/API change, or git-mutating
+  command occurred. Return this fix handoff to Claude for review and
+  re-verification; do not proceed to Phase 5b-2 or release work.

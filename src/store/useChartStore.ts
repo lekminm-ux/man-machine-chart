@@ -41,9 +41,9 @@ interface ChartState extends AppDatabase {
    */
   cloudReady: boolean;
   syncStatus: SyncStatus;
-  activeModule: 1 | 2 | 3 | 4 | 5;
+  activeModule: 1 | 2 | 3 | 4 | 5 | 6;
 
-  setActiveModule: (m: 1 | 2 | 3 | 4 | 5) => void;
+  setActiveModule: (m: 1 | 2 | 3 | 4 | 5 | 6) => void;
 
   // Hydration
   hydrate: () => Promise<void>;
