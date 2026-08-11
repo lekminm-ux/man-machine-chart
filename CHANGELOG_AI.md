@@ -2,6 +2,96 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-11 (Update 21 — Phase 5b-1 push + Production deploy)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Authorization
+
+User explicitly authorized, via a single confirmation covering all three
+steps together: commit, push, and deploy Phase 5b-1 (the M6 Before/After
+comparison feature plus the infinite-loop fix, shipped together since the
+fix was never separately committed) straight to Production — agreeing with
+the reasoning carried over from the prior session that, unlike the
+5a-1/5a-2 pair, there is no reason to hold deployment back for Phase 5b-2
+(the separate Kaizen problem/countermeasure form) to also be ready first.
+
+### Actions taken
+
+1. Read every remaining diff not yet read in this session before
+   committing: `kaizen-compare.ts` in full (pure calculation, no hooks —
+   prefers Module 1 time-study data when present, falls back to Module 4
+   step data, matching Module 5's existing convention; cycle-time-reduction
+   percent correctly guarded against divide-by-zero), plus the smaller
+   diffs in `storage.ts` (`getRevisionSnapshotCloud`, validates the full
+   response shape before returning ok), `useChartStore.ts` (activeModule
+   type extended to include 6), `editor/page.tsx` and `TopBar.tsx` (module-6
+   wiring). No issues found — confirms the prior session's review verdict
+   independently.
+2. Committed as two commits, following this project's established
+   docs/feat split: `03d9b43` (docs — the GPT-5.6 context-checkpoint rule
+   and continuation-prompt refresh that were already sitting in the working
+   tree from an earlier, unrelated Codex session) and `b6e7fdd` (feat(m6) —
+   the actual Phase 5b-1 application code, tests, and this file's Update 20
+   entry, shipping the fix together with the original never-before-committed
+   implementation).
+3. Pushed both commits: `87353ae..b6e7fdd` to `origin/main`.
+4. Fresh `npm run build` from the pushed commit: PASS, 3/3 static routes.
+5. Deployed: `npx wrangler pages deploy out --project-name=man-machine-chart
+   --branch=main --commit-dirty=true` → deployment URL
+   `https://f14a2365.man-machine-chart.pages.dev`.
+
+### Live verification (read-only — no Production D1 write performed)
+
+- Opened `https://man-machine-chart.pages.dev/editor` fresh. Queried
+  `/api/folders` and `/api/files` directly via the page's own `fetch`:
+  **7 folders / 4 roots / 12 charts**, folder and chart names all matching
+  the last recorded Database Safety baseline (Update 19, 10 Aug 2026)
+  exactly. Zero decrease, zero unexpected change.
+- Opened `BYDSidestep Rev.00` (real Production chart): zero console errors
+  across its normal tabs, confirming the deploy didn't regress anything.
+- Confirmed the new bundle is live directly: the module tab bar now shows
+  "6: Kaizen" (absent before this release), and clicking it updates the
+  header to "MODULE 6: KAIZEN — BEFORE/AFTER COMPARISON" and renders the
+  new component's correct empty-state message ("Close at least two
+  Revisions...") for this chart, which currently has 0 closed Revisions —
+  zero console errors, zero API errors. The "2 closed Revisions" happy
+  path was already proven end-to-end against real local D1 in Update 20;
+  no real Production chart currently has 2 closed Revisions to repeat that
+  exact scenario against live data, consistent with this project's
+  established practice of not manufacturing Production test data for
+  scenarios already covered by local D1 verification (see Update 17's
+  Phase 4c-1+4c-2 entry for the same reasoning).
+- Did not close a Revision, save, lock, rename, move, duplicate, or delete
+  any real chart.
+
+### Docs updated
+
+`docs/Master_Plan.html` bumped to v1.24: header status block, module-status
+table (M6 now shows Phase 5a-1+5a-2+5b-1 done/deployed), Roadmap Phase 5
+entry, and a new Change Log table row — all added only after this session's
+fresh test/build/deploy/live-verification evidence, per the Master Plan
+update rule.
+
+### Database Safety Gate / Production statement
+
+- **No Production D1 write occurred.** Verification was strictly read-only
+  browsing plus one live `fetch`-based count check and one DOM/tab-label
+  inspection.
+- Push and deploy did occur this round, explicitly authorized by the user.
+  This entry and the `docs/Master_Plan.html` update are committed and
+  pushed next.
+
+### Next
+
+Phase 5b-1 is complete, reviewed, deployed, and live-verified. Phase 5b-2
+(the Kaizen problem/countermeasure form — Problem, countermeasures list,
+responsible, due date — additive to the same `Module6_Kaizen.tsx`) is the
+next planning target, alongside the two still-open low-severity Phase 5a-2
+follow-ups (not scheduled).
+
 ## 2026-08-10 (Update 20 — Claude re-verification: Phase 5b-1 infinite-loop fix)
 
 ### Tool

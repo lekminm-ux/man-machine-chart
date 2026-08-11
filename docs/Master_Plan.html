@@ -144,12 +144,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.23</div>
-      <div><b>Updated</b>10 Aug 2026</div>
+      <div><b>Version</b>1.24</div>
+      <div><b>Updated</b>11 Aug 2026</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
-      <div><b>Baseline commit</b>4b40648 (Phase 5a-1 + 5a-2 both deployed to Production)</div>
-      <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4 (M5 Yamazumi 4a-4c) complete and deployed · Phase 5a-1 (M6 Revision Snapshot mechanism) and Phase 5a-2 (read-only UI gating) both implemented, reviewed, locally verified, committed, pushed, and deployed to Production together</div>
-      <div><b>Status</b>Master Plan v1.23 · M6 Revision Lock is now live end-to-end on Production: closing a Revision snapshots M1-M5, locks the chart, and every input/button/drag interaction across HeaderForm/M1/M2/M4/M5 is actually disabled while locked — not just the Rev No. field. Live read-only verification confirmed the real folder tree unchanged (7 folders/4 roots/12 charts) and the new bundle's disabled-state classes present in the rendered DOM. Two low-severity, non-blocking UX findings from Phase 5a-2's review remain open as optional follow-ups (see Change Log). Phase 5b (Before/After comparison page) is next.</div>
+      <div><b>Baseline commit</b>b6e7fdd (Phase 5b-1 M6 Before/After comparison, deployed to Production)</div>
+      <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4 (M5 Yamazumi 4a-4c) complete and deployed · Phase 5a-1+5a-2 (M6 Revision Snapshot + read-only UI gating) complete and deployed · Phase 5b-1 (M6 Before/After comparison) implemented, fixed, reviewed, live-verified, committed, pushed, and deployed to Production</div>
+      <div><b>Status</b>Master Plan v1.24 · M6 now also has a live Before/After comparison tab: pick two closed Revisions and see Cycle Time/worker count/walk-idle/capacity deltas plus an overlaid Yamazumi chart. Claude's live verification against real local D1 found a severe infinite-render-loop bug the moment two snapshots were selected; Codex's fix (state → ref for the snapshot cache) was re-verified live with a temporary render counter (stayed bounded at 2→3→4 across three selection changes, never climbed) before release. Live read-only Production verification confirmed the real folder tree unchanged (7 folders/4 roots/12 charts) and the new "6: Kaizen" tab rendering with zero console errors. Two low-severity, non-blocking UX findings from Phase 5a-2's review remain open as optional follow-ups (see Change Log). Phase 5b-2 (Kaizen problem/countermeasure form) is next.</div>
     </div>
   </div>
 </header>
@@ -344,9 +344,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td>— (Phase 4 จบแล้วทั้งแผน)</td>
       </tr>
       <tr>
-        <td><b>M6</b></td><td><span class="b b-done">Phase 5a-1+5a-2 ครบ · deployed</span></td>
-        <td><b>Revision Snapshot + Read-Only Lock (Phase 5a-1+5a-2)</b> — ปิด Revision แล้ว snapshot ข้อมูล M1-M5 ทั้งชุดอัตโนมัติและ lock แก้ไขไม่ได้จนกว่าจะเปิด Revision ใหม่ · ทุกช่อง input/ปุ่ม/drag ใน HeaderForm, M1, M2, M4 (StepTable/LayoutDiagram/SummaryTable), M5 ถูก disable จริงตอน lock ไม่ใช่แค่ช่อง Rev No. · deploy ขึ้น Production แล้ว (10 ส.ค.)</td>
-        <td>เหลือ Phase 5b (หน้าสรุป Before/After) + ใบ Kaizen — มี 2 จุดเล็กที่พบตอนรีวิว (severity ต่ำ ไม่กระทบข้อมูล) เก็บไว้เป็น optional follow-up ดู Change Log</td>
+        <td><b>M6</b></td><td><span class="b b-done">Phase 5a-1+5a-2+5b-1 ครบ · deployed</span></td>
+        <td><b>Revision Snapshot + Read-Only Lock + Before/After Comparison</b> — ปิด Revision แล้ว snapshot ข้อมูล M1-M5 ทั้งชุดอัตโนมัติและ lock แก้ไขไม่ได้จนกว่าจะเปิด Revision ใหม่ · ทุกช่อง input/ปุ่ม/drag ใน HeaderForm, M1, M2, M4, M5 ถูก disable จริงตอน lock · <b>แท็บ "6: Kaizen" ใหม่ (Phase 5b-1)</b> เลือก 2 closed Revision มาเทียบ Cycle Time/จำนวนคน/walk-idle/capacity + กราฟ Yamazumi ซ้อนทับ — deploy ขึ้น Production แล้ว (11 ส.ค.)</td>
+        <td>เหลือ Phase 5b-2 (ใบ Kaizen: Problem/มาตรการ/ผู้รับผิดชอบ/กำหนดเสร็จ) — มี 2 จุดเล็กจาก Phase 5a-2 (severity ต่ำ ไม่กระทบข้อมูล) เก็บไว้เป็น optional follow-up ดู Change Log</td>
       </tr>
     </tbody>
   </table>
@@ -635,11 +635,12 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   </div>
 
   <div class="phase">
-    <div class="tag"><span class="b b-wip">กำลังทำ (5a-1+5a-2 deployed)</span></div>
+    <div class="tag"><span class="b b-wip">กำลังทำ (5a-1+5a-2+5b-1 deployed)</span></div>
     <div class="body">
       <h4>Phase 5 · M6 Kaizen + Before/After</h4>
       <p>✅ 5a-1+5a-2 (10 ส.ค., deployed): Revision Snapshot + Read-Only Lock — ปิด Revision snapshot ข้อมูล M1-M5 ทั้งชุดอัตโนมัติ + lock แก้ไขไม่ได้จนเปิด Revision ใหม่ ครบทุกช่อง input/ปุ่ม/drag ใน HeaderForm/M1/M2/M4/M5 (ไม่ใช่แค่ Rev No.) — live-verified บน Production แล้ว<br>
-         ⏳ 5b (ยังไม่เริ่ม): หน้าสรุปเทียบก่อน–หลังข้ามโมดูล + ใบ Kaizen + Export PNG/PDF</p>
+         ✅ 5b-1 (11 ส.ค., deployed): แท็บ "6: Kaizen" เลือก 2 closed Revision มาเทียบ Cycle Time/จำนวนคน/walk-idle/capacity + กราฟ Yamazumi ซ้อนทับ — Claude เจอบั๊ก infinite render loop ตอน live-verify กับ local D1 จริง (แก้แล้วโดย Codex, Claude ตรวจซ้ำด้วย render counter ก่อนขึ้น Production)<br>
+         ⏳ 5b-2 (ยังไม่เริ่ม): ใบ Kaizen (Problem/มาตรการ/ผู้รับผิดชอบ/กำหนดเสร็จ) + Export PNG/PDF</p>
     </div>
   </div>
 
@@ -855,6 +856,10 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr>
+        <td><b>1.24</b></td><td>11 Aug 2026</td><td><code>b6e7fdd</code> (deployed)</td>
+        <td><b>Phase 5b-1 (M6 Before/After comparison) — re-verify fix + release</b> — a prior Claude session's live verification against real local D1 found the Kaizen comparison component (Codex's Phase 5b-1 implementation) stuck in an infinite re-render loop (~1,850 effect runs/sec) the instant two valid closed-Revision snapshots were selected, and wrote a fix handoff (state → ref for the snapshot cache, dropped from the effect's dependency array). This session's job was re-verification: confirmed the fix on disk matches the handoff exactly; fresh <code>node --test</code> (193/193, up from 185), lint (5 errors, same pre-existing baseline, zero new), <code>tsc --noEmit</code> (clean), and <code>build</code> (PASS) all green. Live-verified against the same local D1 chart ("Side Step LH, RH (QA renamed)", Revisions <code>A</code>/<code>TEST-5A2</code>) by repeating the original bug-hunting technique — a temporary render counter — across three different selection changes: the counter advanced by exactly 1 each time and then stayed flat (2 → 3 → 4), the opposite of the original runaway, with the comparison table and overlaid Yamazumi chart rendering correctly and Before/After swapping correctly. Instrumentation and a temporary <code>.claude/launch.json</code> compatibility-date workaround were both fully reverted (verified via clean <code>git diff</code>) before committing. Committed as two commits (<code>03d9b43</code> docs, <code>b6e7fdd</code> feat, the latter shipping the fix together with the original never-before-committed implementation), pushed, built, and deployed via <code>wrangler pages deploy</code>. Live read-only Production verification: folder tree unchanged (7 folders/4 roots/12 charts, exact match to the last baseline), the new "6: Kaizen" tab renders with zero console errors both on a chart with 0 closed Revisions (correct empty-state message) and was already proven end-to-end on the local D1 chart with 2 closed Revisions. No chart was locked, saved, or otherwise mutated on Production during verification.</td>
+      </tr>
       <tr>
         <td><b>1.23</b></td><td>10 Aug 2026</td><td><code>4b40648</code> (deployed)</td>
         <td><b>Phase 5a-2 (M6 read-only UI gating) — implement + review + release</b> — Codex extended the <code>isLocked</code> pattern from Phase 5a-1's HeaderForm Rev No. field to the rest of HeaderForm (8 fields) plus M1, M2, M4 (StepTable/LayoutDiagram/SummaryTable), and M5, so a closed Revision's inputs/buttons/drag interactions are actually disabled instead of only failing silently at Save time; also fixed <code>duplicateFile</code> carrying a stale <code>lockedAt</code> onto new copies. Claude read all 11 changed files in full (scope matched exactly; <code>useChartStore.ts</code> diff was <code>+1/-0</code>), independently re-ran <code>node --test</code> (185/185)/lint/build, and found two low-severity, non-blocking findings (a LayoutDiagram element-selection/panel-visibility asymmetry, a minor M5 drag-guard ordering nitpick — neither a data-safety issue, both left as optional follow-ups). Verified live end-to-end against real local D1/Pages Dev: every module's controls confirmed <code>disabled</code> in the actual rendered DOM, full close→verify→open→editable-again cycle held with zero data loss. Committed (<code>c0c839e</code>, <code>4b40648</code>), pushed, then — since Phase 5a-1's code had been deliberately held back only until this phase was ready — both phases' application code were built and deployed to Production together via <code>wrangler pages deploy</code>. Live read-only verification: real folder tree unchanged (7 folders/4 roots/12 charts, matching the last preflight baseline exactly), <code>BYDSidestep Rev.00</code> renders correctly with zero console errors across all 5 module tabs, and the deployed bundle was confirmed fresh by inspecting the live DOM directly — the Process Name field's rendered <code>className</code> now carries the new <code>disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100</code> classes that did not exist in the pre-5a-2 bundle. No chart was locked, saved, or otherwise mutated against Production during verification.</td>
