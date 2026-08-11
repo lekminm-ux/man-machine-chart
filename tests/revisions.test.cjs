@@ -196,6 +196,36 @@ test('close creates an immutable snapshot and locks the chart in one atomic batc
   assert.equal(snapshot.closedAt, storedFile.lockedAt, 'snapshot close time and chart lock must agree');
   assert.equal(snapshot.chartFileId, 'chart-1');
   assert.equal(snapshot.revNo, 'A');
+  assert.equal(JSON.parse(snapshot.content).kaizen, undefined, 'a legacy chart without kaizen must close cleanly without inventing the field');
+});
+
+test('close preserves a populated Kaizen sheet in the immutable snapshot content', async () => {
+  const kaizen = {
+    problem: 'Snapshot problem',
+    solution: 'Snapshot solution',
+    beforeNote: 'Snapshot before',
+    afterNote: 'Snapshot after',
+    details: [{ id: 'detail-1', detail: 'Snapshot detail', priority: 5, response: 'Snapshot response', eva: 'Snapshot eva' }],
+    result: 'Snapshot result',
+    responsiblePerson: 'Snapshot owner',
+    dueDate: '2026-09-01',
+  };
+  const base = chartFile();
+  const file = chartFile({
+    content: JSON.stringify({ ...JSON.parse(base.content), kaizen }),
+  });
+  const mock = makeMockD1({ chart_files: [file] });
+  const response = await revisionsApi.onRequestPost({
+    env: mock.env,
+    request: fakeRequest({ id: 'snapshot-kaizen', chartFileId: 'chart-1', revNo: 'KAIZEN-1' }),
+  });
+
+  assert.equal(response.status, 200);
+  const snapshot = mock.state.revision_snapshots[0];
+  const frozen = JSON.parse(snapshot.content).kaizen;
+  assert.equal(frozen.problem, 'Snapshot problem');
+  assert.equal(frozen.details[0].priority, 5);
+  assert.equal(frozen.dueDate, '2026-09-01');
 });
 
 test('close on an already-locked chart returns 409 and creates no snapshot', async () => {

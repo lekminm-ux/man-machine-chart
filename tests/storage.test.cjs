@@ -282,6 +282,27 @@ test('loadFileFromCloud never throws on failure — it resolves ok:false', async
 
 // ── GPT review fix round: complete-payload persistence ──────────────────────
 
+test('chartFileContent includes a populated kaizen sheet and tolerates legacy files without one', () => {
+  const storage = loadStorage();
+  const kaizen = {
+    problem: 'Marker problem',
+    solution: 'Marker solution',
+    beforeNote: 'Before marker',
+    afterNote: 'After marker',
+    details: [{ id: 'detail-1', detail: 'Detail marker', priority: 4, response: 'Response marker', eva: 'Eva marker' }],
+    result: 'Result marker',
+    responsiblePerson: 'Owner marker',
+    dueDate: '2026-08-31',
+  };
+
+  const withKaizen = storage.chartFileContent({ ...sampleFile, kaizen });
+  assert.equal(withKaizen.kaizen.problem, 'Marker problem');
+  assert.equal(withKaizen.kaizen.details[0].priority, 4);
+
+  const legacyContent = storage.chartFileContent(sampleFile);
+  assert.equal(legacyContent.kaizen, undefined, 'a legacy ChartFile without kaizen must still serialize safely');
+});
+
 test('saveFileCloud sends the complete ChartFile payload — timeMeasurement/timeStudy/machineCapacity included, not just header/steps/layoutDiagram', async () => {
   let capturedBody = null;
   installGlobals({

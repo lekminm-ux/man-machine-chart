@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
-  TimeStudy, MachineCapacity,
+  TimeStudy, MachineCapacity, KaizenSheet,
 } from '@/types';
 import {
   loadLocalDatabase, saveLocalDatabase,
@@ -85,6 +85,9 @@ interface ChartState extends AppDatabase {
   /** Seed one process per machine row in the Module 1 sheet. */
   importMachineCapacityFromTimeStudy: () => number;
 
+  // Module 6 — Kaizen sheet
+  updateKaizen: (kaizen: KaizenSheet) => void;
+
   // Step actions
   addStep: () => void;
   updateStep: (id: string, partial: Partial<ChartStep>) => void;
@@ -120,6 +123,19 @@ const defaultHeader: ChartHeader = {
     'Worker J': '',
   },
 };
+
+export function emptyKaizenSheet(): KaizenSheet {
+  return {
+    problem: '',
+    solution: '',
+    beforeNote: '',
+    afterNote: '',
+    details: [],
+    result: '',
+    responsiblePerson: '',
+    dueDate: '',
+  };
+}
 
 // ── Helper: persist local state ──────────────────────────────────────────────
 function persistLocal(state: AppDatabase) {
@@ -765,6 +781,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? { ...f, machineCapacity: mc, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  updateKaizen(kaizen) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, kaizen, updatedAt: new Date().toISOString() }
             : f
         ),
       };

@@ -181,6 +181,7 @@ export function chartFileContent(file: ChartFile): RevisionSnapshotContent {
     timeMeasurement: file.timeMeasurement,
     timeStudy: file.timeStudy,
     machineCapacity: file.machineCapacity,
+    kaizen: file.kaizen,
   };
 }
 

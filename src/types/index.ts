@@ -171,6 +171,33 @@ export interface MachineCapacity {
   rows: MachineCapacityRow[];
 }
 
+// ── Module 6: Kaizen Sheet (ใบ Kaizen) ──────────────────────────────────
+export interface KaizenDetailRow {
+  id: string;
+  detail: string;
+  /** 1-5 priority/effectiveness rating from the paper form's numbered
+   * columns; the team's own convention decides what it means. */
+  priority: number | null;
+  response: string;
+  eva: string;
+}
+
+export interface KaizenSheet {
+  problem: string;
+  solution: string;
+  /** Free-text description of the before/after work-station state.
+   * Photo/image attachment is a planned future addition (Phase 5b-3),
+   * not implemented here. */
+  beforeNote: string;
+  afterNote: string;
+  details: KaizenDetailRow[];
+  /** One overall result, not per Detail row. */
+  result: string;
+  /** One owner + one due date for the whole sheet, not per row. */
+  responsiblePerson: string;
+  dueDate: string; // ISO date string, same convention as ChartHeader.issueDate
+}
+
 /** Per-row figures derived from `readings` — never stored, always recomputed. */
 export interface TimeStudyRowStats {
   min: number;
@@ -197,10 +224,12 @@ export interface ChartFile {
   timeStudy?: TimeStudy;
   /** Module 2 machine capacity sheet. */
   machineCapacity?: MachineCapacity;
+  /** Module 6 Kaizen problem/countermeasure sheet. */
+  kaizen?: KaizenSheet;
 }
 
 export type RevisionSnapshotContent = Pick<ChartFile,
-  'header' | 'steps' | 'layoutDiagram' | 'timeMeasurement' | 'timeStudy' | 'machineCapacity'>;
+  'header' | 'steps' | 'layoutDiagram' | 'timeMeasurement' | 'timeStudy' | 'machineCapacity' | 'kaizen'>;
 
 export interface RevisionSnapshotMeta {
   id: string;

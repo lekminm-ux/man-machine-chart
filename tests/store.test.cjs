@@ -75,6 +75,7 @@ function makeStorageMock(overrides = {}) {
       timeMeasurement: file.timeMeasurement,
       timeStudy: file.timeStudy,
       machineCapacity: file.machineCapacity,
+      kaizen: file.kaizen,
     }),
     ...overrides,
   };
@@ -505,6 +506,42 @@ test('saveActiveFile reports unconfirmed if even one module field (e.g. machineC
   await store.getState().saveActiveFile();
 
   assert.equal(store.getState().syncStatus, 'unconfirmed', 'losing even one module field in the read-back must never be reported as saved');
+});
+
+test('updateKaizen replaces the active sheet wholesale, bumps updatedAt, and is not blocked by a lock at store level', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+  const fileId = store.getState().activeFileId;
+  const initialUpdatedAt = store.getState().activeFile().updatedAt;
+
+  await new Promise(resolve => setTimeout(resolve, 2));
+  const first = {
+    problem: 'First problem', solution: 'First solution', beforeNote: 'Before one', afterNote: 'After one',
+    details: [{ id: 'detail-1', detail: 'First detail', priority: 2, response: 'First response', eva: 'First eva' }],
+    result: 'First result', responsiblePerson: 'First owner', dueDate: '2026-08-20',
+  };
+  store.setState(s => ({ files: s.files.map(f => f.id === fileId ? { ...f, lockedAt: '2026-08-10T00:00:00.000Z' } : f) }));
+  store.getState().updateKaizen(first);
+
+  const afterFirst = store.getState().activeFile();
+  assert.equal(afterFirst.kaizen.problem, 'First problem');
+  assert.equal(afterFirst.kaizen.details.length, 1);
+  assert.notEqual(afterFirst.updatedAt, initialUpdatedAt);
+
+  await new Promise(resolve => setTimeout(resolve, 2));
+  const second = {
+    problem: 'Second problem', solution: '', beforeNote: '', afterNote: '', details: [],
+    result: '', responsiblePerson: '', dueDate: '',
+  };
+  store.getState().updateKaizen(second);
+
+  const afterSecond = store.getState().activeFile();
+  assert.equal(afterSecond.kaizen.problem, 'Second problem');
+  assert.equal(afterSecond.kaizen.details.length, 0, 'a replacement must not retain rows from the previous sheet');
+  assert.notEqual(afterSecond.updatedAt, afterFirst.updatedAt);
+  assert.equal(afterSecond.lockedAt, '2026-08-10T00:00:00.000Z', 'store action follows Module 2 and leaves lock enforcement to the UI');
 });
 
 // ── GPT review Round 2 fix: _unsynced records must block every Cloud action ──

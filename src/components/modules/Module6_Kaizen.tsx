@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3 } from 'lucide-react';
-import { useChartStore } from '@/store/useChartStore';
-import type { RevisionSnapshot, RevisionSnapshotMeta } from '@/types';
+import { BarChart3, Plus, Trash2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { emptyKaizenSheet, useChartStore } from '@/store/useChartStore';
+import type { KaizenDetailRow, KaizenSheet, RevisionSnapshot, RevisionSnapshotMeta } from '@/types';
 import {
   getRevisionSnapshotCloud,
   listRevisionSnapshotsCloud,
@@ -76,6 +77,7 @@ function StackedBar({ bar, yMax }: { bar: OperatorBar | null; yMax: number }) {
 
 export default function Module6_Kaizen() {
   const activeFile = useChartStore(s => s.activeFile());
+  const updateKaizen = useChartStore(s => s.updateKaizen);
   const [snapshots, setSnapshots] = useState<RevisionSnapshotMeta[]>([]);
   const snapshotCacheRef = useRef<Record<string, RevisionSnapshot>>({});
   const [revisionFileId, setRevisionFileId] = useState<string | null>(null);
@@ -170,6 +172,20 @@ export default function Module6_Kaizen() {
     return <div className="p-8 text-center text-slate-500">Please open a file from the sidebar to use Module 6.</div>;
   }
 
+  const isLocked = Boolean(activeFile.lockedAt);
+  const kaizen = activeFile.kaizen ?? emptyKaizenSheet();
+  const patchKaizen = (partial: Partial<KaizenSheet>) => updateKaizen({ ...kaizen, ...partial });
+  const patchDetail = (id: string, partial: Partial<KaizenDetailRow>) =>
+    patchKaizen({ details: kaizen.details.map(row => (row.id === id ? { ...row, ...partial } : row)) });
+  const addDetail = () => patchKaizen({
+    details: [
+      ...kaizen.details,
+      { id: uuidv4(), detail: '', priority: null, response: '', eva: '' },
+    ],
+  });
+  const deleteDetail = (id: string) =>
+    patchKaizen({ details: kaizen.details.filter(row => row.id !== id) });
+
   const yMax = Math.max(
     10,
     Math.ceil(Math.max(
@@ -208,6 +224,206 @@ export default function Module6_Kaizen() {
   return (
     <div className="flex-1 flex flex-col items-center bg-slate-50 min-h-screen p-8">
       <div className="w-full max-w-6xl space-y-6">
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">Kaizen Sheet</h2>
+              <p className="text-sm text-slate-500">Record the current chart problem, response, and improvement result.</p>
+            </div>
+            {isLocked && (
+              <span className="ml-auto text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                This Revision is locked — the Kaizen Sheet is read-only.
+              </span>
+            )}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-4">Problem and Solution</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-sm font-semibold text-slate-600">
+              Problem
+              <textarea
+                rows={4}
+                value={kaizen.problem}
+                onChange={event => patchKaizen({ problem: event.target.value })}
+                disabled={isLocked}
+                placeholder="Describe the problem…"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-600">
+              Solution
+              <textarea
+                rows={4}
+                value={kaizen.solution}
+                onChange={event => patchKaizen({ solution: event.target.value })}
+                disabled={isLocked}
+                placeholder="Describe the solution…"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-4">Before and After</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-sm font-semibold text-slate-600">
+              Before
+              <textarea
+                rows={4}
+                value={kaizen.beforeNote}
+                onChange={event => patchKaizen({ beforeNote: event.target.value })}
+                disabled={isLocked}
+                placeholder="Describe the before state — photo attachment coming in a later phase."
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-600">
+              After
+              <textarea
+                rows={4}
+                value={kaizen.afterNote}
+                onChange={event => patchKaizen({ afterNote: event.target.value })}
+                disabled={isLocked}
+                placeholder="Describe the after state — photo attachment coming in a later phase."
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-bold text-slate-800">Kaizen Details</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Add as many improvement details as this Kaizen needs.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700">
+                  <th className="border border-slate-200 px-3 py-2 text-left min-w-[260px]">Detail</th>
+                  <th className="border border-slate-200 px-3 py-2 text-left w-28">Priority</th>
+                  <th className="border border-slate-200 px-3 py-2 text-left min-w-[220px]">Response</th>
+                  <th className="border border-slate-200 px-3 py-2 text-left min-w-[220px]">Eva</th>
+                  <th className="border border-slate-200 px-2 py-2 w-12" aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {kaizen.details.map(row => (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <td className="border border-slate-200 p-1">
+                      <input
+                        value={row.detail}
+                        onChange={event => patchDetail(row.id, { detail: event.target.value })}
+                        disabled={isLocked}
+                        placeholder="Detail…"
+                        className="w-full bg-transparent px-2 py-1.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="border border-slate-200 p-1">
+                      <select
+                        value={row.priority === null ? '' : String(row.priority)}
+                        onChange={event => patchDetail(row.id, { priority: event.target.value === '' ? null : Number(event.target.value) })}
+                        disabled={isLocked}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="">—</option>
+                        {[1, 2, 3, 4, 5].map(value => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </td>
+                    <td className="border border-slate-200 p-1">
+                      <input
+                        value={row.response}
+                        onChange={event => patchDetail(row.id, { response: event.target.value })}
+                        disabled={isLocked}
+                        placeholder="Response…"
+                        className="w-full bg-transparent px-2 py-1.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="border border-slate-200 p-1">
+                      <input
+                        value={row.eva}
+                        onChange={event => patchDetail(row.id, { eva: event.target.value })}
+                        disabled={isLocked}
+                        placeholder="Evaluation…"
+                        className="w-full bg-transparent px-2 py-1.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="border border-slate-200 p-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => deleteDetail(row.id)}
+                        disabled={isLocked}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Delete detail"
+                        aria-label="Delete detail"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {kaizen.details.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="border border-slate-200 px-4 py-8 text-center text-slate-500">
+                      No details yet — add the first improvement detail below.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-3 border-t border-slate-200 bg-slate-50">
+            <button
+              type="button"
+              onClick={addDetail}
+              disabled={isLocked}
+              className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              <Plus size={14} /> Add Detail
+            </button>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-4">Result and Action Owner</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="block md:col-span-3 text-sm font-semibold text-slate-600">
+              Result
+              <textarea
+                rows={4}
+                value={kaizen.result}
+                onChange={event => patchKaizen({ result: event.target.value })}
+                disabled={isLocked}
+                placeholder="Describe the overall result…"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-600">
+              Responsible Person
+              <input
+                value={kaizen.responsiblePerson}
+                onChange={event => patchKaizen({ responsiblePerson: event.target.value })}
+                disabled={isLocked}
+                placeholder="Name…"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-600">
+              Due Date
+              <input
+                type="date"
+                value={kaizen.dueDate}
+                onChange={event => patchKaizen({ dueDate: event.target.value })}
+                disabled={isLocked}
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+          </div>
+        </section>
+
         <header className="flex flex-wrap justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div>
             <h2 className="text-xl font-bold text-slate-800">Kaizen Before / After Comparison</h2>

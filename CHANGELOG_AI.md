@@ -2,6 +2,185 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-11 (Update 22 — Claude review + live verification: Phase 5b-2)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Context
+
+Follow-up to Codex's own two entries below ("Codex Phase 5b-2 scope audit"
+and "Codex Phase 5b-2 M6 Kaizen Sheet form") — those entries have this
+round's full implementation detail; this entry covers only what they
+didn't: Claude's diff review verdict and the live D1 round-trip
+verification Codex's own environment couldn't run (plain `next dev` has no
+Cloudflare Pages Functions, so `/api/folders` 404s there).
+
+### Review verdict
+
+Read every changed file in full: `src/types/index.ts` (`KaizenDetailRow`/
+`KaizenSheet`, the `ChartFile.kaizen` addition, `RevisionSnapshotContent`'s
+extended `Pick`), `src/lib/storage.ts` (the one-line `chartFileContent()`
+fix), `src/store/useChartStore.ts` (`emptyKaizenSheet`/`updateKaizen`,
+mirroring `updateMachineCapacity` exactly, no lock check at the store
+level), `src/components/modules/Module6_Kaizen.tsx`'s new section (Problem/
+Solution, Before/After, unlimited Detail rows, Result/Responsible/Due
+Date, all routed through `patchKaizen`, all `disabled={isLocked}`), and
+all three test file diffs. Everything matches the amended handoff exactly;
+the existing Phase 5b-1 comparison section is untouched (diff shows only
+additions). No bugs found.
+
+Also reordered this file: Codex's two Phase 5b-2 entries had been appended
+at the very end of a 3800+ line file instead of the top, breaking this
+project's established newest-first convention that the fresh-session
+continuation prompt relies on ("read the top 5-8 entries") — moved them
+here, directly below this entry, with no content change.
+
+### Live verification (real local Pages Dev + D1, not mocks)
+
+Started `mm-chart-pages-dev` directly (the Browser pane's own `preview_start`
+process supervisor is unreliable for this specific server in this
+environment — same issue as Update 20, same workaround: launch directly,
+point a browser tab at it manually). Against the existing local test chart
+("Side Step LH, RH (QA renamed)"), filled in every new field (Problem,
+Solution, Before, After, one Detail row with Priority=4/Response/Eva,
+Result, Responsible Person, Due Date) through real browser interaction —
+not by writing DOM values directly, so `patchKaizen`/`updateKaizen`'s
+actual code path ran on every field:
+
+- Clicked Save: `PUT /api/files` 200, followed immediately by `GET
+  /api/files?id=...` 200. Fetched that same URL again independently and
+  confirmed `content.kaizen` matched every field exactly, including
+  `priority: 4` as a number (not a string).
+- Hard-reloaded the page from scratch: every field still showed the same
+  values, confirming this came from Cloud/D1, not component or
+  localStorage-only state.
+- Set a fresh Rev No. and clicked Close Revision: `PUT /api/files` then
+  `POST /api/revisions`, both 200. Fetched the new snapshot directly
+  (`GET /api/revisions?id=...`) and confirmed `content.kaizen` — the exact
+  data just entered — survived the freeze, proving the original scope gap
+  (Update 22's whole reason for existing) is genuinely fixed end-to-end,
+  not just at the unit-test level.
+- Confirmed every new control (5 textareas, the Add Detail button, all 4
+  Detail-row fields, the delete-row button, Responsible Person) reported
+  `disabled: true` in the live DOM once locked, plus the "This Revision is
+  locked" banner — zero false negatives.
+- Clicked Open New Revision: unlocked, every control re-enabled, and the
+  already-entered data was still present (same pattern as Phase 5a-1's
+  unlock behavior).
+- Zero new console errors through the entire cycle (the only entries
+  present were the same four stale ones left over from an earlier,
+  unrelated tab reuse this session, confirmed present before any of this
+  round's interaction began).
+
+### Database Safety Gate / Production statement
+
+No Production D1 access of any kind. Every command targeted the
+pre-existing **local** `.wrangler` D1 state only. This did close one real
+local Revision (`KAIZEN-5B2-QA`) on the shared local QA chart as part of
+proving the round trip — a local-only, disposable test artifact, not
+Production data. No commit, push, or deploy occurred in this entry.
+
+### Next
+
+Phase 5b-2 is implementation-complete, fully reviewed, and now verified
+live end-to-end including the exact persistence path that was originally
+missing. Phase 5b-3 (photo/image attachment for Before/After) remains
+unscoped and unscheduled. Pending: user authorization to commit + push,
+and separately, deploy.
+
+## 2026-08-11 (Codex Phase 5b-2 M6 Kaizen Sheet form)
+
+### Scope / Implementation
+
+- Implemented the approved Phase 5b-2 additive Kaizen form for the live active
+  chart, above the existing Phase 5b-1 Before / After Revision comparison.
+  The comparison section and `src/lib/kaizen-compare.ts` were left unchanged.
+- Added the optional `ChartFile.kaizen` JSON field and registered it in the
+  existing RevisionSnapshotContent pick and the single `chartFileContent()`
+  allow-list. `src/lib/storage.ts` received exactly one new line:
+  `kaizen: file.kaizen,`; `createFileCloud()`, `saveFileCloud()`, and every
+  other function in that file were untouched.
+- The implemented exact types are:
+  `KaizenDetailRow { id: string; detail: string; priority: number | null;
+  response: string; eva: string }` and
+  `KaizenSheet { problem: string; solution: string; beforeNote: string;
+  afterNote: string; details: KaizenDetailRow[]; result: string;
+  responsiblePerson: string; dueDate: string }`. No deliberate deviation
+  from the approved plan was required.
+- Added `emptyKaizenSheet(): KaizenSheet`, returning empty strings for every
+  scalar and `details: []`. Added `updateKaizen(kaizen: KaizenSheet): void`,
+  which replaces the active file's whole Kaizen object, bumps `updatedAt`,
+  calls `persistLocal`, and deliberately performs no lock check; the UI
+  disables every new input/button when `activeFile.lockedAt` is truthy.
+- The Details table is unlimited, uses nullable priority values (`—`, 1-5),
+  and supports add/delete/edit. Before/After are plain text notes; photo or
+  image attachment is intentionally deferred to a future Phase 5b-3.
+- Added storage, store, and Revision-close coverage for populated and absent
+  Kaizen data. The approved implementation scope files changed were:
+  `src/types/index.ts`, `src/lib/storage.ts`, `src/store/useChartStore.ts`,
+  `src/components/modules/Module6_Kaizen.tsx`, `tests/store.test.cjs`,
+  `tests/revisions.test.cjs`, `tests/storage.test.cjs`, and this file.
+
+### Verification / Handoff
+
+- `git status --short --branch`: implementation changes are limited to the
+  eight approved scope files above; pre-existing `docs/AI_PROMPTS/README.md`,
+  `docs/Master_Plan.html`, and the untracked Phase 5b-2 prompt were preserved
+  unchanged.
+- `node --test`: **PASS, 196/196** (0 failures).
+- `npm run lint`: the direct PowerShell wrapper is blocked by the machine
+  execution policy; equivalent `npm.cmd run lint`: exit 1 with **5 known
+  baseline errors / 23 warnings** (the additional warnings are generated
+  `.wrangler` facades and existing files), and **zero new errors** in any
+  touched file.
+- `npx tsc --noEmit`: direct PowerShell wrapper is blocked by the same policy;
+  equivalent `npx.cmd tsc --noEmit`: **PASS**.
+- `npm run build`: direct PowerShell wrapper is blocked by the same policy;
+  equivalent `npm.cmd run build`: **PASS**, all 5 static pages generated
+  (`/`, `/_not-found`, and `/editor` in the route table).
+- `git diff --check`: **PASS**; only existing LF/CRLF normalization warnings.
+- Best-effort manual check: local Next dev served `/editor`; the Browser
+  confirmed the visible `6: Kaizen` navigator button and no console errors.
+  Plain Next dev does not serve Cloudflare Pages Functions, so `/api/folders`
+  returned 404, the UI showed Cloud unavailable, and no active chart was
+  available to exercise the new form's fields or Add/Delete controls. The
+  local dev server was stopped after the check. Claude should repeat the
+  interaction and lock-state check in the Pages/D1-capable environment.
+- No commit, push, deploy, Production D1 access, schema change, API/function
+  change, migration, or other Production write occurred. This phase only
+  extends the existing JSON content shape already round-tripped by the
+  existing endpoints.
+- **Next action:** return this handoff to Claude for review. Do not proceed to
+  any further phase or release/migration action here.
+
+## 2026-08-11 (Codex Phase 5b-2 scope audit — PLAN_CHANGE_REQUIRED)
+
+### Finding
+
+- Before implementation, the required read-through found that
+  `src/lib/storage.ts:176-184` defines `chartFileContent()` as an explicit
+  field allow-list containing `header`, `steps`, `layoutDiagram`,
+  `timeMeasurement`, `timeStudy`, and `machineCapacity`, but not `kaizen`.
+- Both `createFileCloud()` and `saveFileCloud()` serialize only that helper's
+  result, so adding `ChartFile.kaizen` only in types/store/UI would not persist
+  it through the existing Save path or into Revision snapshot content. The
+  store's read-back comparison would also omit the field.
+- The prompt forbids changing `src/lib/storage.ts` (and requires the new form
+  to persist and freeze in snapshots), so the implementation cannot satisfy
+  its own acceptance criteria without a scope change.
+
+### Handoff / Safety
+
+- **STATUS: PLAN_CHANGE_REQUIRED**. No implementation source/test file was
+  changed. Only this changelog entry was appended.
+- Requested decision: expand the allowed scope to include
+  `src/lib/storage.ts` (and storage/read-back coverage as needed), or provide
+  a revised prompt that defines an in-scope persistence path. No schema,
+  endpoint, Production data, commit, push, deploy, or git-mutating command was
+  performed.
+
 ## 2026-08-11 (Update 21 — Phase 5b-1 push + Production deploy)
 
 ### Tool
