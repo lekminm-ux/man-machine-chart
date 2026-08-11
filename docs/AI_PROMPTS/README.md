@@ -75,30 +75,47 @@ scoped next, after 5a-2 ships and both are deployed together.
 Phase 5a-1 and 5a-2 shipped together (commit `4b40648`, deployed 10 Aug
 2026 — see CHANGELOG_AI.md Update 19). Phase 5b, sub-phases:
 [Phase 5b-1 — M6 Before/After comparison](PROMPT_CODEX_PHASE5B1_BEFORE_AFTER_COMPARISON.md)
-(implemented by Codex 10 Aug 2026) — adds a 6th "Kaizen" module tab that
-compares two closed Revision snapshots (Cycle Time + % change, worker count,
-walk/idle time, capacity/shift, and an overlaid Yamazumi chart), per
-docs/Master_Plan.html section 6. Comparison is restricted to two closed
-Revisions only — never the live/editable current state — an explicit user
-decision, since the whole point of "always re-measure after Kaizen" is
-comparing two frozen, trustworthy numbers. Claude's diff review found the
-scope and calculation logic correct, but live verification against a real
-local D1 chart with two closed Revisions found the component enters an
-infinite React re-render loop (~1,850 effect runs/sec, confirmed by a
-temporary counter) the moment two valid snapshots are actually selected —
-invisible to automated tests (no React component-rendering tests exist in
-this project) and to Codex's own environment check (no chart with 2+ closed
-Revisions was available there). Root cause: `snapshotCache` state was both a
-dependency of, and written by, the same effect. Fix handoff:
+(implemented by Codex 10 Aug 2026, fixed and shipped 11 Aug 2026) — adds a
+6th "Kaizen" module tab that compares two closed Revision snapshots (Cycle
+Time + % change, worker count, walk/idle time, capacity/shift, and an
+overlaid Yamazumi chart), per docs/Master_Plan.html section 6. Comparison
+is restricted to two closed Revisions only — never the live/editable
+current state — an explicit user decision, since the whole point of
+"always re-measure after Kaizen" is comparing two frozen, trustworthy
+numbers. Claude's diff review found the scope and calculation logic
+correct, but live verification against a real local D1 chart with two
+closed Revisions found the component enters an infinite React re-render
+loop (~1,850 effect runs/sec, confirmed by a temporary counter) the moment
+two valid snapshots are actually selected — invisible to automated tests
+(no React component-rendering tests exist in this project) and to Codex's
+own environment check (no chart with 2+ closed Revisions was available
+there). Root cause: `snapshotCache` state was both a dependency of, and
+written by, the same effect. Fix handoff:
 [Phase 5b-1 fix — M6 infinite loop](PROMPT_CODEX_05_FIX_PHASE5B1_M6_INFINITE_LOOP.md)
-(state → ref, removed from the effect's dependency array), sent back to
-Codex 10 Aug 2026 — not yet re-verified.
-Phase 5b-2 (the Kaizen problem/countermeasure form — Problem, list of
-countermeasures, responsible person, due date, per Master Plan section 6 —
-its exact field structure is based on that document's summary, not the raw
-source Excel's `kaizen` sheet directly, since this machine currently has no
-working Python interpreter to open it) is separately scoped next, to be
-added to the same `Module6_Kaizen.tsx` file 5b-1 creates.
+(state → ref, removed from the effect's dependency array) — re-verified
+live by Claude 11 Aug 2026 with the same temporary-counter technique
+(stayed bounded at 2→3→4 across three selection changes instead of
+climbing), committed, pushed, and deployed to Production
+(commit `b6e7fdd`, see CHANGELOG_AI.md Updates 20-21).
+[Phase 5b-2 — M6 Kaizen Sheet form](PROMPT_CODEX_PHASE5B2_KAIZEN_SHEET.md)
+(planned by Claude 11 Aug 2026, not yet implemented) — adds an editable
+Kaizen problem/countermeasure section to the same `Module6_Kaizen.tsx` file
+5b-1 created, additive to the live/current chart content (not the frozen
+Revision snapshots 5b-1 reads). Claude read the actual source Excel
+"kaizen" sheet directly this time (both reference workbooks agree, an
+identical company-standard template) — the machine still has no working
+Python interpreter, so this was done by parsing the `.xlsx` zip/XML
+directly rather than deferring to Master Plan's earlier paraphrase. The
+real sheet has BEFORE/AFTER boxes (most likely meant for photos, not
+numbers — the numeric Before/After is already covered by 5b-1), separate
+Problem/Solution fields, and an unlimited-rows Detail list (description +
+1-5 rating + Response + Eva), plus one overall Result. It has no literal
+"responsible person"/"due date" fields — those were in the original
+Master Plan vision but not on the physical form; the user confirmed
+keeping them anyway, as one shared pair for the whole sheet rather than
+one per Detail row. Photo/image attachment for Before/After is
+intentionally deferred to a future Phase 5b-3, noted in the handoff but
+not built now.
 
 For this task, run Prompt 02A before the normal Prompt 02. Prompt 02A is the
 approved Phase 0B safety gate and must finish with a handoff to GPT/Codex.
