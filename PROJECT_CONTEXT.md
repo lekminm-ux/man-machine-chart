@@ -1,6 +1,6 @@
 ﻿# PROJECT_CONTEXT
 
-Last updated: 2026-08-06
+Last updated: 2026-08-10
 
 ## Project Name
 
@@ -416,6 +416,35 @@ garbage. Check the live site with the browser tools instead.
 - Always guard cloud save operations (saveActiveFile) to prevent overwriting cloud data with empty steps/layouts if lazy-loading has not completed (_loaded === false).
 
 ### New-chat / token-efficiency checkpoint (added 2026-08-06)
+
+#### GPT-5.6 context threshold (added 2026-08-10)
+
+The official OpenAI API model documentation currently lists a **1,050,000-token
+context window** for the GPT-5.6 Sol, Terra, and Luna family. The project
+checkpoint threshold is **70% = 735,000 tokens**. This is a vendor-controlled
+value, so re-check the official model page before changing the threshold:
+`https://developers.openai.com/api/docs/models`.
+
+- When the active GPT-5.6 client or harness reports context usage at or above
+  70%, the AI must finish the current atomic/checkpointable step, then alert the
+  user in Thai that the 70% context checkpoint has been reached.
+- Before or together with that alert, update
+  `docs/AI_PROMPTS/PROMPT_NEW_CHAT_GPT56_CONTEXT_CHECKPOINT.md` with the actual
+  current status, completed work, immediate next task, changed/uncommitted
+  files, verification results, and open risks. The prompt must be ready to
+  paste into a new chat, not a generic "continue" message.
+- Show the user the exact prompt path and offer the new-chat handoff. Do not
+  silently continue a large new phase after the threshold, and do not infer
+  permission to commit, push, deploy, or write Production D1.
+- If the client does not expose a reliable usage meter, do not claim an exact
+  token count. Use the `PreCompact`/system checkpoint notification or a clear
+  model-generated context warning as the fallback trigger, label the exact
+  usage as unknown, and still prepare the new-chat prompt.
+
+The reusable handoff template is listed in `docs/AI_PROMPTS/README.md`. The
+existing Claude-specific `PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md` remains
+valid for Claude chats; this GPT-5.6 checkpoint prompt is the portable
+Codex/GPT-5.6 handoff format.
 
 Long single-chat sessions (many rounds of Codex handoff/review/verification
 stacked in one conversation) burn tokens fast. `.claude/settings.json` has a
