@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
-  TimeStudy, MachineCapacity, KaizenSheet,
+  TimeStudy, TimeStudyRow, MachineCapacity, KaizenSheet,
 } from '@/types';
 import {
   loadLocalDatabase, saveLocalDatabase,
@@ -75,6 +75,7 @@ interface ChartState extends AppDatabase {
 
   // Module 1 — time measurement sheet
   updateTimeStudy: (study: TimeStudy) => void;
+  patchTimeStudyRow: (rowId: string, patch: Partial<TimeStudyRow>) => void;
   /** Seed the sheet from the steps already typed into Module 4. */
   importTimeStudyFromSteps: () => number;
   /** Overwrite Module 4 steps (and therefore M3/M5) from the sheet. */
@@ -87,6 +88,7 @@ interface ChartState extends AppDatabase {
 
   // Module 6 — Kaizen sheet
   updateKaizen: (kaizen: KaizenSheet) => void;
+  patchKaizen: (partial: Partial<KaizenSheet>) => void;
 
   // Step actions
   addStep: () => void;
@@ -130,6 +132,8 @@ export function emptyKaizenSheet(): KaizenSheet {
     solution: '',
     beforeNote: '',
     afterNote: '',
+    beforePhotoKey: null,
+    afterPhotoKey: null,
     details: [],
     result: '',
     responsiblePerson: '',
@@ -739,6 +743,25 @@ export const useChartStore = create<ChartState>((set, get) => ({
     });
   },
 
+  patchTimeStudyRow(rowId, patch) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f => {
+          if (f.id !== s.activeFileId || !f.timeStudy) return f;
+          return {
+            ...f,
+            timeStudy: { ...f.timeStudy, rows: f.timeStudy.rows.map(r => (r.id === rowId ? { ...r, ...patch } : r)) },
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
   importTimeStudyFromSteps() {
     const state = get();
     const file = state.files.find(f => f.id === state.activeFileId);
@@ -797,6 +820,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? { ...f, kaizen, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  patchKaizen(partial) {
+    set(s => {
+      if (!s.activeFileId) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, kaizen: { ...(f.kaizen ?? emptyKaizenSheet()), ...partial }, updatedAt: new Date().toISOString() }
             : f
         ),
       };

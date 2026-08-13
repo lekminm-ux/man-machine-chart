@@ -544,6 +544,63 @@ test('updateKaizen replaces the active sheet wholesale, bumps updatedAt, and is 
   assert.equal(afterSecond.lockedAt, '2026-08-10T00:00:00.000Z', 'store action follows Module 2 and leaves lock enforcement to the UI');
 });
 
+test('patchKaizen merges sequential partial updates against the current sheet', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  store.getState().patchKaizen({ beforePhotoKey: 'before-key' });
+  store.getState().patchKaizen({ afterPhotoKey: 'after-key' });
+
+  const kaizen = store.getState().activeFile().kaizen;
+  assert.equal(kaizen.beforePhotoKey, 'before-key');
+  assert.equal(kaizen.afterPhotoKey, 'after-key');
+});
+
+test('patchKaizen seeds a missing sheet from emptyKaizenSheet', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  assert.equal(store.getState().activeFile().kaizen, undefined);
+  store.getState().patchKaizen({ problem: 'Seeded problem' });
+
+  const kaizen = store.getState().activeFile().kaizen;
+  assert.equal(kaizen.problem, 'Seeded problem');
+  assert.equal(kaizen.beforePhotoKey, null);
+  assert.equal(kaizen.afterPhotoKey, null);
+  assert.deepEqual([...kaizen.details], []);
+});
+
+test('patchTimeStudyRow preserves patches to different rows and unrelated fields', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('F', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Chart 1');
+
+  store.getState().updateTimeStudy({
+    readingCount: 1,
+    rows: [
+      { id: 'row-1', seq: 1, jobElement: 'Element one', operator: 'Worker A', kind: 'man', readings: [1] },
+      { id: 'row-2', seq: 2, jobElement: 'Element two', operator: 'Worker B', kind: 'walk', readings: [2] },
+    ],
+  });
+  store.getState().patchTimeStudyRow('row-1', { photoKey: 'row-one-photo' });
+  store.getState().patchTimeStudyRow('row-2', { photoKey: 'row-two-photo' });
+
+  const rows = store.getState().activeFile().timeStudy.rows;
+  assert.equal(rows[0].photoKey, 'row-one-photo');
+  assert.equal(rows[1].photoKey, 'row-two-photo');
+  assert.equal(rows[0].jobElement, 'Element one');
+  assert.equal(rows[1].jobElement, 'Element two');
+  assert.equal(rows[0].operator, 'Worker A');
+  assert.equal(rows[1].operator, 'Worker B');
+  assert.deepEqual([...rows[0].readings], [1]);
+  assert.deepEqual([...rows[1].readings], [2]);
+});
+
 // ── GPT review Round 2 fix: _unsynced records must block every Cloud action ──
 
 const blankHeader = { processName: '', partNumber: '', partName: '', model: '', moldNo: '', cycleTime: 60, issueDate: '', revNo: 'A', preparedBy: '', approvedBy: '' };

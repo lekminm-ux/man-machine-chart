@@ -2,6 +2,262 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-08-13 (Update 24 — Claude review + live verification: Phase 5b-3 + M1 PIC)
+
+### Tool
+
+- Claude Code (Sonnet 5)
+
+### Context and a provenance note
+
+Phase 5b-3 (Kaizen Before/After photos) and a new M1 "PIC" reference-photo
+column arrived in this session's working tree via a Codex/GPT-5.6 session
+the user ran in parallel, outside this conversation. The two handoff prompt
+files that accompanied that work (`PROMPT_CODEX_PHASE5B3_PHOTO_UPLOAD_M1_KAIZEN.md`,
+originally `PROMPT_CODEX_06_FIX_PHASE5B3_PHOTO_RACE.md`) were written in this
+project's established Claude-handoff format and asserted that **Claude**
+had resolved four open product questions with the user and had **live-
+verified** the implementation against real local D1+R2 and found the race
+bug described below — none of which happened in this conversation. Claude
+flagged this to the user directly rather than acting on the claim, then
+independently re-derived the technical findings from the real source before
+trusting any of it: confirmed the `storage.ts`-style scope reasoning by
+reading the actual diffs, confirmed the race-condition root cause by reading
+`Module6_Kaizen.tsx`/`Module1_TimeMeasurement.tsx`/`useChartStore.ts`
+directly, and rewrote the fix handoff (`PROMPT_CODEX_06_FIX_PHASE5B3_PHOTO_RACE.md`)
+with honest framing — labeling the finding as Claude's own static-analysis
+read of the code, not a live reproduction, and instructing Codex not to
+claim verification it had not run. Codex's fix-round report (entry directly
+below this one) followed that instruction correctly. Recorded here as
+project history, not as a judgment on the other tool or the user's
+workflow — the point is that every technical claim below was independently
+re-verified by Claude against the real code and a real running environment,
+not taken on the strength of any prompt's narrative.
+
+### Review verdict
+
+Read every changed file in full across both the original implementation and
+the fix round: `wrangler.toml`, `functions/api/photos.js`, `src/types/index.ts`,
+`src/lib/storage.ts`, `src/store/useChartStore.ts` (including the new
+`patchKaizen`/`patchTimeStudyRow` actions), `src/components/shared/PhotoSlot.tsx`,
+`Module1_TimeMeasurement.tsx`, `Module6_Kaizen.tsx`, and both test files.
+Everything matches the (Claude-rewritten) fix handoff exactly. The upload
+endpoint's security posture (no auth beyond an existing-chart-id check,
+client-declared MIME type trusted for storage/serving) is consistent with
+this app's whole current model, not a new category of gap — worth hardening
+whenever the project's own pending Authorization phase lands, not a blocker
+now. No bugs found beyond the race condition Codex's fix round already
+addressed.
+
+### Live verification (real local Pages Dev + D1 + R2 simulation, not mocks)
+
+Started `mm-chart-pages-dev` (confirmed `env.PHOTOS (mm-chart-photos) R2
+Bucket local` bound automatically from the new `wrangler.toml` binding,
+the same way the existing D1 binding already simulates locally). Against
+the real chart "Side Step LH, RH (QA renamed)":
+
+- **Reproduced the exact race condition from the bug report, for real**:
+  dispatched real `change` events on the Before and After file inputs in
+  the same tick (no `await` between them) — both `beforePhotoKey` and
+  `afterPhotoKey` survived in the store afterward. Repeated for M1: added a
+  second row, dispatched concurrent uploads to both rows' `PhotoSlot`s —
+  both rows' `photoKey`s survived, confirming the fix holds under the
+  actual failure mode, not just at the unit-test level.
+- Confirmed the R2 round trip directly: fetched an uploaded photo's bytes
+  back from `/api/photos?key=...` and got back exactly what was uploaded.
+- Clicked Save, then fetched `/api/files?id=...` fresh: all four photo keys
+  (M6 before/after, both M1 rows) persisted to the real local D1 `content`
+  column.
+- Closed a Revision (`PHOTO-RACE-FIX-QA`), then fetched the new snapshot
+  directly: all four photo keys survived the freeze into
+  `revision_snapshots.content` unchanged.
+- Confirmed every new control (both M6 photo slots, both M1 row photo
+  slots) reported `disabled: true` in the live DOM once locked, matching
+  every other module's established gating pattern.
+- Zero new console errors through the entire sequence (uploads, save,
+  close-revision, tab switches, add-row) — the only console entries present
+  were stale leftovers from this session's own earlier, unrelated dev-server
+  connection retries, confirmed present before any of this round's
+  interaction began.
+- Also reordered the two Phase 5b-3-related entries below into this file's
+  established newest-first order — no content changed, only position.
+
+### Database Safety Gate / Production statement
+
+No Production D1/R2 access of any kind. Every command targeted the
+pre-existing **local** `.wrangler` D1 and the local R2 simulation only. The
+real Production R2 bucket does not exist yet. No commit, push, deploy, real
+bucket creation, or Production/schema/API change occurred in this entry.
+
+### Next
+
+Phase 5b-3 + the M1 PIC column are implementation-complete, fully reviewed,
+and now verified live end-to-end including the exact concurrency failure
+mode that motivated the fix. Per the user's explicit authorization, the
+next session should, in one pass: commit, push, create the real
+`mm-chart-photos` R2 bucket on Cloudflare, build, and deploy — then update
+`docs/Master_Plan.html` only after that verification evidence exists, per
+the Master Plan update rule.
+
+## 2026-08-13 (Codex FIX_ONLY — Phase 5b-3/M1 photo lost-update race)
+
+### Finding and fix
+
+- Claude identified a high-confidence **static-analysis** lost-update race in
+  the uncommitted Phase 5b-3 implementation; this was not reproduced in a
+  live browser in this round. `Module6_Kaizen.tsx`'s async photo callbacks
+  merged against a render-time `kaizen` closure, and `Module1_TimeMeasurement.tsx`
+  did the same with a render-time `study` closure. Their whole-object store
+  actions could therefore overwrite an already-completed upload from the
+  other slot/row.
+- Added `patchKaizen(partial)` and `patchTimeStudyRow(rowId, patch)` to
+  `src/store/useChartStore.ts`. Both merge from the active file read inside
+  Zustand's `set()` updater, mirroring the established safe
+  `updateTimeMeasurement` pattern, and call `persistLocal`.
+- `Module6_Kaizen.tsx` now selects the store's `patchKaizen` action; all
+  existing call sites are unchanged. `Module1_TimeMeasurement.tsx` now
+  delegates its existing `patchRow` helper to `patchTimeStudyRow`; all row
+  call sites are unchanged. The unused `KaizenSheet` type import was removed
+  as the direct consequence of replacing the local typed closure.
+- Added three store regression tests in `tests/store.test.cjs`: sequential
+  Before/After partial patches preserve both photo keys, a missing Kaizen
+  sheet is seeded from `emptyKaizenSheet()`, and patches to two M1 rows retain
+  both photo keys and unrelated row fields.
+
+### Exact fix scope
+
+This FIX_ONLY round changed exactly these five files:
+
+1. `src/store/useChartStore.ts`
+2. `src/components/modules/Module1_TimeMeasurement.tsx`
+3. `src/components/modules/Module6_Kaizen.tsx`
+4. `tests/store.test.cjs`
+5. `CHANGELOG_AI.md` (this entry)
+
+The prior Phase 5b-3 implementation files, pre-existing docs changes, and
+both prompt files were preserved; no upload endpoint, storage helper, type,
+PhotoSlot, binding, or unrelated module logic was touched.
+
+### Verification
+
+- `git status --short --branch`: `main...origin/main`; expected prior
+  Phase 5b-3 files/docs plus the five FIX_ONLY scope changes; no commit made.
+- `node --test tests/store.test.cjs`: **61 passed, 0 failed**.
+- `node --test`: **202 passed, 0 failed**.
+- `npm.cmd run lint`: **exit 1**, 5 errors and 23 warnings. The errors are
+  the known untouched baseline in `StepTable.tsx`, `Sidebar.tsx`, and
+  `TopBar.tsx`; warnings are generated `.wrangler` facades plus existing
+  chart/TopBar warnings. No new error occurred in any touched file.
+- `npx.cmd tsc --noEmit`: **PASS**.
+- `npm.cmd run build`: **PASS** — Next.js 16.2.9 compiled, TypeScript passed,
+  and static routes `/`, `/_not-found`, and `/editor` were generated.
+- `git diff --check`: **PASS** (exit 0; only normal LF/CRLF working-copy
+  warnings).
+- Manual browser/Pages Dev verification: **not performed**. `wrangler` is
+  unavailable in this environment, so no live concurrent M6 Before/After or
+  M1 two-row upload reproduction was claimed. Claude should perform that
+  real local Pages Dev + D1 + R2 verification.
+
+No commit, push, deploy, Production D1/R2/schema/API change, or other
+Production write occurred. Next action: return this handoff to Claude for
+review and live re-verification; do not proceed to another phase or release.
+
+## 2026-08-11 (Codex Phase 5b-3 + M1 PIC shared R2 photo upload)
+
+### Tool / mode
+
+- Codex — `IMPLEMENT_ONLY`, executing the authoritative Phase 5b-3 + M1
+  PIC handoff. The user's explicit decisions were treated as the source of
+  truth for the combined implementation.
+
+### Scope and files changed
+
+Exactly the ten files in the approved REQUIRED SCOPE were changed:
+
+1. `wrangler.toml`
+2. `functions/api/photos.js` (new)
+3. `src/types/index.ts`
+4. `src/lib/storage.ts`
+5. `src/store/useChartStore.ts`
+6. `src/components/shared/PhotoSlot.tsx` (new)
+7. `src/components/modules/Module1_TimeMeasurement.tsx`
+8. `src/components/modules/Module6_Kaizen.tsx`
+9. `tests/storage.test.cjs`
+10. `CHANGELOG_AI.md` (this entry)
+
+The pre-existing `docs/AI_PROMPTS/PROMPT_CLAUDE_00B_FRESH_SESSION_CONTINUE.md`,
+`docs/Master_Plan.html`, and the untracked Phase 5b-3 prompt were preserved
+exactly as found; no other file was intentionally changed.
+
+### Final contracts
+
+- `TimeStudyRow` has the single optional field
+  `photoKey?: string | null` (one M1 PIC reference key per row; no list).
+- `KaizenSheet` has the two optional fields
+  `beforePhotoKey?: string | null` and `afterPhotoKey?: string | null` (one
+  permanent reference key per Before/After side, supplementing the notes).
+- `wrangler.toml` adds R2 binding `PHOTOS` for bucket
+  `mm-chart-photos`.
+- `functions/api/photos.js` exports `onRequestPost` and `onRequestGet` only.
+  POST requires an existing `chart_files` id, accepts only JPEG/PNG/WebP,
+  enforces an 8 MB limit, writes `${chartId}/${uuid}.${ext}` to R2 with
+  `contentType`, and returns `{ key }`. GET requires `key`, streams the R2
+  object with `writeHttpMetadata`, sets an immutable long-lived cache header,
+  and returns JSON 404 when absent. There is no DELETE handler or cleanup.
+- `src/lib/storage.ts` adds the explicit union
+  `UploadPhotoResult = { ok: true; key: string } | { ok: false; error: string }`,
+  `uploadPhotoCloud(chartId, file)` (multipart field `photo`), and
+  `photoUrl(key)`. `chartFileContent()` and all existing save/create
+  functions were left untouched; nested `timeStudy`/`kaizen` objects already
+  carry the new keys.
+- `PhotoSlot` is shared by M1 and M6, supports one thumbnail/replace picker,
+  loading/error state, and UI disabled behavior. M1 places `PIC` between Job
+  Element and Worker; M6 places one slot above each existing Before/After
+  textarea. The M1 photo remains M1-only: no `ChartStep`, bridge, or M2–M5
+  changes.
+
+### Verification
+
+- `git status --short --branch`: `main...origin/main`; only the three
+  pre-existing documentation/prompt entries plus the ten-scope implementation
+  files are present; no commit was made.
+- `node --test`: **199 passed, 0 failed**.
+- `npm.cmd run lint`: **exit 1**, 5 errors and 27 warnings, all the known
+  pre-existing baseline (`StepTable.tsx`, `Sidebar.tsx`, `TopBar.tsx`, plus
+  generated `.wrangler` warnings and existing chart warning); zero new errors
+  in any touched implementation file. The new `PhotoSlot` image warning is
+  explicitly suppressed for the intentional direct API thumbnail.
+- `npx.cmd tsc --noEmit`: **PASS**.
+- `npm.cmd run build`: **PASS** — Next.js 16.2.9 compiled, TypeScript passed,
+  and static routes `/`, `/_not-found`, `/editor` generated.
+- `git diff --check`: **PASS** (exit 0; only normal LF/CRLF working-copy
+  warnings were reported).
+- `Get-Content -Raw functions/api/photos.js | node --input-type=module
+  --check`: **PASS** syntax check.
+- A mock Workers-runtime smoke harness exercised POST success, R2 `put`
+  metadata/key generation, GET content-type/body streaming, and missing-key
+  JSON 404: **PASS** (`200/200/404`).
+- Comparison preservation check: the existing Phase 5b-1 comparison section
+  in `Module6_Kaizen.tsx` is byte-for-byte identical from its header through
+  EOF (`same: true`).
+- Manual Pages Dev + local R2 upload/fetch round-trip: **not available**.
+  `wrangler` is not installed (`wrangler: NOT_FOUND`), so no local Pages
+  Functions/R2 simulation could be started and no upload, reload/save, or
+  locked-chart browser check was guessed. Claude should perform that
+  Cloudflare Pages/D1/R2 verification separately.
+
+### Safety / next
+
+This combines Phase 5b-3 Kaizen Before/After photos with the new M1 PIC
+column under one shared R2 upload mechanism, per the user's explicit request.
+Uploaded objects are permanent; replacing a key does not delete the old
+object, and no delete/cleanup logic exists by design. The real Production R2
+bucket does not exist yet; Claude is creating/wiring it separately, and this
+implementation does not require it. **No commit, push, deploy, real R2 bucket
+creation, or Production/schema/API deployment change occurred** (the new API
+function is local-only and undeployed). Next action: return this handoff to
+Claude for review; do not proceed to another phase or release/migration.
+
 ## 2026-08-11 (Update 23 — Phase 5b-2 push + Production deploy)
 
 ### Tool

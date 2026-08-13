@@ -3,8 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BarChart3, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import PhotoSlot from '@/components/shared/PhotoSlot';
 import { emptyKaizenSheet, useChartStore } from '@/store/useChartStore';
-import type { KaizenDetailRow, KaizenSheet, RevisionSnapshot, RevisionSnapshotMeta } from '@/types';
+import type { KaizenDetailRow, RevisionSnapshot, RevisionSnapshotMeta } from '@/types';
 import {
   getRevisionSnapshotCloud,
   listRevisionSnapshotsCloud,
@@ -77,7 +78,7 @@ function StackedBar({ bar, yMax }: { bar: OperatorBar | null; yMax: number }) {
 
 export default function Module6_Kaizen() {
   const activeFile = useChartStore(s => s.activeFile());
-  const updateKaizen = useChartStore(s => s.updateKaizen);
+  const patchKaizen = useChartStore(s => s.patchKaizen);
   const [snapshots, setSnapshots] = useState<RevisionSnapshotMeta[]>([]);
   const snapshotCacheRef = useRef<Record<string, RevisionSnapshot>>({});
   const [revisionFileId, setRevisionFileId] = useState<string | null>(null);
@@ -174,7 +175,6 @@ export default function Module6_Kaizen() {
 
   const isLocked = Boolean(activeFile.lockedAt);
   const kaizen = activeFile.kaizen ?? emptyKaizenSheet();
-  const patchKaizen = (partial: Partial<KaizenSheet>) => updateKaizen({ ...kaizen, ...partial });
   const patchDetail = (id: string, partial: Partial<KaizenDetailRow>) =>
     patchKaizen({ details: kaizen.details.map(row => (row.id === id ? { ...row, ...partial } : row)) });
   const addDetail = () => patchKaizen({
@@ -271,23 +271,37 @@ export default function Module6_Kaizen() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block text-sm font-semibold text-slate-600">
               Before
+              <PhotoSlot
+                chartId={activeFile.id}
+                photoKey={kaizen.beforePhotoKey}
+                onChange={key => patchKaizen({ beforePhotoKey: key })}
+                disabled={isLocked}
+                alt="Before state photo"
+              />
               <textarea
                 rows={4}
                 value={kaizen.beforeNote}
                 onChange={event => patchKaizen({ beforeNote: event.target.value })}
                 disabled={isLocked}
-                placeholder="Describe the before state — photo attachment coming in a later phase."
+                placeholder="Describe the before state..."
                 className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
             </label>
             <label className="block text-sm font-semibold text-slate-600">
               After
+              <PhotoSlot
+                chartId={activeFile.id}
+                photoKey={kaizen.afterPhotoKey}
+                onChange={key => patchKaizen({ afterPhotoKey: key })}
+                disabled={isLocked}
+                alt="After state photo"
+              />
               <textarea
                 rows={4}
                 value={kaizen.afterNote}
                 onChange={event => patchKaizen({ afterNote: event.target.value })}
                 disabled={isLocked}
-                placeholder="Describe the after state — photo attachment coming in a later phase."
+                placeholder="Describe the after state..."
                 className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
             </label>

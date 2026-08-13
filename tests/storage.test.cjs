@@ -280,6 +280,46 @@ test('loadFileFromCloud never throws on failure — it resolves ok:false', async
   }
 });
 
+test('uploadPhotoCloud sends multipart data and returns explicit success or failure', async () => {
+  const photo = new File(['photo-bytes'], 'photo.png', { type: 'image/png' });
+  installGlobals({
+    local: undefined,
+    fetchImpl: async (url, opts) => {
+      assert.equal(url, '/api/photos?chartId=file-1');
+      assert.equal(opts.method, 'POST');
+      assert.ok(opts.body instanceof FormData);
+      assert.ok(opts.body.get('photo'));
+      return mockResponse({ key: 'file-1/photo-key.png' });
+    },
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.uploadPhotoCloud('file-1', photo);
+    assert.deepEqual(result, { ok: true, key: 'file-1/photo-key.png' });
+  } finally {
+    restoreGlobals();
+  }
+
+  installGlobals({
+    local: undefined,
+    fetchImpl: async () => mockResponse({ error: 'unsupported image type' }, 400),
+  });
+  try {
+    const storage = loadStorage();
+    const result = await storage.uploadPhotoCloud('file-1', photo);
+    assert.equal(result.ok, false);
+    assert.match(result.error, /API \/api\/photos/);
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('photoUrl encodes the R2 key for the photo GET endpoint', () => {
+  const storage = loadStorage();
+  assert.equal(storage.photoUrl('abc'), '/api/photos?key=abc');
+  assert.equal(storage.photoUrl('chart-1/photo 1.png'), '/api/photos?key=chart-1%2Fphoto%201.png');
+});
+
 // ── GPT review fix round: complete-payload persistence ──────────────────────
 
 test('chartFileContent includes a populated kaizen sheet and tolerates legacy files without one', () => {
@@ -301,6 +341,29 @@ test('chartFileContent includes a populated kaizen sheet and tolerates legacy fi
 
   const legacyContent = storage.chartFileContent(sampleFile);
   assert.equal(legacyContent.kaizen, undefined, 'a legacy ChartFile without kaizen must still serialize safely');
+});
+
+test('chartFileContent carries nested M1 and Kaizen photo keys without another allow-list change', () => {
+  const storage = loadStorage();
+  const content = storage.chartFileContent({
+    ...sampleFile,
+    timeStudy: {
+      readingCount: 1,
+      rows: [{
+        id: 'row-1', seq: 1, jobElement: 'Photo row', operator: 'Worker A', kind: 'man', readings: [3],
+        photoKey: 'file-1/m1-photo.png',
+      }],
+    },
+    kaizen: {
+      problem: '', solution: '', beforeNote: '', afterNote: '',
+      beforePhotoKey: 'file-1/before.webp', afterPhotoKey: 'file-1/after.webp',
+      details: [], result: '', responsiblePerson: '', dueDate: '',
+    },
+  });
+
+  assert.equal(content.timeStudy.rows[0].photoKey, 'file-1/m1-photo.png');
+  assert.equal(content.kaizen.beforePhotoKey, 'file-1/before.webp');
+  assert.equal(content.kaizen.afterPhotoKey, 'file-1/after.webp');
 });
 
 test('saveFileCloud sends the complete ChartFile payload — timeMeasurement/timeStudy/machineCapacity included, not just header/steps/layoutDiagram', async () => {

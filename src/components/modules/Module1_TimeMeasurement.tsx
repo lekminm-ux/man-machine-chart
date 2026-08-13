@@ -11,6 +11,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
+import PhotoSlot from '@/components/shared/PhotoSlot';
 import { ALL_WORKERS, type OperatorType, type TimeStudy, type TimeStudyKind } from '@/types';
 import {
   DEFAULT_READING_COUNT, computeOperatorTotals, computeRowStats, computeTotals,
@@ -43,6 +44,7 @@ function emptyStudy(readingCount = DEFAULT_READING_COUNT): TimeStudy {
 export default function Module1_TimeMeasurement() {
   const activeFile      = useChartStore(s => s.activeFile());
   const updateTimeStudy = useChartStore(s => s.updateTimeStudy);
+  const patchTimeStudyRow = useChartStore(s => s.patchTimeStudyRow);
   const importFromSteps = useChartStore(s => s.importTimeStudyFromSteps);
   const pushToSteps     = useChartStore(s => s.pushTimeStudyToSteps);
 
@@ -100,7 +102,7 @@ export default function Module1_TimeMeasurement() {
   };
 
   const patchRow = (id: string, patch: Partial<(typeof study.rows)[number]>) =>
-    commit({ ...study, rows: study.rows.map(r => (r.id === id ? { ...r, ...patch } : r)) });
+    patchTimeStudyRow(id, patch);
 
   const setReading = (id: string, col: number, raw: string) => {
     const value = raw.trim() === '' ? null : Number(raw);
@@ -236,6 +238,7 @@ export default function Module1_TimeMeasurement() {
                 <th className="border border-slate-200 px-2 py-2 w-12 font-bold">Seq</th>
                 <th className="border border-slate-200 px-1 py-2 w-16 font-bold">Insert</th>
                 <th className="border border-slate-200 px-2 py-2 text-left font-bold min-w-[240px]">Job Element</th>
+                <th className="border border-slate-200 px-2 py-2 w-20 font-bold">PIC</th>
                 <th className="border border-slate-200 px-2 py-2 w-28 font-bold">Worker</th>
                 <th className="border border-slate-200 px-2 py-2 w-20 font-bold">ประเภท</th>
                 <th className="border border-slate-200 px-2 py-2 w-24 font-bold">หมวดเวลา</th>
@@ -282,6 +285,16 @@ export default function Module1_TimeMeasurement() {
                         placeholder="รายละเอียดงาน…"
                         disabled={isLocked}
                         className="w-full bg-transparent px-1 py-0.5 text-slate-800 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+
+                    <td className="border border-slate-200 px-1 py-1">
+                      <PhotoSlot
+                        chartId={activeFile.id}
+                        photoKey={row.photoKey}
+                        onChange={key => patchRow(row.id, { photoKey: key })}
+                        disabled={isLocked}
+                        alt="Job element photo"
                       />
                     </td>
 
@@ -379,7 +392,7 @@ export default function Module1_TimeMeasurement() {
 
               {study.rows.length === 0 && (
                 <tr>
-                  <td colSpan={study.readingCount + 11} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
+                  <td colSpan={study.readingCount + 12} className="border border-slate-200 px-4 py-10 text-center text-slate-500">
                     ยังไม่มีข้อมูล — กด <b>เพิ่มแถว</b> เพื่อกรอกเอง หรือ <b>ดึงข้อมูลจาก M4</b> เพื่อนำ step ที่มีอยู่แล้วมาตั้งต้น
                   </td>
                 </tr>

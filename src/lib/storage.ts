@@ -204,6 +204,31 @@ export type SaveFileResult =
   | { ok: true; id: string; updatedAt: string }
   | { ok: false; error: string };
 
+export type UploadPhotoResult =
+  | { ok: true; key: string }
+  | { ok: false; error: string };
+
+export async function uploadPhotoCloud(chartId: string, file: File): Promise<UploadPhotoResult> {
+  try {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const res = await apiFetch(`/api/photos?chartId=${encodeURIComponent(chartId)}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res || typeof res.key !== 'string') {
+      return { ok: false, error: 'upload did not return a photo key' };
+    }
+    return { ok: true, key: res.key };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function photoUrl(key: string): string {
+  return `/api/photos?key=${encodeURIComponent(key)}`;
+}
+
 export async function saveFileCloud(file: ChartFile, updatedAt: string): Promise<SaveFileResult> {
   const { id, name, folderId } = file;
   try {

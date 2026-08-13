@@ -137,6 +137,8 @@ export interface TimeStudyRow {
   category?: 'periodical' | 'changeover';
   /** One stopwatch reading per round; `null` = not measured yet. */
   readings: (number | null)[];
+  /** R2 object key for this row's reference photo (PIC), or null/absent if none uploaded. */
+  photoKey?: string | null;
 }
 
 export interface TimeStudy {
@@ -190,6 +192,9 @@ export interface KaizenSheet {
    * not implemented here. */
   beforeNote: string;
   afterNote: string;
+  /** R2 object keys for the Before/After photos; exactly one photo per side. */
+  beforePhotoKey?: string | null;
+  afterPhotoKey?: string | null;
   details: KaizenDetailRow[];
   /** One overall result, not per Detail row. */
   result: string;
