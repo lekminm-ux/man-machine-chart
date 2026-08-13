@@ -321,7 +321,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <tr>
         <td><b>M1</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
         <td>ตาราง key-in ตามฟอร์ม Excel: Seq · <b>Insert (แทรกแถวบน/ล่าง)</b> · Job Element · Worker · ประเภท(คน/เครื่อง/เดิน/รอ) · 1st–10th · Min/Max/Fluc/Aver · TOTAL หักแถวเครื่อง · เพิ่มแถวไม่จำกัด · วางจาก Excel ได้ · ปุ่มดึงจาก M4 และส่งไป M2–M5</td>
-        <td>— (นาฬิกาจับเวลาถูกถอดออกแล้ว) งานต่อยอด: เชื่อม Takt Time และพิมพ์ฟอร์มลงกระดาษ</td>
+        <td>งานต่อยอด: เชื่อม Takt Time และพิมพ์ฟอร์มลงกระดาษ · <b>ใหม่ (11 ส.ค.):</b> เพิ่มคอลัมน์ "PIC" รูปอ้างอิงต่อ Job Element ระหว่างคอลัมน์ Job Element กับ Worker — ยังไม่ scope รายละเอียด ดูหัวข้อคำถามค้าง</td>
       </tr>
       <tr>
         <td><b>M2</b></td><td><span class="b b-done">เสร็จแล้ว</span></td>
@@ -346,7 +346,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <tr>
         <td><b>M6</b></td><td><span class="b b-done">Phase 5a-1+5a-2+5b-1+5b-2 ครบ · deployed</span></td>
         <td><b>Revision Snapshot + Read-Only Lock + Before/After Comparison + Kaizen Sheet</b> — ปิด Revision แล้ว snapshot ข้อมูล M1-M6 ทั้งชุดอัตโนมัติและ lock แก้ไขไม่ได้จนกว่าจะเปิด Revision ใหม่ · แท็บ "6: Kaizen" มี 2 ส่วน: <b>(1) เทียบ 2 closed Revision (Phase 5b-1)</b> Cycle Time/จำนวนคน/walk-idle/capacity + กราฟ Yamazumi ซ้อนทับ · <b>(2) ใบ Kaizen แก้ไขได้ (Phase 5b-2)</b> Problem/Solution, Before/After (ข้อความ), ตาราง Detail ไม่จำกัดแถว (priority + Response + Eva), Result, ผู้รับผิดชอบ+กำหนดเสร็จ 1 ชุดต่อทั้งใบ — ผูกกับปุ่ม Save เดิม ไม่มี API ใหม่ — deploy ขึ้น Production แล้ว (11 ส.ค.)</td>
-        <td>เหลือ Phase 5b-3 (แนบรูปภาพ Before/After — ยังไม่ scope) — มี 2 จุดเล็กจาก Phase 5a-2 (severity ต่ำ ไม่กระทบข้อมูล) เก็บไว้เป็น optional follow-up ดู Change Log</td>
+        <td>เหลือ Phase 5b-3 (แนบรูปภาพ Before/After — ยังไม่ scope, ตัดสินใจแล้วว่าใช้ R2 ดู Decision Log, ควรออกแบบร่วมกับคำขอ M1 PIC column ด้านล่าง) — มี 2 จุดเล็กจาก Phase 5a-2 (severity ต่ำ ไม่กระทบข้อมูล) เก็บไว้เป็น optional follow-up ดู Change Log</td>
       </tr>
     </tbody>
   </table>
@@ -641,7 +641,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
       <p>✅ 5a-1+5a-2 (10 ส.ค., deployed): Revision Snapshot + Read-Only Lock — ปิด Revision snapshot ข้อมูล M1-M5 ทั้งชุดอัตโนมัติ + lock แก้ไขไม่ได้จนเปิด Revision ใหม่ ครบทุกช่อง input/ปุ่ม/drag ใน HeaderForm/M1/M2/M4/M5 (ไม่ใช่แค่ Rev No.) — live-verified บน Production แล้ว<br>
          ✅ 5b-1 (11 ส.ค., deployed): แท็บ "6: Kaizen" เลือก 2 closed Revision มาเทียบ Cycle Time/จำนวนคน/walk-idle/capacity + กราฟ Yamazumi ซ้อนทับ — Claude เจอบั๊ก infinite render loop ตอน live-verify กับ local D1 จริง (แก้แล้วโดย Codex, Claude ตรวจซ้ำด้วย render counter ก่อนขึ้น Production)<br>
          ✅ 5b-2 (11 ส.ค., deployed): ใบ Kaizen แก้ไขได้จริง (Problem/Solution, Before/After ข้อความ, ตาราง Detail ไม่จำกัดแถว, Result, ผู้รับผิดชอบ+กำหนดเสร็จ) — เปิดชีต Excel ต้นฉบับตรวจโครงสร้างจริงก่อนออกแบบ, Codex เจอช่องโหว่ scope เอง (storage.ts ไม่ถูกแก้ ข้อมูลจะหายตอน save) หยุดรายงานก่อนเขียนโค้ด, Claude ขยาย scope ให้ 1 บรรทัดตรงจุด แล้ว live-verify ครบวงจรกับ local D1 จริง (กรอก → save → reload → close revision → ตรวจ snapshot) ก่อนขึ้น Production<br>
-         ⏳ 5b-3 (ยังไม่เริ่ม, ยังไม่ scope): แนบรูปภาพ Before/After + Export PNG/PDF</p>
+         ⏳ 5b-3 (ยังไม่เริ่ม, ยังไม่ scope): แนบรูปภาพ Before/After + Export PNG/PDF — เก็บรูปใน R2 (ตัดสินใจแล้ว ดู Decision Log) ควรออกแบบ upload infrastructure ร่วมกับคำขอ M1 PIC column (section 3 + คำถามค้าง section 11) ครั้งเดียว ไม่แยกทำ</p>
     </div>
   </div>
 
@@ -817,6 +817,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:12%">วันที่</th><th style="width:30%">เรื่อง</th><th>มติ</th></tr></thead>
     <tbody>
+      <tr><td>11 ส.ค. 69</td><td>เก็บรูปภาพ (Kaizen Before/After + M1 PIC) ที่ไหน</td><td><b>Cloudflare R2 ไม่ใช่ D1 หรือ Google Sheets/Drive</b> — เก็บไฟล์รูปจริงใน R2 bucket ใหม่ (free tier 10GB + อ่าน 10 ล้านครั้ง/เดือน + egress ฟรีตลอด เกินพอ, อยู่ account เดียวกับ D1 อยู่แล้ว ไม่ต้องตั้ง credential ใหม่) แล้วเก็บแค่ key/URL อ้างอิงสั้นๆ ไว้ใน D1 <code>content</code> JSON เหมือนเดิม เหตุผล: ถ้าฝัง base64 ตรงใน D1 — (1) ชนขีดจำกัด storage/ทำให้ query ทุกครั้งหนักขึ้น (2) ระบบ Revision Snapshot จะก็อปไฟล์รูปซ้ำทุกครั้งที่ปิด Revision สะสมไม่มีลบ บวมเร็วกว่ารูปที่แนบจริงมาก ส่วน Google Sheets เก็บรูปจริงไม่ได้เลย (จำกัด 50,000 ตัวอักษร/เซลล์ รูปเดียวก็เกิน) ตัดสินใจนี้ใช้ร่วมกันทั้ง Phase 5b-3 (Kaizen Before/After) และคำขอใหม่ M1 PIC column — ควรออกแบบ upload endpoint + R2 binding ใช้ร่วมกันครั้งเดียว ไม่แยกทำ 2 รอบ</td></tr>
       <tr><td>2 ส.ค. 69</td><td>Database Safety / Data Preservation</td><td><b>Production D1 เป็น Source of Truth</b> · Local D1 และ <code>.wrangler/</code> ใช้ทดสอบเท่านั้น · ต้องตรวจนับ/สำรอง/เทียบโครงสร้างก่อนเขียนทุกครั้ง · ห้ามทำให้โฟลเดอร์ 4 ชั้นหรือ chart เดิมหาย</td></tr>
       <tr><td>31 ก.ค. 69</td><td>M1 เป็นนาฬิกาจับเวลาหรือตาราง</td><td><b>ตาราง key-in</b> — ถอดนาฬิกาออกจาก WebApp ทั้งหมด (การจับเวลาใช้นาฬิกาจริงหน้างาน)</td></tr>
       <tr><td>31 ก.ค. 69</td><td>วิธีส่งข้อมูล M1 → M2-M5</td><td><b>กดปุ่มส่งเองก่อน</b> · เก็บ Auto Sync ไว้ในแผนสำหรับอนาคต</td></tr>
@@ -841,7 +842,8 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <tbody>
       <tr><td><b>2</b></td><td><s>เลข 39 และ 8.66 ในสูตร <code>=39*8.66</code></s></td><td><span class="b b-done">ตอบแล้ว</span> ใช้สูตรมาตรฐาน TPS แทน</td></tr>
       <tr><td><b>2</b></td><td><s>เวลาทำงาน 1 กะ</s></td><td><span class="b b-done">ตอบแล้ว</span> พัก 80 นาที (เที่ยง 60 + ก่อน OT 20) · ค่าตั้งต้นในระบบคือกะละ 540 นาที → สุทธิ 460 นาที <b>ถ้ากะจริงไม่ใช่ 540 นาที แก้ได้ในหน้าจอ M2</b></td></tr>
-      <tr><td><b>5</b></td><td>Revision ปัจจุบันใช้แบบพิมพ์เลขเอง — ต้องการให้ระบบล็อกและเก็บ snapshot อัตโนมัติไหม</td><td>กระทบการเทียบ Before/After ว่าจะเทียบได้จริงหรือไม่</td></tr>
+      <tr><td><b>5</b></td><td><s>Revision ปัจจุบันใช้แบบพิมพ์เลขเอง — ต้องการให้ระบบล็อกและเก็บ snapshot อัตโนมัติไหม</s></td><td><span class="b b-done">ตอบแล้ว</span> Phase 5a-1 ทำแล้ว — ปิด Revision = snapshot อัตโนมัติ + lock จนเปิด Revision ใหม่</td></tr>
+      <tr><td><b>5b-3 / M1</b></td><td>M1 ต้องการ "PIC" (รูปอ้างอิง) 1 รูปต่อ 1 แถว Job Element, วางคอลัมน์ระหว่าง Job Element กับ Worker (ตาม screenshot ที่ผู้ใช้วาดวงกลมกำกับไว้ 11 ส.ค.) — ยังไม่ตัดสินใจ: อัปโหลดกี่รูปต่อแถวได้ (1 หรือหลายรูป), UI ตอนอัปโหลด/ดูรูป (คลิกไอคอนเปิด modal? thumbnail ในคอลัมน์เลย?), ต้องไหลผ่านสะพาน M1↔M4 ด้วยไหม (ตอนดึงข้อมูลจาก M4 หรือส่งไป M2-M5)</td><td>กระทบการออกแบบ R2 upload endpoint และ UI ร่วมกับ Phase 5b-3 — ควรออกแบบพร้อมกันครั้งเดียว</td></tr>
     </tbody>
   </table>
   </div>

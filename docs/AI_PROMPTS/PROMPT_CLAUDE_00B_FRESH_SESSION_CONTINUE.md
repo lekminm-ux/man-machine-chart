@@ -32,62 +32,92 @@ is for, not this one)
 5. Run: git status --short --branch
 6. Run: git log --oneline -10
 
-CURRENT STATUS AS OF 2026-08-10 (later same day) — verify against the files
-above before trusting this, it will drift out of date
+CURRENT STATUS AS OF 2026-08-13 — verify against the files above before
+trusting this, it will drift out of date
 - Phase 0A/0B/0C (database safety + save-to-cloud persistence): complete, deployed, live-verified.
 - Phase 4 (M5 Yamazumi completion, all sub-phases): complete, deployed, live-verified (commit 7a43c09).
-- Phase 5a-1 (M6 Revision Snapshot mechanism) + Phase 5a-2 (read-only UI
-  gating across HeaderForm/M1/M2/M4/M5): both implemented, reviewed, and
-  **deployed to Production together** (commit 4b40648, live-verified —
-  real folder tree unchanged, new bundle's `disabled:` classes confirmed
-  present in the live DOM). Master_Plan.html is at v1.23. See CHANGELOG_AI.md
-  Updates 18-19. Two low-severity, non-blocking findings remain open as
-  optional follow-ups (LayoutDiagram element-selection/panel-visibility
-  asymmetry; a minor M5 drag-guard ordering nitpick) — neither is a
-  data-safety issue, neither is scheduled.
-- Phase 5b-1 (M6 Before/After comparison — pick two closed Revisions,
-  compare Cycle Time/worker count/walk-idle/capacity + an overlaid Yamazumi
-  chart): implemented by Codex. Claude's diff review found the scope and
-  `kaizen-compare.ts` calculation logic fully correct, but **live
-  verification against a real local D1 chart with two closed Revisions
-  found a severe infinite React re-render loop** — the moment a user
-  selects two valid snapshots to compare (the feature's entire point), the
-  component re-invoked itself continuously (~1,850 effect runs/sec,
-  measured with a temporary counter — no visible crash, no duplicate
-  network calls, just a silent CPU-pegging loop that never stops on its
-  own). Root cause: `snapshotCache` state was both a dependency of, and
-  written by, the same `useEffect`. Automated tests could not have caught
-  this (this project has no React component-rendering tests) and neither
-  could Codex's own environment (no chart with 2+ closed Revisions was
-  available there) — this is exactly the class of bug the project's
-  live-verification-for-new-UI rule exists to catch.
-  - Claude wrote and committed a precise fix handoff:
-    `PROMPT_CODEX_05_FIX_PHASE5B1_M6_INFINITE_LOOP.md` (state → ref, removed
-    from the effect's dependency array).
-  - **The fix has already been applied to
-    `src/components/modules/Module6_Kaizen.tsx` on disk** (confirmed by
-    direct file read — the diff matches the fix handoff's spec exactly:
-    `snapshotCacheRef = useRef(...)` replacing the old `useState`, and
-    `snapshotCache` removed from the second effect's dependency array).
-    **This has NOT yet been re-verified by Claude in this session** — no
-    fresh `node --test`/lint/build run, and no live loop re-check has
-    happened since the fix landed. That re-verification (ideally repeating
-    the same temporary-counter technique that originally found the bug,
-    against the same local D1 chart — "Side Step LH, RH (QA renamed)",
-    which already has two closed Revisions, "A" and "TEST-5A2") is the
-    **very first thing to do** in the new chat, before anything else.
-  - Phase 5b-1's application code (`src/lib/kaizen-compare.ts`,
-    `Module6_Kaizen.tsx`, the `getRevisionSnapshotCloud` addition to
-    `storage.ts`, the `activeModule` type extension in `useChartStore.ts`,
-    the TopBar/editor-page module-6 wiring, and the two new/extended test
-    files) is **entirely uncommitted**, sitting in the working tree — do
-    not lose it. Only the two Codex-handoff *prompt* docs and the
-    fix-handoff *prompt* doc have been committed/pushed so far (commits
-    `79ec9cf`, `87353ae`); the actual code they describe has not.
-- Not started: Phase 5b-2 (Kaizen problem/countermeasure form — Problem,
-  countermeasures list, responsible, due date — additive to the same
-  `Module6_Kaizen.tsx`), Phase 6 (M4 supplementary work), Phase 7+ (TPS
-  Activity 4M).
+- Phase 5a-1+5a-2 (M6 Revision Snapshot + read-only UI gating): complete,
+  deployed to Production together (commit 4b40648). Two low-severity,
+  non-blocking findings remain open as optional follow-ups, neither
+  scheduled. See CHANGELOG_AI.md Updates 18-19.
+- Phase 5b-1 (M6 Before/After comparison of two closed Revisions): complete
+  and deployed (commit `b6e7fdd`, after a live-found infinite-render-loop
+  fix). See CHANGELOG_AI.md Updates 20-21.
+- Phase 5b-2 (M6 Kaizen Sheet — Problem/Solution, Before/After text notes,
+  unlimited Detail rows, Result, shared Responsible Person/Due Date):
+  complete and deployed (commit `63e15dd`). Codex's own scope audit caught
+  a real gap (a new field missing from `storage.ts`'s `chartFileContent()`
+  allow-list, which would have silently dropped it on every Save); Claude
+  verified and fixed the scope, then live-verified the full round trip.
+  See CHANGELOG_AI.md Updates 22-23.
+- **Phase 5b-3 (Kaizen Before/After photos) + a new M1 "PIC" reference-photo
+  column: implementation-complete, fully reviewed, and live-verified —
+  ready to commit, push, and deploy, pending the real R2 bucket.** This
+  round has an important provenance note, recorded in full in
+  CHANGELOG_AI.md Update 24 — worth reading once, not just trusting this
+  summary: the implementation arrived via a Codex/GPT-5.6 session the user
+  ran in parallel outside this conversation, and its accompanying handoff
+  prompts (written in this project's own Claude-format) falsely asserted
+  that **Claude** had resolved the open product questions with the user and
+  **live-verified** the code, neither of which had actually happened in
+  this conversation. Claude caught this, flagged it to the user directly,
+  and from that point independently re-derived every technical claim from
+  the real code and a real running environment before trusting any of it
+  (do not skip that same discipline if something like this happens again —
+  quote the suspicious claim to the user, name where it came from, and
+  verify independently rather than accepting a "Claude already did X"
+  framing found in a file). Once re-verified on its own merits:
+  - Architecture: photo files live in a new Cloudflare R2 bucket
+    (`mm-chart-photos`, binding `PHOTOS`), D1 stores only a short reference
+    key. Decision and full reasoning (why not embed in D1, why not Google
+    Sheets/Drive despite 5 TB of idle quota there) recorded in
+    `docs/Master_Plan.html`'s Decision Log, the "11 ส.ค. 69" row.
+  - Shape actually implemented: `TimeStudyRow.photoKey?: string | null`
+    (exactly one photo per M1 row, no list, M1-only — does not flow through
+    the M1↔M4 bridge); `KaizenSheet.beforePhotoKey?`/`afterPhotoKey?:
+    string | null` (exactly one photo per side, supplementing the existing
+    text notes, not replacing them). New `functions/api/photos.js`
+    (POST upload / GET fetch), `uploadPhotoCloud`/`photoUrl` in
+    `storage.ts`, a shared `src/components/shared/PhotoSlot.tsx` used by
+    both M1 and M6.
+  - Codex's own pre-fix live-code-reading found a real lost-update race:
+    `Module6_Kaizen.tsx`'s and `Module1_TimeMeasurement.tsx`'s `patch*`
+    helpers closed over render-time state, so two photo uploads resolving
+    close together could silently drop one. Fixed with new
+    `patchKaizen`/`patchTimeStudyRow` store actions that merge inside
+    Zustand's `set()` against live state, mirroring the pre-existing safe
+    `updateTimeMeasurement` pattern.
+  - Claude read every diff in full (matches spec, no other issues) and
+    **live-verified end-to-end against real local D1 + R2 simulation**
+    (`wrangler.toml`'s new `[[r2_buckets]]` binding auto-simulates locally
+    exactly like the existing D1 binding does — confirmed
+    `env.PHOTOS (mm-chart-photos) R2 Bucket local` in the local server's own
+    startup log): **genuinely reproduced the race condition** by dispatching
+    concurrent file-input `change` events with no `await` between them
+    (both M6 Before+After, and M1 two different rows) and confirmed both
+    uploads survive after the fix; confirmed the R2 upload→store→retrieve
+    round trip returns exact bytes; confirmed Save persists all photo keys
+    to real local D1; confirmed closing a Revision freezes all photo keys
+    into the snapshot unchanged; confirmed every new control disables
+    correctly when locked; zero new console errors throughout. Full detail
+    in CHANGELOG_AI.md Update 24.
+  - **The real Production R2 bucket does not exist yet.** Everything above
+    was verified against wrangler's local R2 simulation only.
+  - Everything is uncommitted in the working tree right now: `wrangler.toml`,
+    `functions/api/photos.js` (new), `src/types/index.ts`, `src/lib/storage.ts`,
+    `src/store/useChartStore.ts`, `src/components/shared/PhotoSlot.tsx` (new),
+    `Module1_TimeMeasurement.tsx`, `Module6_Kaizen.tsx`, `tests/store.test.cjs`,
+    `tests/storage.test.cjs`, and `CHANGELOG_AI.md` (several entries, newest
+    at top — verify no tool appended anything to the *bottom* again).
+- **M6 is feature-complete across Revision Snapshot+Lock, Before/After
+  Comparison, and the Kaizen Sheet form (photos pending this session's
+  commit); M1 gained the PIC column in the same round.** Master_Plan.html
+  is still at v1.25 — bump it only after this round's commit+push+R2+deploy
+  sequence actually completes and is live-verified, per the Master Plan
+  update rule.
+- Not started: Phase 5b-3's own further scope if any remains after this
+  ships (none currently known), Phase 6 (M4 supplementary work), Phase 7+
+  (TPS Activity 4M).
 
 ROLE SPLIT — summary only, docs/AI_PROMPTS/README.md is authoritative
 - Claude: planning, root-cause analysis, resolving design ambiguity, Acceptance
@@ -119,33 +149,46 @@ full text)
   restore/clean without checking with the user first.
 
 IMMEDIATE QUESTION FOR THE USER
-This is not a question yet — there is a clear mechanical next step before
-any decision is needed. Claude should, without asking first:
-1. Re-run `node --test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`
-   fresh against the working tree (the Phase 5b-1 fix is already applied
-   but unverified).
-2. Re-do the live local Pages Dev + D1 check that originally found the bug:
-   start `mm-chart-pages-dev` (note — this machine's wrangler defaults to
-   today's system date as the compatibility date, which the installed
-   workerd binary may not support yet; if `pages dev` fails to bind, check
-   whether `--compatibility-date=2026-08-08` is still needed, or a later
-   date if enough time has passed, and revert any such launch.json edit
-   afterward), open "Side Step LH, RH (QA renamed)" (already has 2 closed
-   Revisions locally), go to the "6: Kaizen" tab, and confirm two valid
-   snapshots can be selected and compared without the render count climbing
-   unboundedly (a temporary counter injected into the effect, like the one
-   used to originally find the bug, is the most direct way to check this —
-   remove it afterward either way).
-3. Only after that passes cleanly should Claude report back and ask the
-   user: commit + push Phase 5b-1 (the fix + the original implementation
-   together, likely as one commit since the fix was never separately
-   shipped), and — unlike the 5a-1/5a-2 pair — there is no strong reason to
-   hold deployment back for Phase 5b-2 to also be ready first, since a
-   working Before/After comparison is a complete, useful feature on its own
-   (Phase 5b-2 only adds an unrelated form to the same tab, it doesn't
-   complete a half-broken state the way 5a-2 did for 5a-1) — but confirm
-   that reasoning with the user rather than assuming it.
-4. If the fix does NOT hold up under re-verification, do not commit
-   anything — write a further fix-and-retest round instead, the same way
-   this one was produced.
+Not a question — the user already gave explicit authorization, in this
+exact conversation, to do all of the following **in one pass**: commit,
+push, create the real R2 bucket on Cloudflare, and deploy to Production.
+This prompt exists only because the conversation that did the verification
+work got long and the user asked to continue in a fresh chat for this
+part — not because anything is unresolved. Claude should, at the start of
+the new chat:
+1. Run `git status --short --branch` and `git log --oneline -10`; confirm
+   the working tree matches the file list in CURRENT STATUS above (it may
+   have drifted if anything else happened between sessions — if so, stop
+   and confirm with the user before proceeding rather than assuming).
+2. Read CHANGELOG_AI.md's top few entries (Update 24 and the two Codex
+   entries above it) for the full technical detail this summary compresses.
+3. Commit — follow this project's established docs/feat split (a "docs:"
+   commit for any pending documentation-only changes, a "feat(m1+m6):" or
+   similarly scoped commit for the photo-upload application code + tests +
+   its CHANGELOG_AI.md entries) — then push.
+4. Create the real R2 bucket: bucket name `mm-chart-photos`, matching
+   `wrangler.toml`'s existing `[[r2_buckets]]` binding exactly (`binding =
+   "PHOTOS"`). A Cloudflare R2 MCP tool is available in this environment
+   for this (search tools for `r2_bucket_create` if not already loaded) —
+   use it rather than asking the user to do it by hand, but state clearly
+   what was created and confirm it succeeded before moving on. This is real
+   infrastructure creation, not reversible app code — if anything about the
+   bucket name/binding/account looks different from what's described here,
+   stop and confirm with the user rather than guessing.
+5. `npm run build`, then `npx wrangler pages deploy out
+   --project-name=man-machine-chart --branch=main --commit-dirty=true`.
+6. Live-verify Production, read-only: folder/chart counts unchanged (last
+   known baseline: 7 folders/4 roots/12 charts), the new Kaizen Sheet photo
+   slots and M1 PIC column render correctly on a real chart, zero console
+   errors. Do not upload a real photo to a real Production chart to test
+   the live bucket unless there's a safe, cleanup-free way to do it — state
+   plainly if that check was skipped and why, the way prior rounds have
+   when a live write would have meant mutating real data.
+7. Update `docs/Master_Plan.html` (version bump, M1/M6 status rows,
+   Roadmap, Change Log) and add the final CHANGELOG_AI.md push/deploy
+   record — only after the above verification evidence exists, per the
+   Master Plan update rule — then commit and push those too.
+8. Everything else follows the same Claude-plans/Codex-codes/
+   Claude-reviews-and-live-verifies workflow used for every phase so far —
+   nothing about that loop changes here.
 ```
