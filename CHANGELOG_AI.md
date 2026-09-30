@@ -2,6 +2,13 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-09-30 (Codex: Trash Production release, purge Worker pending)
+
+- Owner authorized the full Production release. Fresh verified backup at `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_121806` captured 11 folders, 20 complete charts, zero revisions and zero R2 objects; the additive D1 migration then succeeded and the original counts remained unchanged.
+- Pushed `b73d679` and `247e2cf` sequentially to `main`. Pages compatibility deployment `00b5798c-b3a2-4138-950e-d7a34c6aefe9` succeeded before enabling delete controls; feature deployment `2fc98027-41b9-44ac-80b0-6f1f38ea80b7` succeeded. Production lacked its `PHOTOS` binding despite the repo config, so added R2 bucket `mm-chart-photos` as `PHOTOS` in Pages settings and redeployed the same feature commit as successful deployment `427b0360-61ac-4f68-bb24-f0e355320a8a`.
+- On synthetic QA data only, live APIs passed chart Trash/restore and full nested-folder Trash/restore, preserving chart content, frozen revision and exact PNG bytes in R2. Early warning acknowledgement returned HTTP 409. The synthetic subtree was left in Trash under entry `a0bd6dd8-06e6-4a2e-86fe-2bbffe2cb19b` for ordinary 90-day retention. Post-release read-only comparison matched every original folder, chart metadata row and all 20 complete chart contents to the pre-migration backup.
+- The live Sidebar displayed delete and Trash controls. Browser automation became unavailable before UI click-through Trash/restore, so only API behavior and UI presence were verified. Local targeted Trash tests passed 7/7. Wrangler 4.144.0 installed in a temporary npm cache, but Cloudflare CLI was unauthenticated; OAuth device approval has been requested. The separate daily purge Worker has not yet been deployed, so automatic permanent deletion is not yet active.
+
 ## 2026-09-30 (Codex: 90-day recoverable Trash, local implementation)
 
 ### Tool / Session Goal

@@ -1,14 +1,13 @@
 # Recoverable Trash: 90-day retention and seven-day in-app warning
 
-Status: implemented and tested locally on 2026-09-30. **Not migrated or deployed to Production.**
+Status: D1 migration, Pages compatibility and feature deployments, and Production
+reversible QA completed on 2026-09-30. Scheduled purge Worker deployment is
+pending Cloudflare CLI authentication.
 
-Read-only Production Data Gate: **complete**. Verified backup and audit:
-`D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_104913`.
-The live D1 schema still has no Trash tables or columns. Current D1 counts are
-11 folders (6 roots, depth 3), 20 charts, and 0 revisions. R2 has 0 objects.
-One chart was added since the earlier 19-chart backup; the earlier 19 are
-unchanged. The backup contains 25 SHA-256-verified payload files. No Production
-write has been authorized or performed for this feature.
+The pre-migration Production Data Gate used a fresh verified export at
+`D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_121806`.
+Before QA, Production had 11 folders, 20 charts, zero revisions, and zero R2
+objects. The active original data still matches that export after release.
 
 ## Agreed behavior
 
@@ -27,4 +26,12 @@ write has been authorized or performed for this feature.
 5. **Scheduled purge deployment:** deploy `wrangler.trash.toml` as a separate Worker with the existing D1 and R2 bindings and a daily 01:00 UTC trigger (08:00 Bangkok). Verify its configuration and a dry no-eligible-entry run. It has no HTTP endpoint. The Worker must not be enabled before the app and migration are confirmed healthy.
 6. **Post-release:** compare Production counts/tree/content to the preflight, allowing only the specifically approved synthetic test rows. Monitor API and Worker errors. On app failure, roll back to the compatibility deployment; retain the additive schema and all Trash data.
 
-No Production D1/R2 read or write, migration, push, Pages deployment, or Worker deployment was performed during local implementation.
+## Release record (2026-09-30)
+
+- Fresh pre-migration Production recovery export: `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_121806`. Its 25 payload files were read back and SHA-256 verified: 11 folders (6 roots, depth 3), 20 full charts, zero revisions and zero pre-existing R2 objects.
+- Applied the additive migration to D1 `mm-chart-db` (`c475f51c-3bcc-410a-8205-846b458c4efd`), then verified two new columns, two tables, four indexes, and unchanged original row counts.
+- Pushed compatibility commit `b73d679` to `main`; Pages deployment `00b5798c-b3a2-4138-950e-d7a34c6aefe9` succeeded with delete controls still off. This is the Trash-aware rollback target.
+- Pushed feature commit `247e2cf`; Pages deployment `2fc98027-41b9-44ac-80b0-6f1f38ea80b7` succeeded. Added missing Production `PHOTOS` binding to R2 bucket `mm-chart-photos` in Pages settings and redeployed the same commit as `427b0360-61ac-4f68-bb24-f0e355320a8a` (success).
+- Production QA created only uniquely named test data: one root folder, nested child, chart, revision and PNG. Chart Trash/restore and full folder subtree Trash/restore passed through live APIs. Chart content, frozen revision and R2 photo bytes matched after restore. Acknowledgement before the seven-day window correctly returned HTTP 409.
+- Left the synthetic folder subtree in normal Trash for the 90-day policy. Entry `a0bd6dd8-06e6-4a2e-86fe-2bbffe2cb19b` expires `2026-12-29T06:35:57.416Z`. Original active Production inventory remains 11 folders and 20 charts. Post-release GET comparison matched the full content of all 20 original charts to the fresh backup. The live Sidebar displayed delete and Trash controls; browser automation failed before a complete click-through Trash/restore check, so that UI path is not claimed as manually verified.
+- Scheduled Worker is the remaining release step. `tests/trash.test.cjs` passed 7/7, including purge timing, acknowledgement, nested retention and R2 retry. Cloudflare CLI requires a fresh OAuth device login.
