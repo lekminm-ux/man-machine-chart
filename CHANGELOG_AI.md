@@ -2,6 +2,12 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-09-30 (Codex: scheduled Trash purge Worker deployed)
+
+- Owner signed into Cloudflare Dashboard and authorized continuation. Wrangler OAuth used only the `account:read`, `user:read`, and `workers_scripts:write` scopes. Deployed `man-machine-trash-purge` with the exact D1 `mm-chart-db` and R2 `mm-chart-photos` bindings, then set `workers_dev=false` and `preview_urls=false` in `wrangler.trash.toml` and redeployed. Final Worker version: `d770d323-ae8d-4246-89db-53d56ec290ba`. Wrangler and Dashboard both show one `0 1 * * *` trigger; Dashboard shows public URL disabled and next run 2026-10-01 01:00 UTC (08:00 Bangkok).
+- The live Sidebar displayed one synthetic Trash entry with its 90-day date and restored its root folder, nested child and chart through the Restore button. Browser automation failed while clicking the QA folder's delete button; a read-only API check showed no deletion occurred. Moved only the same synthetic subtree back to Trash through its scoped DELETE API. Current entry `6e8beac2-0967-4cf1-a395-6d8fe82ee7b8` expires `2026-12-29T07:30:58.290Z`; the prior entry is restored history, not an active Trash item.
+- Final read-only Production comparison passed: 11 original folders, 20 original metadata records, all 20 full chart contents, and exactly the synthetic QA subtree in Trash. Targeted Trash tests passed 7/7. No entry is presently eligible for permanent purge. Deployment and schedule are verified; the first real scheduled Worker invocation has not happened yet.
+
 ## 2026-09-30 (Codex: Trash Production release, purge Worker pending)
 
 - Owner authorized the full Production release. Fresh verified backup at `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_121806` captured 11 folders, 20 complete charts, zero revisions and zero R2 objects; the additive D1 migration then succeeded and the original counts remained unchanged.
