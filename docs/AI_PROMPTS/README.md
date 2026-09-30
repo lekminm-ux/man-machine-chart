@@ -1,5 +1,7 @@
 # AI Collaboration Prompts — Man-Machine Chart
 
+Current Smart Factory 9+1 Hermes workflow for APP01–APP09: [Hermes ↔ Gemini Antigravity runbook](RUNBOOK_HERMES_ANTIGRAVITY_APP01_09.md). For current APP02 work, this newer workflow supersedes the historical Claude/Codex role split below; do not perform per-Task credit/token balance checks.
+
 Project root:
 
 `D:/00_LocalFile_WebApp/ManMachineChart_StandardOperation`

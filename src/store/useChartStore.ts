@@ -67,7 +67,7 @@ interface ChartState extends AppDatabase {
   saveActiveFile: () => Promise<void>;
   closeRevision: (revNo: string) => Promise<void>;
   openNewRevision: () => Promise<void>;
-  duplicateFile: (id: string) => Promise<void>;
+  duplicateFile: (id: string, targetFolderId?: string) => Promise<void>;
 
   // Header actions
   updateHeader: (partial: Partial<ChartHeader>) => void;
@@ -521,13 +521,19 @@ export const useChartStore = create<ChartState>((set, get) => ({
     await mutateWithRollback(set, snapshot, next, () => deleteFileCloud(id));
   },
 
-  async duplicateFile(id) {
+  async duplicateFile(id, targetFolderId) {
     const s0 = get();
     const file = s0.files.find(f => f.id === id);
     if (blockCloudMutation(set, s0, 'duplicateFile', id, file?.folderId)) return;
     if (!file) return;
     if (blockUnloadedFile(set, 'duplicateFile', file)) return;
     if (blockUnconfirmedFile(set, 'duplicateFile', file)) return;
+
+    const destFolderId = targetFolderId ?? file.folderId;
+    const destFolder = s0.folders.find(f => f.id === destFolderId);
+    if (!destFolder) return;
+    if (blockCloudMutation(set, s0, 'duplicateFile', id, destFolderId)) return;
+
     const snapshot: AppDatabase = { folders: s0.folders, files: s0.files, activeFileId: s0.activeFileId };
 
     // Clone steps with new UUIDs
@@ -553,6 +559,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const duplicatedFile: ChartFile = {
       ...file,
       id: uuidv4(),
+      folderId: destFolderId,
       name: `${file.name} - Copy`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

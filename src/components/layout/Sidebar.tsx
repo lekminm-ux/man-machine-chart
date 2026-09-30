@@ -75,6 +75,7 @@ export default function Sidebar() {
   const [newFileName, setNewFileName]           = useState('');
 
   const [movingTarget, setMovingTarget]         = useState<ContextTarget>(null);
+  const [copyingFileId, setCopyingFileId]       = useState<string | null>(null);
 
   // Tooltip for truncated folder/file names
   const [nameTip, setNameTip] = useState<{ text: string; x: number; y: number; flip: boolean } | null>(null);
@@ -264,12 +265,52 @@ export default function Sidebar() {
                 )}
                 {unsyncedBadge(file as ChartFile & { _unsynced?: boolean; _unconfirmed?: boolean })}
 
-                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   <button
                     onClick={e => { e.stopPropagation(); duplicateFile(file.id); }}
                     className="text-slate-400 hover:text-slate-700 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
                     title="Duplicate Chart"
                   >📋</button>
+                  <button
+                    disabled={!cloudReady}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setCopyingFileId(copyingFileId === file.id ? null : file.id);
+                    }}
+                    className={`text-[10px] p-1 rounded transition-colors ${
+                      !cloudReady
+                        ? 'opacity-30 cursor-not-allowed text-slate-400'
+                        : 'text-slate-400 hover:text-blue-600 hover:bg-slate-300'
+                    }`}
+                    title={cloudReady ? "Copy to Folder" : "Cloud unavailable"}
+                  >📑</button>
+                  {copyingFileId === file.id && (
+                    <span className="flex items-center gap-1 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs shadow-sm" onClick={e => e.stopPropagation()}>
+                      <select
+                        defaultValue=""
+                        onChange={e => {
+                          if (e.target.value) {
+                            duplicateFile(file.id, e.target.value);
+                            setCopyingFileId(null);
+                          }
+                        }}
+                        className="bg-transparent text-slate-800 text-[10px] focus:outline-none"
+                      >
+                        <option value="" disabled>Select target folder…</option>
+                        {folders.filter(f => {
+                          const status = f as ChartFolder & { _unconfirmed?: boolean; _unsynced?: boolean };
+                          return !status._unconfirmed && !status._unsynced;
+                        }).map(f => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setCopyingFileId(null)}
+                        className="text-[10px] text-slate-500 hover:text-slate-800 font-semibold px-1"
+                        title="Cancel"
+                      >✕</button>
+                    </span>
+                  )}
                   <button
                     onClick={e => { e.stopPropagation(); setMovingTarget({ type: 'file', id: file.id }); }}
                     className="text-slate-400 hover:text-blue-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"

@@ -216,6 +216,98 @@ test('duplicateFile starts a copied locked chart as an open revision', async () 
   assert.equal(copy.lockedAt, null, 'the duplicate must start unlocked without a snapshot');
 });
 
+test('duplicateFile(sourceId, targetFolderId) copies into target folder while preserving independent source content and IDs', async () => {
+  const cloudCreates = [];
+  const store = await freshReadyStore({ createFileCloud: async file => { cloudCreates.push(file); } });
+  await store.getState().createFolder('Source', 'custom');
+  await store.getState().createFolder('Destination', 'custom');
+  const [sourceFolder, destinationFolder] = store.getState().folders;
+  await store.getState().createFile(sourceFolder.id, 'Original');
+  store.getState().addStep();
+  const source = store.getState().activeFile();
+  const sourceStepId = source.steps[0].id;
+  cloudCreates.length = 0;
+
+  await store.getState().duplicateFile(source.id, destinationFolder.id);
+
+  const copy = store.getState().activeFile();
+  assert.equal(store.getState().files.length, 2);
+  assert.equal(source.folderId, sourceFolder.id);
+  assert.equal(store.getState().files.find(f => f.id === source.id).folderId, sourceFolder.id);
+  assert.equal(copy.folderId, destinationFolder.id);
+  assert.notEqual(copy.id, source.id);
+  assert.notEqual(copy.steps[0].id, sourceStepId);
+  assert.equal(copy.steps[0].description, source.steps[0].description);
+  assert.equal(cloudCreates.length, 1);
+  assert.equal(cloudCreates[0].folderId, destinationFolder.id);
+});
+
+test('duplicateFile(sourceId) keeps same-folder behavior', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('Source', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Original');
+  const sourceId = store.getState().activeFileId;
+
+  await store.getState().duplicateFile(sourceId);
+
+  assert.equal(store.getState().files.length, 2);
+  assert.equal(store.getState().activeFile().folderId, folderId);
+  assert.equal(store.getState().files.find(f => f.id === sourceId).folderId, folderId);
+});
+
+test('duplicateFile with nonexistent destination makes no Cloud call or local copy', async () => {
+  let cloudCalls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { cloudCalls++; } });
+  await store.getState().createFolder('Source', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'Original');
+  const sourceId = store.getState().activeFileId;
+  cloudCalls = 0;
+
+  await store.getState().duplicateFile(sourceId, 'missing-folder');
+
+  assert.equal(cloudCalls, 0);
+  assert.equal(store.getState().files.length, 1);
+  assert.equal(store.getState().activeFileId, sourceId);
+});
+
+test('duplicateFile with local-only unsynced destination makes no Cloud call or local copy', async () => {
+  let cloudCalls = 0;
+  const store = await freshReadyStore({ createFileCloud: async () => { cloudCalls++; } });
+  await store.getState().createFolder('Source', 'custom');
+  await store.getState().createFolder('Destination', 'custom');
+  const [sourceFolder, destinationFolder] = store.getState().folders;
+  await store.getState().createFile(sourceFolder.id, 'Original');
+  const sourceId = store.getState().activeFileId;
+  store.setState({ folders: store.getState().folders.map(f => f.id === destinationFolder.id ? { ...f, _unsynced: true } : f) });
+  cloudCalls = 0;
+
+  await store.getState().duplicateFile(sourceId, destinationFolder.id);
+
+  assert.equal(cloudCalls, 0);
+  assert.equal(store.getState().files.length, 1);
+  assert.equal(store.getState().activeFileId, sourceId);
+});
+
+test('duplicateFile rolls back cross-folder copy and active ID on createFileCloud failure', async () => {
+  let failCreate = false;
+  const store = await freshReadyStore({ createFileCloud: async () => { if (failCreate) throw new Error('Cloud create failed'); } });
+  await store.getState().createFolder('Source', 'custom');
+  await store.getState().createFolder('Destination', 'custom');
+  const [sourceFolder, destinationFolder] = store.getState().folders;
+  await store.getState().createFile(sourceFolder.id, 'Original');
+  const sourceId = store.getState().activeFileId;
+  failCreate = true;
+
+  await store.getState().duplicateFile(sourceId, destinationFolder.id);
+
+  assert.equal(store.getState().files.length, 1);
+  assert.equal(store.getState().activeFileId, sourceId);
+  assert.equal(store.getState().files[0].folderId, sourceFolder.id);
+  assert.equal(store.getState().syncStatus, 'error');
+});
+
 test('cloud load failure produces an unsafe/unavailable state, not a silent success', async () => {
   const store = freshStore({
     loadDatabaseFromCloud: async () => ({
