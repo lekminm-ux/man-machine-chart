@@ -261,3 +261,14 @@ export interface AppDatabase {
   files: ChartFile[];
   activeFileId: string | null;
 }
+
+export interface TrashEntry {
+  id: string;
+  kind: 'file' | 'folder';
+  rootId: string;
+  name: string;
+  deletedAt: string;
+  expiresAt: string;
+  warnedAt: string | null;
+  purgeStartedAt: string | null;
+}

@@ -3,7 +3,7 @@
 // storage.ts — Cloud (Cloudflare D1) + localStorage fallback
 // ============================================================
 
-import type { AppDatabase, ChartFile, ChartFolder } from '@/types';
+import type { AppDatabase, ChartFile, ChartFolder, TrashEntry } from '@/types';
 import type { RevisionSnapshot, RevisionSnapshotContent, RevisionSnapshotMeta } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -40,7 +40,7 @@ async function apiFetch(path: string, options?: RequestInit) {
 // `fallback` for display/review only, so a caller can never mistake "the
 // cloud read failed, here's what's cached" for "the cloud is confirmed synced".
 export type CloudLoadResult =
-  | { ok: true; db: AppDatabase }
+  | { ok: true; db: AppDatabase; trashEntries: TrashEntry[] }
   | { ok: false; error: string; fallback: AppDatabase };
 
 export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
@@ -50,9 +50,19 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
         apiFetch('/api/folders'),
         apiFetch('/api/files'),
       ]);
+    // Read tombstones after the active lists so a concurrent delete observed
+    // between requests wins over a stale active-list response.
+    const trash: TrashList = await apiFetch('/api/trash');
+    if (!Array.isArray(trash.entries) || !Array.isArray(trash.hiddenFileIds) || !Array.isArray(trash.hiddenFolderIds)) {
+      throw new Error('trash inventory did not return a confirmed response');
+    }
+    const hiddenFileIds = new Set(trash.hiddenFileIds);
+    const hiddenFolderIds = new Set(trash.hiddenFolderIds);
+    const visibleFiles = files.filter(file => !hiddenFileIds.has(file.id));
+    const visibleFolders = folders.filter(folder => !hiddenFolderIds.has(folder.id));
 
     const local = loadLocalDatabase();
-    const cloudFileIds = new Set(files.map(f => f.id));
+    const cloudFileIds = new Set(visibleFiles.map(f => f.id));
 
     // We have metadata for files; load full content lazily when file is opened
     // Merge cloud files metadata with local loaded files. Cloud is
@@ -63,7 +73,7 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
     // this browser's own past session) is stale and must go back through the
     // lazy `_loaded: false` path rather than being presented as confirmed
     // Cloud content.
-    const mergedFiles = files.map(cloudFile => {
+    const mergedFiles = visibleFiles.map(cloudFile => {
       const localFile = local.files?.find(f => f.id === cloudFile.id) as (ChartFile & { _loaded?: boolean; _unconfirmed?: boolean }) | undefined;
       // A local file marked _unconfirmed (its last save's read-back never
       // proved the write, or hasn't been retried) must never be trusted as
@@ -95,13 +105,13 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
     // that gets marked `cloudReady`, so they're never mistaken for confirmed
     // Cloud rows (a save attempt against one still correctly fails, since
     // there is no matching row for the API to update).
-    const unsyncedFiles = (local.files || []).filter(f => !cloudFileIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
+    const unsyncedFiles = (local.files || []).filter(f => !cloudFileIds.has(f.id) && !hiddenFileIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
     const finalFiles = [...mergedFiles, ...unsyncedFiles];
 
     // Keep any local folders that are not in the cloud
-    const cloudFolderIds = new Set(folders.map(f => f.id));
-    const mergedFolders = folders.map(f => ({ ...f, expanded: Boolean(f.expanded) }));
-    const unsyncedFolders = (local.folders || []).filter(f => !cloudFolderIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
+    const cloudFolderIds = new Set(visibleFolders.map(f => f.id));
+    const mergedFolders = visibleFolders.map(f => ({ ...f, expanded: Boolean(f.expanded) }));
+    const unsyncedFolders = (local.folders || []).filter(f => !cloudFolderIds.has(f.id) && !hiddenFolderIds.has(f.id)).map(f => ({ ...f, _unsynced: true }));
     const finalFolders = [...mergedFolders, ...unsyncedFolders];
 
     const db: AppDatabase = {
@@ -110,7 +120,7 @@ export async function loadDatabaseFromCloud(): Promise<CloudLoadResult> {
       activeFileId: local.activeFileId ?? null,
     };
     saveLocalDatabase(db);
-    return { ok: true, db };
+    return { ok: true, db, trashEntries: trash.entries };
   } catch (err) {
     console.warn('Cloud load failed:', err);
     return {
@@ -159,8 +169,12 @@ export async function updateFolderCloud(id: string, patch: Partial<ChartFolder>)
   });
 }
 
-export async function deleteFolderCloud(id: string): Promise<void> {
-  await apiFetch(`/api/folders?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+export async function deleteFolderCloud(id: string): Promise<TrashEntry> {
+  const result = await apiFetch(`/api/folders?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (result?.success !== true || !result.trashId || !result.deletedAt || !result.expiresAt) {
+    throw new Error('folder was not confirmed in trash');
+  }
+  return { id: result.trashId, kind: 'folder', rootId: id, name: '', deletedAt: result.deletedAt, expiresAt: result.expiresAt, warnedAt: null, purgeStartedAt: null };
 }
 
 // ── File cloud actions ─────────────────────────────────────────────────────
@@ -347,6 +361,41 @@ export async function getRevisionSnapshotCloud(id: string): Promise<GetRevisionS
   }
 }
 
-export async function deleteFileCloud(id: string): Promise<void> {
-  await apiFetch(`/api/files?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+export async function deleteFileCloud(id: string): Promise<TrashEntry> {
+  const result = await apiFetch(`/api/files?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (result?.success !== true || !result.trashId || !result.deletedAt || !result.expiresAt) {
+    throw new Error('chart was not confirmed in trash');
+  }
+  return { id: result.trashId, kind: 'file', rootId: id, name: '', deletedAt: result.deletedAt, expiresAt: result.expiresAt, warnedAt: null, purgeStartedAt: null };
+}
+
+export interface TrashList {
+  entries: TrashEntry[];
+  hiddenFolderIds: string[];
+  hiddenFileIds: string[];
+}
+
+export async function loadTrashCloud(): Promise<TrashList> {
+  const result = await apiFetch('/api/trash');
+  if (!Array.isArray(result?.entries) || !Array.isArray(result?.hiddenFolderIds) || !Array.isArray(result?.hiddenFileIds)) {
+    throw new Error('trash inventory did not return a confirmed response');
+  }
+  return result as TrashList;
+}
+
+export async function restoreTrashCloud(id: string): Promise<void> {
+  const result = await apiFetch('/api/trash', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'restore', id }),
+  });
+  if (result?.success !== true || result.id !== id) throw new Error('restore was not confirmed');
+}
+
+export async function acknowledgeTrashWarningCloud(id: string): Promise<string> {
+  const result = await apiFetch('/api/trash', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'acknowledge', id }),
+  });
+  if (result?.success !== true || result.id !== id || !result.warnedAt) throw new Error('warning acknowledgement was not confirmed');
+  return result.warnedAt;
 }

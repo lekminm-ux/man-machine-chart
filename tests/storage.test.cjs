@@ -90,6 +90,7 @@ test('loadDatabaseFromCloud resets a stale local file to _loaded:false instead o
     },
     fetchImpl: async (url) => {
       const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: [], hiddenFileIds: [] });
       if (u.includes('/api/folders')) return mockResponse([]);
       if (u.includes('/api/files')) {
         return mockResponse([{ id: 'file-1', name: 'Chart', folderId: 'folder-1', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' }]);
@@ -124,6 +125,7 @@ test('loadDatabaseFromCloud trusts a local file whose updatedAt still matches Cl
     },
     fetchImpl: async (url) => {
       const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: [], hiddenFileIds: [] });
       if (u.includes('/api/folders')) return mockResponse([]);
       if (u.includes('/api/files')) {
         return mockResponse([{ id: 'file-1', name: 'Chart', folderId: 'folder-1', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' }]);
@@ -155,6 +157,7 @@ test('a local-only file absent from Cloud is flagged _unsynced, not silently fol
     },
     fetchImpl: async (url) => {
       const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: [], hiddenFileIds: [] });
       if (u.includes('/api/folders')) return mockResponse([]);
       if (u.includes('/api/files')) return mockResponse([]); // Cloud has no files at all
       throw new Error('unexpected fetch: ' + u);
@@ -167,6 +170,33 @@ test('a local-only file absent from Cloud is flagged _unsynced, not silently fol
     const file = result.db.files.find(f => f.id === 'local-only-1');
     assert.ok(file, 'the local-only file should still be present for review');
     assert.equal(file._unsynced, true, 'a file missing from Cloud must be explicitly flagged, never presented as a confirmed row');
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test('trashed IDs stay hidden when a stale browser cache still contains them', async () => {
+  installGlobals({
+    local: {
+      folders: [{ id: 'old-folder', parentId: null, name: 'Old', processType: 'custom', expanded: true, createdAt: '2026-01-01T00:00:00.000Z' }],
+      files: [{ id: 'old-chart', name: 'Old Chart', folderId: 'old-folder', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', header: blankHeader, steps: [], layoutDiagram: { elements: [], connections: [] } }],
+      activeFileId: 'old-chart',
+    },
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: ['old-folder'], hiddenFileIds: ['old-chart'] });
+      // Simulate a read race: the active-list response was produced just
+      // before deletion, but the Trash inventory already has the tombstones.
+      if (u.includes('/api/folders')) return mockResponse([{ id: 'old-folder', parentId: null, name: 'Old', processType: 'custom', expanded: 1, createdAt: '2026-01-01T00:00:00.000Z' }]);
+      if (u.includes('/api/files')) return mockResponse([{ id: 'old-chart', name: 'Old Chart', folderId: 'old-folder', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }]);
+      throw new Error('unexpected fetch: ' + u);
+    },
+  });
+  try {
+    const result = await loadStorage().loadDatabaseFromCloud();
+    assert.equal(result.ok, true);
+    assert.equal(result.db.folders.length, 0);
+    assert.equal(result.db.files.length, 0);
   } finally {
     restoreGlobals();
   }
@@ -413,6 +443,7 @@ test('an _unconfirmed local file is never trusted on a fresh hydration, even wit
     },
     fetchImpl: async (url) => {
       const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: [], hiddenFileIds: [] });
       if (u.includes('/api/folders')) return mockResponse([]);
       if (u.includes('/api/files')) {
         return mockResponse([{ id: 'file-1', name: 'Draft Chart', folderId: 'folder-1', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' }]);
@@ -452,6 +483,7 @@ test('a synthetic multi-level tree survives hydration alongside a local-only uns
     },
     fetchImpl: async (url) => {
       const u = String(url);
+      if (u.includes('/api/trash')) return mockResponse({ entries: [], hiddenFolderIds: [], hiddenFileIds: [] });
       if (u.includes('/api/folders')) {
         // local-folder-1 intentionally absent — it never synced.
         return mockResponse([

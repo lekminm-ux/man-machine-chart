@@ -16,7 +16,7 @@ export async function onRequestGet(context) {
     if (id) {
       // Single file with content
       const row = await env.DB.prepare(
-        'SELECT * FROM chart_files WHERE id = ?'
+        'SELECT * FROM chart_files WHERE id = ? AND trashId IS NULL'
       ).bind(id).first();
       if (!row) return json({ error: 'not found' }, 404);
       return json({ ...row, content: JSON.parse(row.content) });
@@ -24,7 +24,7 @@ export async function onRequestGet(context) {
 
     // All files — metadata only (no content to keep payload small)
     const { results } = await env.DB.prepare(
-      'SELECT id, name, folderId, createdAt, updatedAt FROM chart_files ORDER BY updatedAt DESC'
+      'SELECT id, name, folderId, createdAt, updatedAt FROM chart_files WHERE trashId IS NULL ORDER BY updatedAt DESC'
     ).all();
     return json(results);
   } catch (err) {
@@ -38,7 +38,7 @@ export async function onRequestPost(context) {
     const file = await request.json();
     const { id, name, folderId, createdAt, updatedAt, content } = file;
     if (!id || !name || !folderId) return badRequest('id, name, folderId required');
-    const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(folderId).first();
+    const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ? AND trashId IS NULL').bind(folderId).first();
     if (!folder) return badRequest('folderId does not reference an existing folder');
     await env.DB.prepare(
       'INSERT INTO chart_files (id, name, folderId, createdAt, updatedAt, content) VALUES (?, ?, ?, ?, ?, ?)'
@@ -61,7 +61,7 @@ export async function onRequestPut(context) {
     const { id, name, folderId, updatedAt, content } = file;
     if (!id) return badRequest('id required');
     const existing = await env.DB.prepare(
-      'SELECT lockedAt FROM chart_files WHERE id = ?'
+      'SELECT lockedAt FROM chart_files WHERE id = ? AND trashId IS NULL'
     ).bind(id).first();
     if (existing && existing.lockedAt != null) {
       return json({
@@ -71,7 +71,7 @@ export async function onRequestPut(context) {
       }, 409);
     }
     if (folderId != null) {
-      const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(folderId).first();
+      const folder = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ? AND trashId IS NULL').bind(folderId).first();
       if (!folder) return badRequest('folderId does not reference an existing folder');
     }
     // COALESCE keeps the stored value when a field is omitted, so a
@@ -81,7 +81,7 @@ export async function onRequestPut(context) {
     // persisted. It's now applied the same COALESCE way as the other fields.
     const savedUpdatedAt = updatedAt ?? new Date().toISOString();
     const result = await env.DB.prepare(
-      'UPDATE chart_files SET name = COALESCE(?, name), folderId = COALESCE(?, folderId), updatedAt = ?, content = COALESCE(?, content) WHERE id = ?'
+      'UPDATE chart_files SET name = COALESCE(?, name), folderId = COALESCE(?, folderId), updatedAt = ?, content = COALESCE(?, content) WHERE id = ? AND trashId IS NULL'
     ).bind(
       name ?? null,
       folderId ?? null,
@@ -108,8 +108,22 @@ export async function onRequestDelete(context) {
     const url = new URL(request.url);
     const id  = url.searchParams.get('id');
     if (!id) return badRequest('id query param required');
-    await env.DB.prepare('DELETE FROM chart_files WHERE id = ?').bind(id).run();
-    return json({ success: true });
+    const row = await env.DB.prepare('SELECT id, name FROM chart_files WHERE id = ? AND trashId IS NULL').bind(id).first();
+    if (!row) return json({ error: 'chart not found or already in trash' }, 404);
+    const now = new Date();
+    const deletedAt = now.toISOString();
+    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const trashId = crypto.randomUUID();
+    const results = await env.DB.batch([
+      env.DB.prepare('INSERT INTO trash_entries (id, kind, rootId, name, deletedAt, expiresAt) SELECT ?, ?, id, name, ?, ? FROM chart_files WHERE id = ? AND trashId IS NULL')
+        .bind(trashId, 'file', deletedAt, expiresAt, id),
+      env.DB.prepare("INSERT INTO trash_members (kind, memberId, trashId) SELECT 'file', id, ? FROM chart_files WHERE id = ? AND trashId IS NULL")
+        .bind(trashId, id),
+      env.DB.prepare('UPDATE chart_files SET trashId = ? WHERE id = ? AND trashId IS NULL')
+        .bind(trashId, id),
+    ]);
+    if (results[0]?.meta?.changes !== 1 || results[1]?.meta?.changes !== 1 || results[2]?.meta?.changes !== 1) return json({ error: 'chart was not moved to trash' }, 409);
+    return json({ success: true, trashId, deletedAt, expiresAt });
   } catch (err) {
     return error(err);
   }

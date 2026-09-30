@@ -36,118 +36,7 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function makeMockD1(initial = {}) {
-  const state = {
-    chart_files: clone(initial.chart_files ?? []),
-    revision_snapshots: clone(initial.revision_snapshots ?? []),
-  };
-
-  function runSelect(sql, binds) {
-    if (sql === 'SELECT * FROM revision_snapshots WHERE id = ?') {
-      return state.revision_snapshots.filter(row => row.id === binds[0]);
-    }
-    if (sql === 'SELECT id, chartFileId, revNo, closedAt FROM revision_snapshots WHERE chartFileId = ? ORDER BY closedAt DESC') {
-      return state.revision_snapshots
-        .filter(row => row.chartFileId === binds[0])
-        .sort((a, b) => b.closedAt.localeCompare(a.closedAt))
-        .map(({ id, chartFileId, revNo, closedAt }) => ({ id, chartFileId, revNo, closedAt }));
-    }
-    if (sql === 'SELECT id, content, lockedAt FROM chart_files WHERE id = ?') {
-      const row = state.chart_files.find(file => file.id === binds[0]);
-      return row ? [{ id: row.id, content: row.content, lockedAt: row.lockedAt ?? null }] : [];
-    }
-    if (sql === 'SELECT lockedAt FROM chart_files WHERE id = ?') {
-      const row = state.chart_files.find(file => file.id === binds[0]);
-      return row ? [{ lockedAt: row.lockedAt ?? null }] : [];
-    }
-    if (sql === 'SELECT 1 FROM folders WHERE id = ?') {
-      return [{ '1': 1 }];
-    }
-    throw new Error('mock D1: unhandled SELECT: ' + sql);
-  }
-
-  function runMutate(sql, binds) {
-    if (sql === 'INSERT INTO revision_snapshots (id, chartFileId, revNo, content, closedAt) VALUES (?, ?, ?, ?, ?)') {
-      const [id, chartFileId, revNo, content, closedAt] = binds;
-      if (state.revision_snapshots.some(row => row.id === id)) {
-        throw new Error('UNIQUE constraint failed: revision_snapshots.id');
-      }
-      if (state.revision_snapshots.some(row => row.chartFileId === chartFileId && row.revNo === revNo)) {
-        throw new Error('UNIQUE constraint failed: revision_snapshots.chartFileId, revision_snapshots.revNo');
-      }
-      state.revision_snapshots.push({ id, chartFileId, revNo, content, closedAt });
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql === 'UPDATE chart_files SET lockedAt = ? WHERE id = ? AND lockedAt IS NULL') {
-      const [lockedAt, id] = binds;
-      const row = state.chart_files.find(file => file.id === id);
-      if (!row || row.lockedAt != null) return { success: true, meta: { changes: 0 } };
-      row.lockedAt = lockedAt;
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql === 'UPDATE chart_files SET lockedAt = NULL WHERE id = ?') {
-      const row = state.chart_files.find(file => file.id === binds[0]);
-      if (!row) return { success: true, meta: { changes: 0 } };
-      row.lockedAt = null;
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql.startsWith('UPDATE chart_files SET name = COALESCE(')) {
-      const [name, folderId, updatedAt, content, id] = binds;
-      const row = state.chart_files.find(file => file.id === id);
-      if (!row) return { success: true, meta: { changes: 0 } };
-      if (name !== null) row.name = name;
-      if (folderId !== null) row.folderId = folderId;
-      row.updatedAt = updatedAt;
-      if (content !== null) row.content = content;
-      return { success: true, meta: { changes: 1 } };
-    }
-    throw new Error('mock D1: unhandled mutation: ' + sql);
-  }
-
-  function restore(snapshot) {
-    state.chart_files.splice(0, state.chart_files.length, ...clone(snapshot.chart_files));
-    state.revision_snapshots.splice(0, state.revision_snapshots.length, ...clone(snapshot.revision_snapshots));
-  }
-
-  function prepare(sql) {
-    const normalized = sql.replace(/\s+/g, ' ').trim();
-    const statement = {
-      _binds: [],
-      bind(...args) { statement._binds = args; return statement; },
-      async first() {
-        const rows = runSelect(normalized, statement._binds);
-        return rows[0] ?? null;
-      },
-      async all() {
-        return { results: runSelect(normalized, statement._binds) };
-      },
-      async run() {
-        return runMutate(normalized, statement._binds);
-      },
-    };
-    return statement;
-  }
-
-  return {
-    env: {
-      DB: {
-        prepare,
-        async batch(statements) {
-          const before = clone(state);
-          try {
-            const results = [];
-            for (const statement of statements) results.push(await statement.run());
-            return results;
-          } catch (err) {
-            restore(before);
-            throw err;
-          }
-        },
-      },
-    },
-    state,
-  };
-}
+const makeMockD1 = require('./helpers/d1-memory.cjs');
 
 function fakeRequest(body, url = 'http://local.test/api/revisions') {
   return { json: async () => body, url };
@@ -336,6 +225,7 @@ test('list returns metadata only and orders snapshots by closedAt descending', a
 test('get single snapshot returns full parsed content', async () => {
   const content = JSON.stringify({ marker: 'FULL CONTENT', steps: [{ id: 's1' }] });
   const mock = makeMockD1({
+    chart_files: [chartFile()],
     revision_snapshots: [{
       id: 'snapshot-full', chartFileId: 'chart-1', revNo: 'A', content,
       closedAt: '2026-08-06T01:00:00.000Z',

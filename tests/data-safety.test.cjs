@@ -39,102 +39,9 @@ function loadModule(relativePath) {
 
 const foldersApi = loadModule('functions/api/folders.js');
 const filesApi = loadModule('functions/api/files.js');
+const trashApi = loadModule('functions/api/trash.js');
 
-// ── In-memory mock D1 — recognizes exactly the query shapes this project's
-//    API handlers issue. Not a general SQL engine. ─────────────────────────
-function makeMockD1(initial = {}) {
-  const state = {
-    folders: (initial.folders ?? []).map(f => ({ ...f })),
-    chart_files: (initial.chart_files ?? []).map(f => ({ ...f })),
-  };
-
-  function runSelect(sql, binds) {
-    if (sql.startsWith('SELECT id, parentId, name, processType, expanded, createdAt FROM folders')) {
-      return [...state.folders].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    }
-    if (sql === 'SELECT 1 FROM folders WHERE id = ?') {
-      return state.folders.some(f => f.id === binds[0]) ? [{ '1': 1 }] : [];
-    }
-    if (sql === 'SELECT parentId FROM folders WHERE id = ?') {
-      const f = state.folders.find(x => x.id === binds[0]);
-      return f ? [{ parentId: f.parentId }] : [];
-    }
-    if (sql === 'SELECT 1 FROM folders WHERE parentId = ? LIMIT 1') {
-      return state.folders.some(f => f.parentId === binds[0]) ? [{ '1': 1 }] : [];
-    }
-    if (sql === 'SELECT 1 FROM chart_files WHERE folderId = ? LIMIT 1') {
-      return state.chart_files.some(f => f.folderId === binds[0]) ? [{ '1': 1 }] : [];
-    }
-    if (sql === 'SELECT lockedAt FROM chart_files WHERE id = ?') {
-      // Phase 5a-1: files.js's PUT guard checks this before every update.
-      // None of this file's fixtures are ever locked, so this always reports
-      // unlocked — existing behavior for every test in this file is unchanged.
-      const f = state.chart_files.find(x => x.id === binds[0]);
-      return f ? [{ lockedAt: f.lockedAt ?? null }] : [];
-    }
-    throw new Error('mock D1: unhandled SELECT: ' + sql);
-  }
-
-  function runMutate(sql, binds) {
-    if (sql.startsWith('INSERT INTO folders')) {
-      const [id, parentId, name, processType, expanded, createdAt] = binds;
-      state.folders.push({ id, parentId, name, processType, expanded, createdAt });
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql.startsWith('UPDATE folders SET')) {
-      const id = binds[binds.length - 1];
-      const folder = state.folders.find(f => f.id === id);
-      if (!folder) return { success: true, meta: { changes: 0 } };
-      const setPart = sql.slice('UPDATE folders SET '.length, sql.indexOf(' WHERE'));
-      const cols = setPart.split(',').map(s => s.trim().split('=')[0].trim());
-      cols.forEach((col, i) => { folder[col] = binds[i]; });
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql === 'DELETE FROM folders WHERE id = ?') {
-      const before = state.folders.length;
-      state.folders = state.folders.filter(f => f.id !== binds[0]);
-      return { success: true, meta: { changes: before - state.folders.length } };
-    }
-    if (sql.startsWith('INSERT INTO chart_files')) {
-      const [id, name, folderId, createdAt, updatedAt, content] = binds;
-      state.chart_files.push({ id, name, folderId, createdAt, updatedAt, content });
-      return { success: true, meta: { changes: 1 } };
-    }
-    if (sql.startsWith('UPDATE chart_files SET')) {
-      const id = binds[binds.length - 1];
-      const file = state.chart_files.find(f => f.id === id);
-      if (!file) return { success: true, meta: { changes: 0 } };
-      const [name, folderId, updatedAt, content] = binds;
-      if (name !== null) file.name = name;
-      if (folderId !== null) file.folderId = folderId;
-      file.updatedAt = updatedAt;
-      if (content !== null) file.content = content;
-      return { success: true, meta: { changes: 1 } };
-    }
-    throw new Error('mock D1: unhandled mutation: ' + sql);
-  }
-
-  function prepare(sql) {
-    const normalized = sql.replace(/\s+/g, ' ').trim();
-    const stmt = {
-      _binds: [],
-      bind(...args) { stmt._binds = args; return stmt; },
-      async first() {
-        const rows = runSelect(normalized, stmt._binds);
-        return rows[0] ?? null;
-      },
-      async all() {
-        return { results: runSelect(normalized, stmt._binds) };
-      },
-      async run() {
-        return runMutate(normalized, stmt._binds);
-      },
-    };
-    return stmt;
-  }
-
-  return { env: { DB: { prepare } }, state };
-}
+const makeMockD1 = require('./helpers/d1-memory.cjs');
 
 function fakeRequest(body) {
   return { json: async () => body, url: 'http://local.test/api/folders' };
@@ -239,34 +146,44 @@ test('a corrupt/cyclic parentId chain already in the database does not hang the 
   assert.equal(res.status, 400, 'a corrupt cyclic chain must be refused, not hang the request');
 });
 
-// ── 2. Non-empty-folder deletion refusal ────────────────────────────────────
+// ── 2. Recoverable folder trash ─────────────────────────────────────────────
 
-test('DELETE /api/folders refuses to delete a folder with child folders (zero rows deleted)', async () => {
+test('DELETE /api/folders moves a nested subtree to trash without deleting rows', async () => {
   const mock = makeMockD1(syntheticTree());
   const before = mock.state.folders.length;
   const res = await foldersApi.onRequestDelete({ env: mock.env, request: fakeRequestWithUrl('http://local.test/api/folders?id=root-c') });
-  assert.equal(res.status, 409);
+  assert.equal(res.status, 200);
   assert.equal(mock.state.folders.length, before, 'zero folders must be deleted');
+  const trashId = (await bodyOf(res)).trashId;
+  assert.equal(mock.state.folders.filter(f => f.trashId === trashId).length, 3);
+  assert.equal(mock.state.chart_files.find(f => f.id === 'chart-2').trashId, trashId);
+  const visible = await bodyOf(await foldersApi.onRequestGet({ env: mock.env }));
+  assert.equal(visible.some(f => f.id === 'leaf'), false);
+  const restored = await trashApi.onRequestPost({ env: mock.env, request: fakeRequest({ action: 'restore', id: trashId }) });
+  assert.equal(restored.status, 200);
+  assert.equal(mock.state.folders.find(f => f.id === 'leaf').parentId, 'mid');
+  assert.equal(mock.state.chart_files.find(f => f.id === 'chart-2').trashId, null);
 });
 
-test('DELETE /api/folders refuses to delete a folder with chart files (zero rows deleted)', async () => {
+test('DELETE /api/folders keeps a contained chart and its content recoverable', async () => {
   const mock = makeMockD1(syntheticTree());
   const beforeFolders = mock.state.folders.length;
   const beforeFiles = mock.state.chart_files.length;
   const res = await foldersApi.onRequestDelete({ env: mock.env, request: fakeRequestWithUrl('http://local.test/api/folders?id=root-a') });
-  assert.equal(res.status, 409);
+  assert.equal(res.status, 200);
   assert.equal(mock.state.folders.length, beforeFolders, 'zero folders must be deleted');
-  assert.equal(mock.state.chart_files.length, beforeFiles, 'zero chart files must be deleted (no cascading delete in this phase)');
+  assert.equal(mock.state.chart_files.length, beforeFiles, 'zero chart files must be deleted');
+  assert.equal(mock.state.chart_files.find(f => f.id === 'chart-1').content, '{}');
 });
 
-test('DELETE /api/folders allows deleting a genuinely empty folder', async () => {
+test('DELETE /api/folders also puts an empty folder in trash', async () => {
   const mock = makeMockD1(syntheticTree());
   // root-b has no child folders and no chart files in the synthetic tree —
   // leaf looks childless but actually holds chart-2, which is the case the
   // previous two tests exist to catch.
   const res = await foldersApi.onRequestDelete({ env: mock.env, request: fakeRequestWithUrl('http://local.test/api/folders?id=root-b') });
   assert.equal(res.status, 200);
-  assert.equal(mock.state.folders.find(f => f.id === 'root-b'), undefined);
+  assert.ok(mock.state.folders.find(f => f.id === 'root-b').trashId);
 });
 
 // ── 3. GET must not perform a hidden schema write ───────────────────────────
@@ -286,6 +203,20 @@ test('GET /api/folders returns a clear schema-unavailable error (not a silent AL
   assert.equal(res.status, 409);
   const body = await bodyOf(res);
   assert.match(body.error, /schema-unavailable/);
+});
+
+test('GET /api/folders fails closed with a clear error before the Trash migration', async () => {
+  const mock = makeMockD1(syntheticTree());
+  const originalPrepare = mock.env.DB.prepare;
+  mock.env.DB.prepare = sql => {
+    if (sql.includes('WHERE trashId IS NULL')) {
+      return { async all() { throw new Error('no such column: trashId'); } };
+    }
+    return originalPrepare(sql);
+  };
+  const response = await foldersApi.onRequestGet({ env: mock.env });
+  assert.equal(response.status, 409);
+  assert.match((await bodyOf(response)).error, /Trash migration is missing/);
 });
 
 // ── 4. Synthetic multi-level tree survives the API boundary intact ─────────

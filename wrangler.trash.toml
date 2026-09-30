@@ -1,0 +1,15 @@
+name = "man-machine-trash-purge"
+main = "workers/trash-purge.js"
+compatibility_date = "2026-09-30"
+
+[triggers]
+crons = ["0 1 * * *"] # daily at 08:00 Asia/Bangkok (01:00 UTC)
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mm-chart-db"
+database_id = "c475f51c-3bcc-410a-8205-846b458c4efd"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "mm-chart-photos"

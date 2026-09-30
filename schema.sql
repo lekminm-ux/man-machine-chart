@@ -44,3 +44,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_revision_snapshots_unique
   ON revision_snapshots(chartFileId, revNo);
 CREATE INDEX IF NOT EXISTS idx_revision_snapshots_file
   ON revision_snapshots(chartFileId);
+
+-- 90-day recoverable trash. Apply these additive statements as a separate
+-- migration to an existing D1; do not re-run this whole schema.sql file.
+ALTER TABLE folders ADD COLUMN trashId TEXT DEFAULT NULL;
+ALTER TABLE chart_files ADD COLUMN trashId TEXT DEFAULT NULL;
+CREATE TABLE IF NOT EXISTS trash_entries (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'folder')),
+  rootId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  deletedAt TEXT NOT NULL,
+  expiresAt TEXT NOT NULL,
+  warnedAt TEXT DEFAULT NULL,
+  purgeStartedAt TEXT DEFAULT NULL,
+  restoredAt TEXT DEFAULT NULL,
+  purgedAt TEXT DEFAULT NULL
+);
+CREATE TABLE IF NOT EXISTS trash_members (
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'folder')),
+  memberId TEXT NOT NULL,
+  trashId TEXT NOT NULL,
+  PRIMARY KEY (kind, memberId, trashId),
+  FOREIGN KEY (trashId) REFERENCES trash_entries(id)
+);
+CREATE INDEX IF NOT EXISTS idx_folders_trash ON folders(trashId);
+CREATE INDEX IF NOT EXISTS idx_files_trash ON chart_files(trashId);
+CREATE INDEX IF NOT EXISTS idx_trash_members_batch ON trash_members(trashId);
+CREATE INDEX IF NOT EXISTS idx_trash_expiry ON trash_entries(expiresAt, warnedAt)
+  WHERE restoredAt IS NULL AND purgedAt IS NULL;

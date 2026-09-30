@@ -2,6 +2,26 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-09-30 (Codex: 90-day recoverable Trash, local implementation)
+
+### Tool / Session Goal
+
+- Codex implemented the Owner's request to unlock chart and folder deletion through recoverable Trash. The Owner specified nested folders should restore as a group, an in-app warning seven days ahead, and temporary delete/restore access for all website visitors. Shared login and roles across the nine Smart Factory apps are a later project.
+
+### Local changes
+
+- Added additive D1 Trash migration and a separate release plan. `folders` and `chart_files` gain nullable `trashId`; `trash_entries` tracks 90-day expiry, warning acknowledgement, restore, and purge; `trash_members` records IDs so stale browser caches cannot resurrect deleted records after purge.
+- Existing file/folder DELETE APIs now move rows to Trash in a D1 batch. Nested folders and charts move together without deleting content, revisions, or R2 photos. Active GET/POST/PUT and revision/photo upload routes exclude trashed records. New `/api/trash` lists, restores, and acknowledges warning. The Sidebar adds confirmation, Trash inventory, restore, and visible seven-day warning. The store removes a deleted subtree locally with rollback on API failure and reloads authoritative Cloud state after restore.
+- Added a separate daily Worker and `wrangler.trash.toml`. Purge eligibility requires 90 full days plus seven full days after an in-app acknowledgement. Unacknowledged items stay recoverable past day 90. R2 objects are removed before D1 chart rows; failure leaves D1 rows for retry and blocks restore after purge begins. A parent folder batch waits for separately trashed descendants. The Worker has no HTTP route.
+- Updated direct API/storage/store tests and added SQLite-backed D1 and purge tests. The migration was applied successfully to an in-memory copy of the prior committed schema. No project data fixture or Production backup was used in tests.
+
+### Verification / Notes-Risks
+
+- `npm.cmd test`: **PASS, 218/218** after the last store safety check. `npm.cmd run build`: **PASS**. Targeted ESLint on all modified runtime files passed after replacing Sidebar's old `any` module cast with a typed constant. Full lint exits with four pre-existing errors in StepTable/TopBar and 11 warnings; no modified runtime file has an ESLint issue. `git diff --check` passed (line-ending notices only).
+- Local Pages Dev/Wrangler is not installed, so no real-browser delete/restore flow was claimed. Current Production remains unchanged and continues serving the prior release. Owner approved only the read-only Production Data Gate; no migration, Production data write, push, Pages deployment, Worker deployment, or live delete occurred.
+- Read-only Gate completed on 2026-09-30: `scripts/production-readonly-backup.mjs` exported all active Production rows through GET APIs to `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-09-30_104913`. Cloudflare D1 Console `SELECT` confirmed the live schema and 11 folders, 20 charts, zero revisions; R2 Overview confirmed `mm-chart-photos` has zero objects. Backup records 6 roots, max depth 3, and 25 payload files with read-back SHA-256 verification. Compared with the earlier 19-chart backup, one new chart was added; no earlier chart was removed or changed. The current schema has no Trash columns/tables.
+- Release must follow `docs/Trash_90_Day_Release_Plan.md`: additive migration, compatibility deployment, feature deployment with an explicitly approved reversible Production test, and finally scheduled Worker deployment. Do not push this combined working tree to `main` before the schema migration; Git integration may auto-deploy it against the old schema. The known-good rollback after first deletion must be a Trash-aware compatibility deployment, not the older release.
+
 ## 2026-09-30 (APP02 cross-folder Copy Chart released to Production)
 
 - Owner approved the missing read-only Production Data Gate and use of the signed-in Codex local web. Verified Production target `man-machine-chart.pages.dev`, Pages project `man-machine-chart`, D1 `mm-chart-db` (`c475f51c-3bcc-410a-8205-846b458c4efd`), and the prior live deployment `2fa01c21-19a4-4b13-85d1-d7b060a44f28` / commit `5265cbf`. Cancelled an overly broad Wrangler OAuth request before granting any access; used existing browser session and read-only HTTP GET/D1 Console instead.

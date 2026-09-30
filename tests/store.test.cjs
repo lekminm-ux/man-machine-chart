@@ -349,6 +349,38 @@ test('a failed delete leaves the local folder/file state unchanged (rollback, no
   assert.equal(store.getState().syncStatus, 'error');
 });
 
+test('deleting a parent folder removes its visible subtree and records one recoverable group', async () => {
+  const store = await freshReadyStore({
+    deleteFolderCloud: async id => ({ id: 'trash-1', kind: 'folder', rootId: id, name: '', deletedAt: '2026-09-30T00:00:00.000Z', expiresAt: '2026-12-29T00:00:00.000Z', warnedAt: null, purgeStartedAt: null }),
+  });
+  await store.getState().createFolder('Root', 'custom');
+  const rootId = store.getState().folders[0].id;
+  await store.getState().createFolder('Child', 'custom', rootId);
+  const childId = store.getState().folders[1].id;
+  await store.getState().createFile(childId, 'Chart');
+  await store.getState().deleteFolder(rootId);
+  assert.equal(store.getState().folders.length, 0);
+  assert.equal(store.getState().files.length, 0);
+  assert.equal(store.getState().activeFileId, null);
+  assert.equal(store.getState().trashEntries[0].name, 'Root');
+});
+
+test('deleting the active chart leaves other unloaded charts unselected', async () => {
+  const store = await freshReadyStore({
+    deleteFileCloud: async id => ({ id: 'trash-file-1', kind: 'file', rootId: id, name: '', deletedAt: '2026-09-30T00:00:00.000Z', expiresAt: '2026-12-29T00:00:00.000Z', warnedAt: null, purgeStartedAt: null }),
+  });
+  await store.getState().createFolder('Root', 'custom');
+  const folderId = store.getState().folders[0].id;
+  await store.getState().createFile(folderId, 'First');
+  const firstId = store.getState().files[0].id;
+  await store.getState().createFile(folderId, 'Second');
+  store.setState({ activeFileId: firstId });
+  await store.getState().deleteFile(firstId);
+  assert.equal(store.getState().files.length, 1);
+  assert.equal(store.getState().activeFileId, null);
+  assert.equal(store.getState().trashEntries[0].name, 'First');
+});
+
 test('a failed move leaves the local file state unchanged (rollback, not partial apply)', async () => {
   const store = await freshReadyStore({
     saveFileCloud: async () => ({ ok: false, error: 'server rejected the move' }),

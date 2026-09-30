@@ -5,13 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
   ChartHeader, ProcessType, LayoutElement, LayoutConnection,
-  TimeStudy, TimeStudyRow, MachineCapacity, KaizenSheet,
+  TimeStudy, TimeStudyRow, MachineCapacity, KaizenSheet, TrashEntry,
 } from '@/types';
 import {
   loadLocalDatabase, saveLocalDatabase,
   loadDatabaseFromCloud, loadFileFromCloud,
   createFolderCloud, updateFolderCloud, deleteFolderCloud,
   createFileCloud, saveFileCloud, deleteFileCloud,
+  restoreTrashCloud, acknowledgeTrashWarningCloud,
   closeRevisionCloud, openRevisionCloud,
   chartFileContent,
 } from '@/lib/storage';
@@ -41,6 +42,8 @@ interface ChartState extends AppDatabase {
    */
   cloudReady: boolean;
   syncStatus: SyncStatus;
+  trashEntries: TrashEntry[];
+  trashMessage: string | null;
   activeModule: 1 | 2 | 3 | 4 | 5 | 6;
 
   setActiveModule: (m: 1 | 2 | 3 | 4 | 5 | 6) => void;
@@ -64,6 +67,8 @@ interface ChartState extends AppDatabase {
   moveFile: (id: string, newFolderId: string) => Promise<void>;
   renameFile: (id: string, name: string) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
+  restoreTrash: (id: string) => Promise<void>;
+  acknowledgeTrashWarning: (id: string) => Promise<void>;
   saveActiveFile: () => Promise<void>;
   closeRevision: (revNo: string) => Promise<void>;
   openNewRevision: () => Promise<void>;
@@ -260,7 +265,7 @@ async function mutateWithRollback(
   snapshot: AppDatabase,
   next: AppDatabase,
   cloudCall: () => Promise<void>,
-): Promise<void> {
+): Promise<boolean> {
   set(next);
   persistLocal(next);
   set({ syncStatus: 'syncing' });
@@ -268,10 +273,12 @@ async function mutateWithRollback(
     await cloudCall();
     set({ syncStatus: 'saved' });
     setTimeout(() => set({ syncStatus: 'idle' }), 2000);
+    return true;
   } catch {
     set(snapshot);
     persistLocal(snapshot);
     set({ syncStatus: 'error' });
+    return false;
   }
 }
 
@@ -292,6 +299,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
   hydrated: false,
   cloudReady: false,
   syncStatus: 'idle',
+  trashEntries: [],
+  trashMessage: null,
   activeModule: 4,
 
   setActiveModule: (m) => set({ activeModule: m }),
@@ -329,9 +338,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
       // back to the existing "no file open" state until the user re-opens it
       // through openFile()'s verified path.
       const wasActive = db.files.find(f => f.id === db.activeFileId) as (ChartFile & { _loaded?: boolean; _unsynced?: boolean; _unconfirmed?: boolean }) | undefined;
-      const activeFileId = wasActive && (wasActive._loaded === false || wasActive._unsynced || wasActive._unconfirmed) ? null : db.activeFileId;
+      const activeFileId = !wasActive || wasActive._loaded === false || wasActive._unsynced || wasActive._unconfirmed
+        ? null : db.activeFileId;
       const next: AppDatabase = { ...db, activeFileId };
-      set({ ...next, hydrated: true, cloudReady: true, syncStatus: 'idle' });
+      set({ ...next, trashEntries: result.trashEntries ?? [], trashMessage: null, hydrated: true, cloudReady: true, syncStatus: 'idle' });
       if (activeFileId !== db.activeFileId) persistLocal(next);
     } else {
       console.warn('Cloud hydration unavailable, showing cached data only:', result.error);
@@ -430,11 +440,35 @@ export const useChartStore = create<ChartState>((set, get) => ({
   async deleteFolder(id) {
     if (blockCloudMutation(set, get(), 'deleteFolder', id)) return;
     const s = get();
+    const root = s.folders.find(f => f.id === id);
+    if (!root) return;
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
-    const files = s.files.filter(f => f.folderId !== id);
-    const activeFileId = files.find(f => f.id === s.activeFileId) ? s.activeFileId : (files[0]?.id ?? null);
-    const next: AppDatabase = { folders: s.folders.filter(f => f.id !== id), files, activeFileId };
-    await mutateWithRollback(set, snapshot, next, () => deleteFolderCloud(id));
+    const descendantIds = new Set([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const folder of s.folders) {
+        if (folder.parentId && descendantIds.has(folder.parentId) && !descendantIds.has(folder.id)) {
+          descendantIds.add(folder.id);
+          grew = true;
+        }
+      }
+    }
+    const hasUnconfirmedDescendant = s.folders.some(f => descendantIds.has(f.id) && (
+      (f as ChartFolder & { _unsynced?: boolean; _unconfirmed?: boolean })._unsynced ||
+      (f as ChartFolder & { _unsynced?: boolean; _unconfirmed?: boolean })._unconfirmed
+    )) || s.files.some(f => descendantIds.has(f.folderId) && (
+      (f as ChartFile & { _unsynced?: boolean; _unconfirmed?: boolean })._unsynced ||
+      (f as ChartFile & { _unsynced?: boolean; _unconfirmed?: boolean })._unconfirmed
+    ));
+    if (hasUnconfirmedDescendant) { set({ syncStatus: 'error', trashMessage: 'This folder contains local or unconfirmed changes. Confirm or save them before moving it to Trash.' }); return; }
+    const files = s.files.filter(f => !descendantIds.has(f.folderId));
+    const activeFileId = files.find(f => f.id === s.activeFileId) ? s.activeFileId : null;
+    const next: AppDatabase = { folders: s.folders.filter(f => !descendantIds.has(f.id)), files, activeFileId };
+    let entry: TrashEntry | undefined;
+    const ok = await mutateWithRollback(set, snapshot, next, async () => { entry = await deleteFolderCloud(id); });
+    if (ok && entry) set(state => ({ trashEntries: [{ ...entry!, name: root.name }, ...state.trashEntries], trashMessage: null }));
+    else set({ trashMessage: 'Could not move the folder to Trash. Reload and try again.' });
   },
 
   async toggleFolder(id) {
@@ -514,11 +548,49 @@ export const useChartStore = create<ChartState>((set, get) => ({
   async deleteFile(id) {
     if (blockCloudMutation(set, get(), 'deleteFile', id)) return;
     const s = get();
+    const file = s.files.find(f => f.id === id);
+    if (!file) return;
+    if ((file as ChartFile & { _unconfirmed?: boolean })._unconfirmed) { set({ syncStatus: 'error', trashMessage: 'This chart has an unconfirmed save. Confirm it before moving the chart to Trash.' }); return; }
     const snapshot: AppDatabase = { folders: s.folders, files: s.files, activeFileId: s.activeFileId };
     const files = s.files.filter(f => f.id !== id);
-    const activeFileId = id === s.activeFileId ? (files[0]?.id ?? null) : s.activeFileId;
+    const activeFileId = id === s.activeFileId ? null : s.activeFileId;
     const next: AppDatabase = { folders: s.folders, files, activeFileId };
-    await mutateWithRollback(set, snapshot, next, () => deleteFileCloud(id));
+    let entry: TrashEntry | undefined;
+    const ok = await mutateWithRollback(set, snapshot, next, async () => { entry = await deleteFileCloud(id); });
+    if (ok && entry) set(state => ({ trashEntries: [{ ...entry!, name: file.name }, ...state.trashEntries], trashMessage: null }));
+    else set({ trashMessage: 'Could not move the chart to Trash. Reload and try again.' });
+  },
+
+  async restoreTrash(id) {
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    set({ syncStatus: 'syncing' });
+    try {
+      await restoreTrashCloud(id);
+      const result = await loadDatabaseFromCloud();
+      if (!result.ok) throw new Error(result.error);
+      const next = { ...result.db, activeFileId: get().activeFileId };
+      set({ ...next, trashEntries: result.trashEntries, trashMessage: null, syncStatus: 'saved' });
+      persistLocal(next);
+    } catch (err) {
+      console.warn('restoreTrash: cloud confirmation failed:', err);
+      set({ syncStatus: 'error', trashMessage: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  async acknowledgeTrashWarning(id) {
+    if (!get().cloudReady) { set({ syncStatus: 'error' }); return; }
+    set({ syncStatus: 'syncing' });
+    try {
+      const warnedAt = await acknowledgeTrashWarningCloud(id);
+      set(state => ({
+        trashEntries: state.trashEntries.map(entry => entry.id === id ? { ...entry, warnedAt } : entry),
+        trashMessage: null,
+        syncStatus: 'saved',
+      }));
+    } catch (err) {
+      console.warn('acknowledgeTrashWarning failed:', err);
+      set({ syncStatus: 'error', trashMessage: err instanceof Error ? err.message : String(err) });
+    }
   },
 
   async duplicateFile(id, targetFolderId) {

@@ -15,10 +15,13 @@ export async function onRequestGet(context) {
     // needs the column added is a migration decision, not something a GET
     // handler self-heals.
     const { results } = await env.DB.prepare(
-      'SELECT id, parentId, name, processType, expanded, createdAt FROM folders ORDER BY createdAt ASC'
+      'SELECT id, parentId, name, processType, expanded, createdAt FROM folders WHERE trashId IS NULL ORDER BY createdAt ASC'
     ).all();
     return json(results);
   } catch (err) {
+    if (/no such column:\s*trashId/i.test(err.message)) {
+      return json({ error: 'schema-unavailable: Trash migration is missing' }, 409);
+    }
     if (/no such column/i.test(err.message)) {
       return json({ error: 'schema-unavailable: folders.parentId column is missing' }, 409);
     }
@@ -32,7 +35,7 @@ export async function onRequestPost(context) {
     const { id, parentId, name, processType, expanded, createdAt } = await request.json();
     if (!id || !name) return badRequest('id and name are required');
     if (parentId != null) {
-      const parent = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(parentId).first();
+      const parent = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ? AND trashId IS NULL').bind(parentId).first();
       if (!parent) return badRequest('parentId does not reference an existing folder');
     }
     await env.DB.prepare(
@@ -54,7 +57,7 @@ export async function onRequestPut(context) {
     if (parentId !== undefined) {
       if (parentId != null) {
         if (parentId === id) return badRequest('a folder cannot be its own parent');
-        const parent = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ?').bind(parentId).first();
+        const parent = await env.DB.prepare('SELECT 1 FROM folders WHERE id = ? AND trashId IS NULL').bind(parentId).first();
         if (!parent) return badRequest('parentId does not reference an existing folder');
         if (await wouldCreateCycle(env, id, parentId)) {
           return badRequest('cannot move a folder into its own descendant');
@@ -66,7 +69,8 @@ export async function onRequestPut(context) {
     if (expanded !== undefined) { updates.push('expanded = ?'); binds.push(expanded ? 1 : 0); }
     if (updates.length === 0)   return badRequest('nothing to update');
     binds.push(id);
-    await env.DB.prepare(`UPDATE folders SET ${updates.join(', ')} WHERE id = ?`).bind(...binds).run();
+    const result = await env.DB.prepare(`UPDATE folders SET ${updates.join(', ')} WHERE id = ? AND trashId IS NULL`).bind(...binds).run();
+    if (!result?.meta || result.meta.changes === 0) return conflict('folder not found or in trash');
     return json({ success: true });
   } catch (err) {
     return error(err);
@@ -80,20 +84,31 @@ export async function onRequestDelete(context) {
     const id   = url.searchParams.get('id');
     if (!id) return badRequest('id query param required');
 
-    // Live Production has no self-referencing FK on folders.parentId (it was
-    // added later via ALTER TABLE, which SQLite cannot attach a same-table FK
-    // to), so nothing enforces this at the database level — it must be
-    // enforced here. Deleting a folder that still has children would silently
-    // orphan them (still present in the table, but unreachable from the root
-    // tree), which reads as data loss to the user even though no row is gone.
-    const childFolder = await env.DB.prepare('SELECT 1 FROM folders WHERE parentId = ? LIMIT 1').bind(id).first();
-    if (childFolder) return conflict('folder has child folders; move or delete them first');
-
-    const childFile = await env.DB.prepare('SELECT 1 FROM chart_files WHERE folderId = ? LIMIT 1').bind(id).first();
-    if (childFile) return conflict('folder has chart files; move or delete them first');
-
-    await env.DB.prepare('DELETE FROM folders WHERE id = ?').bind(id).run();
-    return json({ success: true });
+    const root = await env.DB.prepare('SELECT id, name FROM folders WHERE id = ? AND trashId IS NULL').bind(id).first();
+    if (!root) return json({ error: 'folder not found or already in trash' }, 404);
+    const now = new Date();
+    const deletedAt = now.toISOString();
+    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const trashId = crypto.randomUUID();
+    const subtree = `WITH RECURSIVE descendants(id) AS (
+      SELECT id FROM folders WHERE id = ? AND trashId IS NULL
+      UNION ALL
+      SELECT f.id FROM folders f JOIN descendants d ON f.parentId = d.id WHERE f.trashId IS NULL
+    )`;
+    const results = await env.DB.batch([
+      env.DB.prepare('INSERT INTO trash_entries (id, kind, rootId, name, deletedAt, expiresAt) SELECT ?, ?, id, name, ?, ? FROM folders WHERE id = ? AND trashId IS NULL')
+        .bind(trashId, 'folder', deletedAt, expiresAt, id),
+      env.DB.prepare(`${subtree} INSERT INTO trash_members (kind, memberId, trashId) SELECT 'folder', id, ? FROM descendants`)
+        .bind(id, trashId),
+      env.DB.prepare(`${subtree} INSERT INTO trash_members (kind, memberId, trashId) SELECT 'file', id, ? FROM chart_files WHERE folderId IN (SELECT id FROM descendants) AND trashId IS NULL`)
+        .bind(id, trashId),
+      env.DB.prepare(`${subtree} UPDATE chart_files SET trashId = ? WHERE folderId IN (SELECT id FROM descendants) AND trashId IS NULL`)
+        .bind(id, trashId),
+      env.DB.prepare(`${subtree} UPDATE folders SET trashId = ? WHERE id IN (SELECT id FROM descendants) AND trashId IS NULL`)
+        .bind(id, trashId),
+    ]);
+    if (results[0]?.meta?.changes !== 1 || results[4]?.meta?.changes < 1) return conflict('folder was not moved to trash');
+    return json({ success: true, trashId, deletedAt, expiresAt });
   } catch (err) {
     return error(err);
   }

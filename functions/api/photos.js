@@ -14,7 +14,7 @@ export async function onRequestPost(context) {
     const chartId = url.searchParams.get('chartId');
     if (!chartId) return badRequest('chartId query param required');
 
-    const chart = await env.DB.prepare('SELECT 1 FROM chart_files WHERE id = ?').bind(chartId).first();
+    const chart = await env.DB.prepare('SELECT 1 FROM chart_files WHERE id = ? AND trashId IS NULL').bind(chartId).first();
     if (!chart) return badRequest('chartId does not reference an existing chart');
 
     const formData = await request.formData();
