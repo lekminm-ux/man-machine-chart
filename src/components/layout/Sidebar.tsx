@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import type { ChartFile, ChartFolder, ProcessType } from '@/types';
 
@@ -16,12 +16,9 @@ function getLevelColor(level: number) {
 
 type ContextTarget = { type: 'folder'; id: string } | { type: 'file'; id: string } | null;
 
-// The previous Admin PIN prompt looked like security but never was one — a
-// client-side window.prompt() compared to a value shipped in the JS bundle
-// is fully visible and bypassable from devtools. Phase 0B removes that false
-// impression rather than keep it: until real server-side authorization
-// ships, destructive/hierarchy-changing actions stay off instead of behind
-// fake security. No PIN, password, or token is checked or sent anywhere.
+// Moving remains gated pending the shared login/authorization design. The
+// current owner-approved trash action is available to all app visitors; this
+// confirmation is an accident guard, not an identity or permission check.
 function denyDestructiveAction(actionName: string): void {
   alert(`${actionName} is not available yet — it requires server-side authorization, which has not shipped. This is a safety gate, not an error.`);
 }
@@ -61,6 +58,12 @@ export default function Sidebar() {
   const openFile      = useChartStore(s => s.openFile);
   const renameFile    = useChartStore(s => s.renameFile);
   const duplicateFile = useChartStore(s => s.duplicateFile);
+  const deleteFile = useChartStore(s => s.deleteFile);
+  const deleteFolder = useChartStore(s => s.deleteFolder);
+  const restoreTrash = useChartStore(s => s.restoreTrash);
+  const acknowledgeTrashWarning = useChartStore(s => s.acknowledgeTrashWarning);
+  const trashEntries = useChartStore(s => s.trashEntries);
+  const trashMessage = useChartStore(s => s.trashMessage);
   const setActiveModule = useChartStore(s => s.setActiveModule);
   const activeModule = useChartStore(s => s.activeModule);
 
@@ -76,6 +79,32 @@ export default function Sidebar() {
 
   const [movingTarget, setMovingTarget]         = useState<ContextTarget>(null);
   const [copyingFileId, setCopyingFileId]       = useState<string | null>(null);
+  const [trashOpen, setTrashOpen]                 = useState(false);
+  const [clockNow, setClockNow]                   = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const warningStart = clockNow + 7 * 24 * 60 * 60 * 1000;
+  const expiringEntries = trashEntries.filter(entry => !entry.purgeStartedAt && Date.parse(entry.expiresAt) <= warningStart);
+
+  const confirmDeleteFile = (file: ChartFile) => {
+    if (!cloudReady) return;
+    if (window.confirm(`Move chart "${file.name}" to Trash? You can restore it for at least 90 days.`)) {
+      setTrashOpen(true);
+      void deleteFile(file.id);
+    }
+  };
+
+  const confirmDeleteFolder = (folder: ChartFolder) => {
+    if (!cloudReady) return;
+    if (window.confirm(`Move folder "${folder.name}" and everything inside it to Trash? You can restore the whole group for at least 90 days.`)) {
+      setTrashOpen(true);
+      void deleteFolder(folder.id);
+    }
+  };
 
   // Tooltip for truncated folder/file names
   const [nameTip, setNameTip] = useState<{ text: string; x: number; y: number; flip: boolean } | null>(null);
@@ -198,10 +227,11 @@ export default function Sidebar() {
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  denyDestructiveAction('Deleting folders');
+                  confirmDeleteFolder(folder);
                 }}
+                disabled={!cloudReady}
                 className="text-slate-500 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                title="Delete folder — disabled until server-side authorization ships"
+                title="Move folder and contents to Trash"
               >🗑️</button>
             </div>
           )}
@@ -324,10 +354,11 @@ export default function Sidebar() {
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      denyDestructiveAction('Deleting charts');
+                      confirmDeleteFile(file);
                     }}
+                    disabled={!cloudReady}
                     className="text-slate-400 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Delete — disabled until server-side authorization ships"
+                    title="Move chart to Trash"
                   >🗑️</button>
                 </div>
               </div>
@@ -373,13 +404,55 @@ export default function Sidebar() {
       {/* Cloud-unavailable state — data safety gate (Phase 0B) */}
       {!cloudReady && (
         <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] leading-snug">
-          <b>⚠ Cloud unavailable.</b> Showing cached data — new folders/charts and renames can&apos;t be saved until reconnected. Delete and move stay off either way, pending server-side authorization.
+          <b>⚠ Cloud unavailable.</b> Showing cached data — changes and Trash are unavailable until reconnected.
+        </div>
+      )}
+
+      {cloudReady && expiringEntries.length > 0 && (
+        <div className="px-3 py-2 bg-red-50 border-b border-red-200 text-red-800 text-[11px] leading-snug" role="alert">
+          ⚠ {expiringEntries.length} Trash item{expiringEntries.length === 1 ? '' : 's'} near the 90-day deadline. Review Trash now; permanent deletion requires seven days after notice acknowledgement.
+          <button onClick={() => setTrashOpen(true)} className="ml-1 underline font-semibold">Open Trash</button>
         </div>
       )}
 
       {/* Folder tree */}
       <div className="flex-1 overflow-y-auto py-2" onScroll={hideNameTip}>
         {rootFolders.map(folder => renderFolderNode(folder, 0))}
+      </div>
+
+      <div className="border-t border-slate-200 bg-white">
+        <button onClick={() => setTrashOpen(open => !open)} className="w-full px-4 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-100">
+          🗑️ Trash ({trashEntries.length}) {trashOpen ? '▴' : '▾'}
+        </button>
+        {trashOpen && (
+          <div className="max-h-56 overflow-y-auto px-3 pb-2 space-y-2">
+            {trashMessage && <p className="rounded bg-red-50 border border-red-200 px-2 py-1 text-[11px] text-red-700" role="alert">{trashMessage}</p>}
+            {trashEntries.length === 0 && <p className="text-xs text-slate-500">Trash is empty.</p>}
+            {trashEntries.map(entry => {
+              const warningDue = Date.parse(entry.expiresAt) <= warningStart && !entry.warnedAt && !entry.purgeStartedAt;
+              const purgeTime = entry.warnedAt
+                ? Math.max(Date.parse(entry.expiresAt), Date.parse(entry.warnedAt) + 7 * 24 * 60 * 60 * 1000)
+                : null;
+              return (
+                <div key={entry.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
+                  <div className="font-semibold break-words">{entry.kind === 'folder' ? '📁' : '📄'} {entry.name}</div>
+                  <div className="text-[10px] text-slate-500">
+                    Deleted {new Date(entry.deletedAt).toLocaleDateString()} · 90 days {new Date(entry.expiresAt).toLocaleDateString()}
+                  </div>
+                  <div className="text-[10px] text-slate-600">
+                    {entry.purgeStartedAt ? 'Permanent deletion in progress' : purgeTime
+                      ? `Permanent deletion no sooner than ${new Date(purgeTime).toLocaleDateString()}`
+                      : 'Permanent deletion waits for the seven-day notice'}
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    {!entry.purgeStartedAt && <button onClick={() => void restoreTrash(entry.id)} className="text-blue-700 font-semibold underline">Restore</button>}
+                    {warningDue && <button onClick={() => void acknowledgeTrashWarning(entry.id)} className="text-red-700 font-semibold underline">Acknowledge notice</button>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Full-name tooltip (fixed so it is not clipped by the sidebar) */}
@@ -443,10 +516,10 @@ export default function Sidebar() {
       <div className="border-t border-slate-200 bg-slate-50 p-2 flex flex-col gap-1">
         <div className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1">Ecosystem Modules</div>
         <div className="grid grid-cols-5 gap-1">
-          {[1, 2, 3, 4, 5].map(m => (
+          {([1, 2, 3, 4, 5] as const).map(m => (
             <button
               key={m}
-              onClick={() => setActiveModule(m as any)}
+              onClick={() => setActiveModule(m)}
               className={`py-1.5 rounded text-xs font-bold transition-colors shadow-sm border ${
                 activeModule === m
                   ? 'bg-blue-600 text-white border-blue-700'
