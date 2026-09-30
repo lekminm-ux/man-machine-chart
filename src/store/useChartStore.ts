@@ -106,7 +106,9 @@ interface ChartState extends AppDatabase {
   // Layout actions
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
   updateLayoutElement: (id: string, partial: Partial<LayoutElement>) => void;
+  updateLayoutElements: (patches: Record<string, Partial<LayoutElement>>) => void;
   deleteLayoutElement: (id: string) => void;
+  deleteLayoutElements: (ids: string[]) => void;
   addLayoutConnection: (conn: Omit<LayoutConnection, 'id'> & { id?: string }) => void;
   updateLayoutConnection: (id: string, partial: Partial<LayoutConnection>) => void;
   deleteLayoutConnection: (id: string) => void;
@@ -1129,6 +1131,42 @@ export const useChartStore = create<ChartState>((set, get) => ({
         files: s.files.map(f =>
           f.id === s.activeFileId
             ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(el => el.id === id ? { ...el, ...partial } : el) }, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  updateLayoutElements(patches) {
+    set(s => {
+      if (!s.activeFileId || !Object.keys(patches).length) return s;
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(el => patches[el.id] ? { ...el, ...patches[el.id] } : el) }, updatedAt: new Date().toISOString() }
+            : f
+        ),
+      };
+      persistLocal(next);
+      return next;
+    });
+  },
+
+  deleteLayoutElements(ids) {
+    set(s => {
+      if (!s.activeFileId || !ids.length) return s;
+      const removed = new Set(ids);
+      const next = {
+        ...s,
+        files: s.files.map(f =>
+          f.id === s.activeFileId
+            ? { ...f, layoutDiagram: {
+                elements: f.layoutDiagram.elements.filter(el => !removed.has(el.id)),
+                connections: f.layoutDiagram.connections.filter(c => !removed.has(c.fromId ?? '') && !removed.has(c.toId ?? '')),
+              }, updatedAt: new Date().toISOString() }
             : f
         ),
       };

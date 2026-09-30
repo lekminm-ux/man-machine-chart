@@ -4454,3 +4454,20 @@ Phase 3: สร้าง Module 3 ตารางงานมาตรฐาน�
 - No commit, push, deploy, Production/schema/API change, or git-mutating
   command occurred. Return this fix handoff to Claude for review and
   re-verification; do not proceed to Phase 5b-2 or release work.
+
+## 2026-09-30 (Codex Layout Man Map readability and grouping)
+
+### Scope
+
+- Added independent shape/icon and text colours with automatic high-contrast text for existing layout elements; expanded the colour palette to include dark neutrals.
+- Added marquee and Shift/Ctrl selection, persistent element grouping, batch group movement/deletion, Group/Ungroup buttons, and Ctrl+G / Ctrl+Shift+G shortcuts. Alt-click selects one grouped member for property editing.
+- Replaced circular worker drawings with human silhouettes. Added Injection Molding and Blow Molding palette items with process-specific machine drawings; older generic machine elements also show the correct process drawing when their label or chart process name identifies it.
+- Documented symbol meaning and primary references in `docs/Layout_Man_Map_Symbols.md`. The Blow Molding glyph depicts extrusion blow molding; site-specific variants should be confirmed before claiming a universal standard.
+- `LayoutElement.textColor` and `groupId` are optional fields within the existing chart JSON. There is no D1 schema migration or API change.
+
+### Verification / Notes
+
+- `npm test`: **PASS 220/220** (including new contrast, group selection, batch update, and connector deletion checks).
+- `npm run build`: **PASS** (Next.js compile, TypeScript, and five static pages).
+- Targeted ESLint on changed source files: **PASS**, no errors. Full `npm run lint` still reports the existing 4 errors in `StepTable.tsx` and `TopBar.tsx` plus 11 warnings elsewhere/generated Wrangler files.
+- No production chart data was modified for testing. Browser-level drag and visual checks against live charts remain to be done after the feature is deployed.

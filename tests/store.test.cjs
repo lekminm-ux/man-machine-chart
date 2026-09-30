@@ -193,6 +193,27 @@ test('duplicateFile deep-copies steps and remaps layout connections', async () =
   assert.equal(conn.toId, copyB.id);
 });
 
+test('layout group moves together in one batch and deletion removes attached connectors', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('Group Test', 'custom');
+  await store.getState().createFile(store.getState().folders[0].id, 'Grouped Layout');
+  store.getState().addLayoutElement({ type: 'table', label: 'T', x: 10, y: 10, width: 80, height: 40 });
+  store.getState().addLayoutElement({ type: 'worker', label: 'W', x: 110, y: 10, width: 60, height: 70 });
+  const [a, b] = store.getState().activeFile().layoutDiagram.elements;
+  store.getState().addLayoutConnection({ fromId: a.id, toId: b.id });
+  store.getState().updateLayoutElements({
+    [a.id]: { x: 30, groupId: 'group-1', textColor: '#ffffff' },
+    [b.id]: { x: 130, groupId: 'group-1' },
+  });
+  const moved = store.getState().activeFile().layoutDiagram.elements;
+  assert.deepEqual([...moved.map(el => el.x)], [30, 130]);
+  assert.deepEqual([...moved.map(el => el.groupId)], ['group-1', 'group-1']);
+  assert.equal(moved[0].textColor, '#ffffff');
+  store.getState().deleteLayoutElements([a.id, b.id]);
+  assert.equal(store.getState().activeFile().layoutDiagram.elements.length, 0);
+  assert.equal(store.getState().activeFile().layoutDiagram.connections.length, 0);
+});
+
 // ── Phase 0B: runtime data-safety guards ─────────────────────────────────────
 
 test('duplicateFile starts a copied locked chart as an open revision', async () => {

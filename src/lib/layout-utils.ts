@@ -15,9 +15,11 @@ export interface PaletteItem {
 export const ELEMENT_PALETTE: PaletteItem[] = [
   // Equipment
   { type: 'machine',    label: 'Machine',      icon: '⚙️', color: '#3b82f6', w: 140, h: 72, shape: 'rect',    group: 'equipment' },
+  { type: 'injection_machine', label: 'Injection Molding', icon: '⇥▣', color: '#1d4ed8', w: 170, h: 88, shape: 'rect', group: 'equipment' },
+  { type: 'blow_molding_machine', label: 'Blow Molding', icon: '⬇◧', color: '#0f766e', w: 170, h: 88, shape: 'rect', group: 'equipment' },
   { type: 'table',      label: 'Table',        icon: '🗂️', color: '#6b7280', w: 120, h: 56, shape: 'rect',    group: 'equipment' },
   { type: 'rack',       label: 'Rack / Shelf', icon: '📦', color: '#10b981', w: 100, h: 56, shape: 'rect',    group: 'equipment' },
-  { type: 'worker',     label: 'Worker Pos.',  icon: '👷', color: '#f59e0b', w: 64,  h: 64, shape: 'circle',  group: 'equipment' },
+  { type: 'worker',     label: 'Worker Pos.',  icon: '♟', color: '#b45309', w: 78,  h: 82, shape: 'circle',  group: 'equipment' },
   { type: 'conveyor',   label: 'Conveyor',     icon: '➡️', color: '#8b5cf6', w: 200, h: 32, shape: 'rect',    group: 'equipment' },
   { type: 'robot',      label: 'Robot',        icon: '🦾', color: '#6366f1', w: 90,  h: 64, shape: 'rect',    group: 'equipment' },
   { type: 'jig',        label: 'Jig / Fixture',icon: '🧲', color: '#14b8a6', w: 96,  h: 52, shape: 'rect',    group: 'equipment' },
@@ -43,9 +45,28 @@ export function shapeOf(el: Pick<LayoutElement, 'type' | 'shape'>): LayoutShape 
 
 // ── Preset colours offered in the property panel ────────────────────────────
 export const COLOR_PRESETS = [
-  '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
-  '#f59e0b', '#10b981', '#14b8a6', '#6b7280', '#94a3b8', '#111827',
+  '#ffffff', '#e2e8f0', '#94a3b8', '#64748b', '#334155', '#111827', '#000000',
+  '#1d4ed8', '#312e81', '#7e22ce', '#9d174d', '#b91c1c', '#c2410c',
+  '#b45309', '#15803d', '#0f766e',
 ];
+
+/** Pick readable text for old elements which do not yet have an explicit textColor. */
+export function defaultTextColor(fill: string): string {
+  const hex = fill.replace('#', '');
+  if (!/^(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return '#0f172a';
+  const full = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+  const channels = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255);
+  const [r, g, b] = channels.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? '#0f172a' : '#ffffff';
+}
+
+/** Expand a selection to include all members of every selected group. */
+export function expandGroupedSelection(elements: LayoutElement[], ids: string[]): string[] {
+  const selected = new Set(ids);
+  const groups = new Set(elements.filter(el => selected.has(el.id) && el.groupId).map(el => el.groupId));
+  for (const el of elements) if (el.groupId && groups.has(el.groupId)) selected.add(el.id);
+  return elements.filter(el => selected.has(el.id)).map(el => el.id);
+}
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 export interface Pt { x: number; y: number; }

@@ -34,6 +34,18 @@ test('shapeOf falls back to the palette default for the type', () => {
   assert.equal(L.shapeOf({ type: 'machine', shape: 'ellipse' }), 'ellipse');
 });
 
+test('dark fills get readable text and explicit groups expand as one selection', () => {
+  assert.equal(L.defaultTextColor('#111827'), '#ffffff');
+  assert.equal(L.defaultTextColor('#f8fafc'), '#0f172a');
+  const elements = [
+    box(0, 0, 20, 20, { id: 'a', groupId: 'g' }),
+    box(30, 0, 20, 20, { id: 'b', groupId: 'g' }),
+    box(60, 0, 20, 20, { id: 'c' }),
+  ];
+  assert.deepEqual([...L.expandGroupedSelection(elements, ['b', 'c'])], ['a', 'b', 'c']);
+  assert.deepEqual([...L.expandGroupedSelection(elements, ['c'])], ['c']);
+});
+
 test('edgePoint lands on the box border toward the target', () => {
   const b = box(0, 0, 100, 100); // centre (50,50)
   // target far to the right → exits the right edge at x=100, y=50

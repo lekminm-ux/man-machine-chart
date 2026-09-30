@@ -53,6 +53,7 @@ export type LayoutElementType =
   | 'machine' | 'table' | 'rack' | 'worker' | 'label' | 'arrow_start' | 'conveyor'
   // Extended factory equipment
   | 'robot' | 'jig' | 'inspection' | 'buffer' | 'pallet' | 'door'
+  | 'injection_machine' | 'blow_molding_machine'
   // Basic geometric shapes
   | 'shape_rect' | 'shape_circle' | 'shape_diamond' | 'shape_ellipse';
 
@@ -68,6 +69,8 @@ export interface LayoutElement {
   width: number;
   height: number;
   color?: string;
+  textColor?: string;   // label colour, independent of the shape/icon colour
+  groupId?: string;     // elements with the same id move together
   shape?: LayoutShape;   // overrides the default shape for the type
   fontSize?: number;     // label size in px (default 11)
   fontBold?: boolean;    // bold label (default true)

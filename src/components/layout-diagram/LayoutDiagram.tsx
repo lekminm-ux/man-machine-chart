@@ -5,7 +5,7 @@ import { useChartStore } from '@/store/useChartStore';
 import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  ELEMENT_PALETTE, COLOR_PRESETS, shapeOf,
+  ELEMENT_PALETTE, COLOR_PRESETS, shapeOf, defaultTextColor, expandGroupedSelection,
   elCenter, edgePoint, connectionPath, pointsToPath,
   arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
 } from '@/lib/layout-utils';
@@ -25,6 +25,7 @@ function ElementShape({
   selected,
   hovered,
   linkTarget,
+  processHint,
   onPointerDown,
   onDoubleClick,
   onResizeStart,
@@ -36,6 +37,7 @@ function ElementShape({
   selected: boolean;
   hovered: boolean;
   linkTarget: boolean;
+  processHint?: 'injection' | 'blow';
   onPointerDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
   onResizeStart: (e: React.MouseEvent | React.TouchEvent, corner: Corner) => void;
@@ -48,12 +50,16 @@ function ElementShape({
   const rotation = el.rotation ?? 0;
   const fontSize = el.fontSize ?? 11;
   const fontWeight = el.fontBold === false ? '500' : '700';
-  const filled = el.type === 'worker'; // workers render as a solid disc
+  const isWorker = el.type === 'worker';
+  const iconKind = el.type === 'injection_machine' ? 'injection'
+    : el.type === 'blow_molding_machine' ? 'blow'
+    : el.type === 'machine' ? (/injection|ฉีด/i.test(label) ? 'injection' : /blow|เป่า/i.test(label) ? 'blow' : processHint)
+    : undefined;
+  const isProcessMachine = Boolean(iconKind);
+  const textColor = el.textColor ?? defaultTextColor(color);
 
   const body = (() => {
-    const common = filled
-      ? { fill: color, fillOpacity: 0.9, stroke: 'none' as const }
-      : { fill: color, fillOpacity: 0.15, stroke: color, strokeWidth: selected ? 2.5 : 1.5 };
+    const common = { fill: color, fillOpacity: 0.88, stroke: color, strokeWidth: selected ? 2.5 : 1.5 };
     switch (shape) {
       case 'circle':
         return <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} {...common} />;
@@ -94,14 +100,50 @@ function ElementShape({
     >
       {/* Rotated visual content (shadow + body + label) */}
       <g transform={`rotate(${rotation}, ${w / 2}, ${h / 2})`} style={{ cursor: 'grab' }}>
-        <rect x={3} y={3} width={w} height={h} rx={shape === 'circle' ? w / 2 : 6} fill="rgba(0,0,0,0.18)" />
-        {body}
+        {isWorker ? (
+          <>
+            <rect width={w} height={h} fill="transparent" />
+            <circle cx={w / 2} cy={h * 0.20} r={Math.min(w, h) * 0.10} fill={color} />
+            <path d={`M ${w / 2} ${h * 0.32} L ${w / 2} ${h * 0.59} M ${w * 0.26} ${h * 0.40} L ${w * 0.74} ${h * 0.40} M ${w / 2} ${h * 0.59} L ${w * 0.30} ${h * 0.77} M ${w / 2} ${h * 0.59} L ${w * 0.70} ${h * 0.77}`}
+              fill="none" stroke={color} strokeWidth={Math.max(5, w * 0.085)} strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        ) : (
+          <>
+            <rect x={3} y={3} width={w} height={h} rx={shape === 'circle' ? w / 2 : 6} fill="rgba(0,0,0,0.18)" />
+            {body}
+          </>
+        )}
+        {isProcessMachine && (
+          <g transform={`translate(${w * 0.13}, ${h * 0.10}) scale(${w * 0.0074}, ${h * 0.012})`}
+            fill="none" stroke={textColor} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
+            {iconKind === 'injection' ? (
+              <>
+                <path d="M 3 4 H 25 L 19 16 H 9 Z" />
+                <rect x={2} y={18} width={46} height={17} rx={2} />
+                <path d="M 9 26 H 42 M 19 22 L 25 30 L 31 22 L 37 30" />
+                <path d="M 49 26 H 61 M 56 21 L 62 26 L 56 31" />
+                <rect x={64} y={12} width={8} height={30} />
+                <rect x={82} y={12} width={8} height={30} />
+                <path d="M 72 16 H 82 M 72 38 H 82" />
+              </>
+            ) : (
+              <>
+                <rect x={2} y={5} width={40} height={13} rx={2} />
+                <path d="M 9 11 H 38 M 18 7 L 24 16 L 30 7" />
+                <path d="M 42 11 H 51 V 20 H 62 M 57 16 L 62 21 L 57 26" />
+                <path d="M 65 11 H 75 V 23 M 70 16 V 26" />
+                <path d="M 55 24 L 66 24 L 64 41 L 57 41 Z M 84 24 L 73 24 L 75 41 L 82 41 Z" />
+                <path d="M 66 31 H 73 M 66 36 H 73" />
+              </>
+            )}
+          </g>
+        )}
         <text
-          x={w / 2} y={h / 2 + fontSize / 3}
+          x={w / 2} y={isWorker || isProcessMachine ? h - 5 : h / 2 + fontSize / 3}
           textAnchor="middle"
           fontSize={fontSize}
           fontWeight={fontWeight}
-          fill={filled ? '#ffffff' : color}
+          fill={isWorker ? (el.textColor ?? '#0f172a') : textColor}
           fontFamily="Inter, sans-serif"
           pointerEvents="none"
           style={{ userSelect: 'none' }}
@@ -275,12 +317,13 @@ export default function LayoutDiagram() {
   const activeFile   = useChartStore(s => s.activeFile());
   const addEl        = useChartStore(s => s.addLayoutElement);
   const updateEl     = useChartStore(s => s.updateLayoutElement);
-  const deleteEl     = useChartStore(s => s.deleteLayoutElement);
+  const updateMany   = useChartStore(s => s.updateLayoutElements);
+  const deleteMany   = useChartStore(s => s.deleteLayoutElements);
   const addConn      = useChartStore(s => s.addLayoutConnection);
   const updateConn   = useChartStore(s => s.updateLayoutConnection);
   const deleteConn   = useChartStore(s => s.deleteLayoutConnection);
 
-  const [selectedId, setSelectedId]         = useState<string | null>(null);
+  const [selectedIds, setSelectedIds]       = useState<string[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [connectMode, setConnectMode]       = useState(false);
   const [connectFrom, setConnectFrom]       = useState<string | null>(null);
@@ -288,7 +331,9 @@ export default function LayoutDiagram() {
   // Excel-style drag-to-connect: live rubber-band from a source element to the cursor.
   const [linking, setLinking]               = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null);
 
-  const dragRef   = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
+  const dragRef   = useRef<{ positions: { id: string; x: number; y: number; width: number; height: number }[]; startX: number; startY: number } | null>(null);
+  const marqueeRef = useRef<{ x: number; y: number; additive: boolean } | null>(null);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const resizeRef = useRef<{ id: string; corner: Corner; ox: number; oy: number; ow: number; oh: number; startX: number; startY: number } | null>(null);
   const rotateRef = useRef<{ id: string; cx: number; cy: number } | null>(null);
   // Free-arrow endpoint / body dragging
@@ -303,16 +348,27 @@ export default function LayoutDiagram() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       const isLocked = Boolean(activeFile?.lockedAt);
       if (isLocked) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined }])));
+        } else if (selectedIds.length > 1) {
+          const groupId = uuidv4();
+          updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId }])));
+        }
+        return;
+      }
+      if (e.key === 'Escape') { setSelectedIds([]); setSelectedConnId(null); return; }
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      if (selectedId) { deleteEl(selectedId); setSelectedId(null); }
+      if (selectedIds.length) { deleteMany(selectedIds); setSelectedIds([]); }
       else if (selectedConnId) { deleteConn(selectedConnId); setSelectedConnId(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [deleteEl, deleteConn, selectedId, selectedConnId, activeFile?.lockedAt]);
+  }, [deleteMany, deleteConn, updateMany, selectedIds, selectedConnId, activeFile?.lockedAt]);
 
   const pointer = useCallback((clientX: number, clientY: number): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -323,9 +379,12 @@ export default function LayoutDiagram() {
   const isLocked = Boolean(activeFile.lockedAt);
   const { elements, connections } = activeFile.layoutDiagram;
   const getEl = (id: string) => elements.find(e => e.id === id);
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selectedEl = selectedId ? getEl(selectedId) : null;
   const selectedConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
   const selectedConnPts = selectedConn ? (connectionPath(selectedConn, getEl)?.pts ?? null) : null;
+  const processHint = /injection|ฉีด/i.test(activeFile.header.processName) ? 'injection'
+    : /blow|เป่า/i.test(activeFile.header.processName) ? 'blow' : undefined;
 
   // ── Element pointer down (move / connect) ──────────────────────────────────
   const onElementPointerDown = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
@@ -341,11 +400,28 @@ export default function LayoutDiagram() {
       }
       return;
     }
-    setSelectedId(el.id);
+    const clicked = expandGroupedSelection(elements, [el.id]);
+    if ('altKey' in e && e.altKey) {
+      setSelectedIds([el.id]);
+      setSelectedConnId(null);
+      return;
+    }
+    const multi = 'shiftKey' in e && (e.shiftKey || e.ctrlKey || e.metaKey);
+    if (multi) {
+      setSelectedIds(current => clicked.every(id => current.includes(id))
+        ? current.filter(id => !clicked.includes(id))
+        : expandGroupedSelection(elements, [...current, ...clicked]));
+      return;
+    }
+    const movingIds = selectedIds.length > 1 && selectedIds.includes(el.id) ? selectedIds : clicked;
+    setSelectedIds(movingIds);
     setSelectedConnId(null);
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
-    dragRef.current = { id: el.id, ox: el.x, oy: el.y, startX: p.x, startY: p.y };
+    dragRef.current = {
+      positions: elements.filter(item => movingIds.includes(item.id)).map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height })),
+      startX: p.x, startY: p.y,
+    };
   };
 
   const onResizeStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement, corner: Corner) => {
@@ -368,7 +444,7 @@ export default function LayoutDiagram() {
     e.stopPropagation();
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
-    setSelectedId(null);
+    setSelectedIds([]);
     setSelectedConnId(null);
     setLinking({ sourceId: el.id, x: p.x, y: p.y, targetId: null });
   };
@@ -394,7 +470,7 @@ export default function LayoutDiagram() {
       arrow: 'end', style: 'solid', routing: 'straight', color: '#e2e8f0',
     });
     setSelectedConnId(id);
-    setSelectedId(null);
+    setSelectedIds([]);
   };
 
   const onConnEndpointDown = (e: React.MouseEvent | React.TouchEvent, id: string, end: 'from' | 'to') => {
@@ -463,7 +539,15 @@ export default function LayoutDiagram() {
 
     if (dragRef.current) {
       const d = dragRef.current;
-      updateEl(d.id, { x: Math.max(0, d.ox + (p.x - d.startX)), y: Math.max(0, d.oy + (p.y - d.startY)) });
+      const dx = Math.max(-Math.min(...d.positions.map(item => item.x)), Math.min(CANVAS_W - Math.max(...d.positions.map(item => item.x + item.width)), p.x - d.startX));
+      const dy = Math.max(-Math.min(...d.positions.map(item => item.y)), Math.min(CANVAS_H - Math.max(...d.positions.map(item => item.y + item.height)), p.y - d.startY));
+      updateMany(Object.fromEntries(d.positions.map(item => [item.id, { x: Math.round(item.x + dx), y: Math.round(item.y + dy) }])));
+      return;
+    }
+
+    if (marqueeRef.current) {
+      const start = marqueeRef.current;
+      setMarquee({ x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), width: Math.abs(p.x - start.x), height: Math.abs(p.y - start.y) });
     }
   };
 
@@ -476,13 +560,32 @@ export default function LayoutDiagram() {
       }
       setLinking(null);
     }
+    if (marqueeRef.current && marquee) {
+      const ids = elements.filter(el => el.x < marquee.x + marquee.width && el.x + el.width > marquee.x && el.y < marquee.y + marquee.height && el.y + el.height > marquee.y).map(el => el.id);
+      setSelectedIds(current => expandGroupedSelection(elements, marqueeRef.current?.additive ? [...current, ...ids] : ids));
+    }
+    marqueeRef.current = null;
+    setMarquee(null);
     dragRef.current = null; resizeRef.current = null; rotateRef.current = null; connDragRef.current = null;
   };
 
-  const clearSelection = () => {
+  const onCanvasDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.target !== e.currentTarget && (e.target as Element).id !== 'layout-grid-background') return;
     if (connectMode) return;
-    setSelectedId(null);
+    const p = pointer(e.clientX, e.clientY);
+    if (!e.shiftKey) setSelectedIds([]);
     setSelectedConnId(null);
+    if (!isLocked) marqueeRef.current = { ...p, additive: e.shiftKey };
+  };
+
+  const groupSelected = () => {
+    if (isLocked || selectedIds.length < 2) return;
+    const groupId = uuidv4();
+    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId }])));
+  };
+  const ungroupSelected = () => {
+    if (isLocked || !selectedIds.length) return;
+    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined }])));
   };
 
   const addFromPalette = (type: string) => {
@@ -500,6 +603,12 @@ export default function LayoutDiagram() {
       <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
         <h3 className="text-slate-700 font-bold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
         <div className="flex items-center gap-2">
+          <button onClick={groupSelected} disabled={isLocked || selectedIds.length < 2}
+            className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Group selected shapes and move them together">Group ({selectedIds.length})</button>
+          <button onClick={ungroupSelected} disabled={isLocked || !selectedIds.some(id => getEl(id)?.groupId)}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Separate the selected group">Ungroup</button>
           <button
             onClick={addFreeArrow}
             disabled={isLocked}
@@ -562,19 +671,19 @@ export default function LayoutDiagram() {
           height={600}
           style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'block', cursor: isLocked ? 'not-allowed' : 'default', opacity: isLocked ? 0.7 : 1, touchAction: 'none' }}
           onMouseMove={onMouseMove}
+          onMouseDown={onCanvasDown}
           onTouchMove={onTouchMove}
           onMouseUp={endPointer}
           onTouchEnd={endPointer}
           onMouseLeave={endPointer}
           onContextMenu={(e) => e.preventDefault()}
-          onClick={clearSelection}
         >
           <defs>
             <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="0.5" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
+          <rect id="layout-grid-background" width="100%" height="100%" fill="url(#grid)" />
 
           {/* Connections (under elements) */}
           {connections.map(c => {
@@ -586,7 +695,7 @@ export default function LayoutDiagram() {
                 conn={c}
                 pts={path.pts}
                 selected={selectedConnId === c.id}
-                onSelect={() => { setSelectedConnId(c.id); setSelectedId(null); }}
+                onSelect={() => { setSelectedConnId(c.id); setSelectedIds([]); }}
                 onBodyDown={(e) => onConnBodyDown(e, c)}
               />
             );
@@ -597,17 +706,21 @@ export default function LayoutDiagram() {
             <ElementShape
               key={el.id}
               el={el}
-              selected={selectedId === el.id}
+              selected={selectedIds.includes(el.id)}
               hovered={hoveredId === el.id && !linking && !connectMode}
               linkTarget={linking?.targetId === el.id}
+              processHint={processHint}
               onPointerDown={e => onElementPointerDown(e, el)}
-              onDoubleClick={() => { setSelectedId(el.id); setSelectedConnId(null); }}
+              onDoubleClick={() => { setSelectedIds(expandGroupedSelection(elements, [el.id])); setSelectedConnId(null); }}
               onResizeStart={(e, corner) => onResizeStart(e, el, corner)}
               onRotateStart={e => onRotateStart(e, el)}
               onLinkStart={e => onLinkStart(e, el)}
               onHoverChange={hovering => setHoveredId(hovering ? el.id : (cur => cur === el.id ? null : cur))}
             />
           ))}
+
+          {marquee && <rect x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height}
+            fill="#2563eb" fillOpacity={0.12} stroke="#2563eb" strokeDasharray="5 3" pointerEvents="none" />}
 
           {/* Live rubber-band while drawing a connection */}
           {linking && getEl(linking.sourceId) && (() => {
@@ -648,11 +761,21 @@ export default function LayoutDiagram() {
         </svg>
 
         {/* ── Element property panel ─────────────────────────────────────────── */}
+        {selectedIds.length > 1 && (
+          <div className={PANEL}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800">{selectedIds.length} elements selected</span>
+              <button onClick={() => { deleteMany(selectedIds); setSelectedIds([]); }} disabled={isLocked}
+                className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 text-white disabled:opacity-50">✕ Delete selected</button>
+            </div>
+            <p className="text-xs text-slate-600">Drag any selected element to move all. Group with Ctrl+G and ungroup with Ctrl+Shift+G. Alt-click a group member to edit its properties.</p>
+          </div>
+        )}
         {selectedEl && (
           <ElementPanel
             el={selectedEl}
             onChange={(patch) => updateEl(selectedEl.id, patch)}
-            onDelete={() => { deleteEl(selectedEl.id); setSelectedId(null); }}
+            onDelete={() => { deleteMany([selectedEl.id]); setSelectedIds([]); }}
             disabled={isLocked}
           />
         )}
@@ -667,13 +790,14 @@ export default function LayoutDiagram() {
           />
         )}
 
-        {!selectedEl && !selectedConn && (
+        {!selectedIds.length && !selectedConn && (
           <p className="text-xs text-slate-500 mt-2 px-1 leading-relaxed">
             <b className="text-blue-600">Connect boxes (Excel-style):</b> hover a box, then drag a blue dot onto another box.
             <br />
             <b className="text-blue-600">Free arrow:</b> click <b>➘ Free Arrow</b>, then drag its blue endpoints anywhere · edit colour, solid/dashed, and arrowheads in the panel.
             <br />
-            Drag body to move · drag a corner to resize · drag the top dot to rotate ·
+            Drag on empty canvas to select many · Shift-click to add · Group to keep them together · Alt-click one group member to edit ·
+            drag body to move · drag a corner to resize · drag the top dot to rotate ·
             press <kbd className="bg-slate-100 border border-slate-300 text-slate-600 px-1 rounded shadow-sm">Del</kbd> to remove
           </p>
         )}
@@ -743,8 +867,16 @@ function ElementPanel({
       </div>
 
       <div className={ROW}>
-        <span className={LBL}>Colour</span>
+        <span className={LBL}>Shape</span>
         <Swatches value={el.color} onPick={c => onChange({ color: c })} disabled={disabled} />
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Text</span>
+        <Swatches value={el.textColor ?? (el.type === 'worker' ? '#0f172a' : defaultTextColor(el.color ?? '#64748b'))}
+          onPick={c => onChange({ textColor: c })} disabled={disabled} />
+        {el.textColor && <button onClick={() => onChange({ textColor: undefined })} disabled={disabled}
+          className="px-2 py-1 text-xs rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-50">Auto</button>}
       </div>
 
       <div className={ROW}>

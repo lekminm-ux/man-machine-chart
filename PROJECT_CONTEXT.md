@@ -166,7 +166,10 @@ Generated / local-only, never committed (all git-ignored): `.next/`, `out/`, `no
   - show Auto M/C machine time
 - Layout workflow:
   - add and edit machines/equipment/workers/shapes
-  - drag elements
+  - set shape/icon and text colours separately; old elements use an automatic contrast colour until text colour is chosen
+  - marquee or Shift-select multiple elements, group/ungroup them, and drag a group as one unit
+  - `LayoutElement.groupId` and `textColor` are optional fields in the chart's existing `layoutDiagram` JSON; no D1 migration is needed
+  - draw workers as human silhouettes and show process-specific Injection/Blow machine glyphs, including on older generic machines when the process name identifies them
   - draw/delete connectors and free arrows
 - Export workflow:
   - save active file to cloud
