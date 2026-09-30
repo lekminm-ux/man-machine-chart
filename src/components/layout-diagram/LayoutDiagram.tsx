@@ -56,7 +56,11 @@ function ElementShape({
     : el.type === 'machine' ? (/injection|ฉีด/i.test(label) ? 'injection' : /blow|เป่า/i.test(label) ? 'blow' : processHint)
     : undefined;
   const isProcessMachine = Boolean(iconKind);
+  const showProcessGlyph = isProcessMachine && w >= 100 && h >= 60;
   const textColor = el.textColor ?? defaultTextColor(color);
+  const glyphScale = Math.min((w - 20) / 92, (h - 30) / 42, 1.5);
+  const glyphX = (w - 92 * glyphScale) / 2;
+  const glyphY = Math.max(5, (h - fontSize - 42 * glyphScale) / 2 - 4);
 
   const body = (() => {
     const common = { fill: color, fillOpacity: 0.88, stroke: color, strokeWidth: selected ? 2.5 : 1.5 };
@@ -113,8 +117,8 @@ function ElementShape({
             {body}
           </>
         )}
-        {isProcessMachine && (
-          <g transform={`translate(${w * 0.13}, ${h * 0.10}) scale(${w * 0.0074}, ${h * 0.012})`}
+        {showProcessGlyph && (
+          <g transform={`translate(${glyphX}, ${glyphY}) scale(${glyphScale})`}
             fill="none" stroke={textColor} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
             {iconKind === 'injection' ? (
               <>
@@ -139,7 +143,7 @@ function ElementShape({
           </g>
         )}
         <text
-          x={w / 2} y={isWorker || isProcessMachine ? h - 5 : h / 2 + fontSize / 3}
+          x={w / 2} y={isWorker || showProcessGlyph ? h - 5 : h / 2 + fontSize / 3}
           textAnchor="middle"
           fontSize={fontSize}
           fontWeight={fontWeight}

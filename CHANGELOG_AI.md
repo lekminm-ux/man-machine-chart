@@ -2,6 +2,13 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-09-30 (Codex: Layout Man Map Production release)
+
+- The Owner approved the Production release of independent dark shape/text colours, multi-selection and grouping, human worker symbols, and Injection/Blow Molding machine symbols. Fast-forwarded local `main` to `7b84d62`, then merged the tested feature commit `848eda6`.
+- Added `pages:write` to the existing Wrangler OAuth authorization with the Owner's explicit approval. Deployed the static site and Functions to Cloudflare Pages Production. A first visual pass revealed that the legacy extra-wide Injection Machine enlarged its process glyph too much, so capped glyph scale and centered it within the machine; deployed the corrected build as `https://a9e8f3e0.man-machine-chart.pages.dev`.
+- The canonical `https://man-machine-chart.pages.dev/editor` loaded the corrected Production release. Read-only inspection of the existing Garnish Side Sill chart showed the Group control and both process palette items, human workers, legible dark/contrasting shapes and text, and the centered Injection glyph. Browser console contained zero errors. No Production chart content was saved or intentionally changed during verification.
+- Final local verification after the correction: `npm test` **220/220 PASS**, `npm run build` **PASS**, targeted ESLint on `LayoutDiagram.tsx` **PASS**. Full lint retains the previously documented StepTable/TopBar baseline errors. Group drag was covered by the implementation tests; it was not exercised by modifying the live chart.
+
 ## 2026-09-30 (Codex: scheduled Trash purge Worker deployed)
 
 - Owner signed into Cloudflare Dashboard and authorized continuation. Wrangler OAuth used only the `account:read`, `user:read`, and `workers_scripts:write` scopes. Deployed `man-machine-trash-purge` with the exact D1 `mm-chart-db` and R2 `mm-chart-photos` bindings, then set `workers_dev=false` and `preview_urls=false` in `wrangler.trash.toml` and redeployed. Final Worker version: `d770d323-ae8d-4246-89db-53d56ec290ba`. Wrangler and Dashboard both show one `0 1 * * *` trigger; Dashboard shows public URL disabled and next run 2026-10-01 01:00 UTC (08:00 Bangkok).
