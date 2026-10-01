@@ -144,13 +144,13 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
     <h1>Master Plan — TPS Digital Activity WebApp</h1>
     <p>แผนแม่บทการพัฒนา Man-Machine Chart (Standard Operation) สู่ระบบกิจกรรมปรับปรุงกระบวนการผลิตแบบครบวงจร</p>
     <div class="docctl">
-      <div><b>Version</b>1.28</div>
+      <div><b>Version</b>1.29</div>
       <div><b>Updated</b>1 Oct 2026</div>
       <div><b>Repo</b>ManMachineChart_StandardOperation</div>
       <div><b>Baseline commit</b>63e15dd (Phase 5b-2 M6 Kaizen Sheet form, deployed to Production)</div>
       <div><b>Planning gate</b>Phase 0A/0B/0C complete and deployed · Phase 4 (M5 Yamazumi 4a-4c) complete and deployed · Phase 5a-1+5a-2 (M6 Revision Snapshot + read-only UI gating) complete and deployed · Phase 5b-1+5b-2 (M6 Before/After comparison + Kaizen Sheet form) both implemented, reviewed, live-verified, committed, pushed, and deployed to Production</div>
       <div><b>Historical status (11 Aug 2026)</b>Master Plan v1.25 · M6 now has the full Kaizen Sheet: Problem/Solution, Before/After text notes, an unlimited-rows Detail list (priority + Response + Eva), Result, and a shared Responsible Person/Due Date — additive to the live/current chart, saved through the existing Save button, frozen into Revision snapshots exactly like every other module. Codex's own pre-implementation scope audit caught that the original handoff would have silently dropped Kaizen data from every Save and Revision snapshot (storage.ts's chartFileContent() allow-list); Claude verified the finding, amended scope with the exact one-line fix, and live-verified the full round trip end-to-end against real local D1 — fill in every field, Save, reload from scratch, close a Revision, then fetch the frozen snapshot directly and confirm the data survived intact. Locked-state gating and unlock-preserves-data were also confirmed live. Live read-only Production verification confirmed the real folder tree unchanged (7 folders/4 roots/12 charts) and the new Kaizen Sheet rendering correctly with zero console errors. Two low-severity, non-blocking UX findings from Phase 5a-2's review remain open as optional follow-ups (see Change Log). Phase 5b-3 (photo/image attachment for Before/After) is unscoped and not scheduled.</div>
-      <div><b>Current release</b>1 Oct 2026 · Named Layout groups and batch Shape/Text/Font editing are deployed on APP02 Production Pages (<code>1903274d.man-machine-chart.pages.dev</code>). Selecting an existing group exposes its name and shared styling controls; Alt-click still edits one member. The canonical Production editor showed the controls without console errors. All 221 tests, targeted lint and the build passed. A read-only post-deploy comparison matched all 11 folders and the full content of all 19 active charts to the pre-deploy backup. No Production chart was saved during verification. The 11 Aug 2026 status above is retained as historical planning context.</div>
+      <div><b>Current release</b>1 Oct 2026 · Layout Job 01 Copy/Paste/Duplicate is deployed on APP02 Production Pages (<code>2520fa0b.man-machine-chart.pages.dev</code>, source <code>44ce754</code>). Shapes and groups retain styling and internal connectors with independent IDs. Named groups and batch styling remain available. All 228 tests, targeted lint and build passed; local copy, duplicate, cross-chart paste and Save/reload passed. Live Copy on an existing group enabled Paste without console errors. Read-only comparison matched all 11 folders and full content of all 19 active charts. No Production chart was saved during verification. Wait for Owner trial feedback before Job 02. The 11 Aug 2026 status above is retained as historical planning context.</div>
     </div>
   </div>
 </header>
@@ -335,9 +335,9 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
         <td>งานต่อยอด: คลิกแถบใน M3 แล้วไฮไลต์ตำแหน่งใน M4</td>
       </tr>
       <tr>
-        <td><b>M4</b></td><td><span class="b b-done">ใช้งานได้ — ยังไม่แตะ</span></td>
-        <td>StepTable + LayoutDiagram + SummaryTable ครบ ใช้งานจริงอยู่</td>
-        <td><b>รอบนี้ไม่แก้ตามที่สั่ง</b> — งานเสริม (Symbol Library, Walking Path) เลื่อนไป Phase 6</td>
+        <td><b>M4</b></td><td><span class="b b-done">Layout Job 01 · deployed</span></td>
+        <td>StepTable + LayoutDiagram + SummaryTable; Layout มีสี Shape/Text แยกกัน, สัญลักษณ์คนและเครื่อง Injection/Blow Molding, กลุ่มพร้อมชื่อ/ปรับรูปแบบทั้งกลุ่ม และ Copy/Paste/Duplicate</td>
+        <td>รอเจ้าของทดลอง Job 01; งานต่อไปเสนอ Undo/Redo ตาม <a href="Layout_Editor_Visio_Plan.md">แผน Layout Editor</a></td>
       </tr>
       <tr>
         <td><b>M5</b></td><td><span class="b b-done">Phase 4 ครบ · deployed</span></td>
@@ -560,6 +560,8 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
 <section id="roadmap">
   <h2><span class="num">7</span> Roadmap</h2>
   <p class="lead">ทำทีละเฟส ทดสอบผ่านแล้วค่อยขยับ — แต่ละเฟสจบด้วยการ commit + push + อัปเดตแผนนี้</p>
+
+  <div class="note"><b>Layout Editor — 1 Oct 2026:</b> ทำทีละ Job และให้เจ้าของทดลองก่อนงานถัดไป ตาม <a href="Layout_Editor_Visio_Plan.md">แผนอ้างอิง Visio</a>: <b>01 Copy/Paste/Duplicate เผยแพร่แล้ว</b> → 02 Undo/Redo → 03 Align/Distribute → 04 ลำดับซ้อน → 05 Grid/Snap/Nudge → 06 Zoom/Pan/Fit → 07 Connectors → 08 Format Painter/Change Shape → 09 Workstation templates. Jobs 02–09 ยังไม่เริ่ม; ลำดับปรับได้ตามข้อเสนอแนะ</div>
 
   <div class="phase">
     <div class="tag"><span class="b b-done">เสร็จแล้ว</span></div>
@@ -860,6 +862,7 @@ footer{color:var(--muted); font-size:12.5px; text-align:center; padding:26px 0}
   <table>
     <thead><tr><th style="width:10%">Ver.</th><th style="width:14%">วันที่</th><th style="width:16%">Commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
     <tbody>
+      <tr><td>1.29</td><td>1 Oct 2026</td><td><code>44ce754</code></td><td>Layout Job 01 Copy/Paste/Duplicate deployed to <code>2520fa0b</code>. Copy shapes/groups across charts in one tab; preserve style and internal connectors with new IDs/group names. Tests 228/228, build/lint and local Save/reload passed. Live read-only Copy verified without console errors; all 11 folders and 19 chart contents match backup. Ctrl+C/V handlers tested directly; browser tool intercepted their keypresses, so Owner trial should include them. Added nine-Job Visio-inspired plan; wait for feedback before further implementation. Rollback <code>1903274d</code>.</td></tr>
       <tr>
         <td><b>1.28</b></td><td>1 Oct 2026</td><td>Production Pages deployment <code>1903274d</code></td>
         <td><b>Named groups and batch styling released</b> — a newly grouped selection receives a unique default name, and selecting a complete group exposes an editable name plus shared Shape colour, Text colour, Font size and Bold/Regular controls. Existing unnamed groups can also be named. Local Pages Dev verified naming, styling, Save and reload against isolated D1. Tests 221/221, targeted lint and build passed. Live read-only UI verification showed the panel on an existing two-element group, with no browser errors; all 11 folders and 19 active chart contents matched the pre-deploy backup.</td>

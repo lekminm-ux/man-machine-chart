@@ -2,6 +2,12 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-01 (Codex: Layout Job 01 Production release)
+
+- Committed tested Job 01 as `44ce754`; Cloudflare Pages Production deploy succeeded at `https://2520fa0b.man-machine-chart.pages.dev`. Canonical editor displayed Copy/Paste/Duplicate. Selected BYDSidestep's existing two-member group, pressed Copy only, and confirmed Paste enabled plus the Copied hint; console errors were empty. No Production Paste/Duplicate/Save occurred.
+- Post-deploy read-only comparison against `2026-10-01_copy-layout_140027` matched all 11 folder IDs/parents and the full content of all 19 active charts. No missing/reparented folders or changed chart content. Saved live UI evidence to ignored `.tmp/layout-copy-production.png`.
+- Updated Master Plan to v1.29 and Job 01 to released/awaiting Owner trial. Jobs 02–09 are proposals; do not start the next Job until Owner feedback/selection. Verification remains 228/228 tests, build and targeted lint PASS; browser C/V interception limitation is documented in the plan. Rollback: Pages `1903274d` / source `a376fbf`.
+
 ## 2026-10-01 (Codex: Layout Job 01 Copy/Paste/Duplicate — implementation)
 
 - Owner requested a Visio-inspired roadmap delivered one Job at a time, beginning with Copy, with trial feedback before further features. Added `docs/Layout_Editor_Visio_Plan.md` with nine Jobs and official Microsoft references; only Job 01 is implemented.
