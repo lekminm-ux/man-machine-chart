@@ -202,13 +202,16 @@ test('layout group moves together in one batch and deletion removes attached con
   const [a, b] = store.getState().activeFile().layoutDiagram.elements;
   store.getState().addLayoutConnection({ fromId: a.id, toId: b.id });
   store.getState().updateLayoutElements({
-    [a.id]: { x: 30, groupId: 'group-1', textColor: '#ffffff' },
-    [b.id]: { x: 130, groupId: 'group-1' },
+    [a.id]: { x: 30, groupId: 'group-1', groupName: 'Finishing area', color: '#334155', textColor: '#ffffff', fontSize: 14 },
+    [b.id]: { x: 130, groupId: 'group-1', groupName: 'Finishing area', color: '#334155', textColor: '#ffffff', fontSize: 14 },
   });
   const moved = store.getState().activeFile().layoutDiagram.elements;
   assert.deepEqual([...moved.map(el => el.x)], [30, 130]);
   assert.deepEqual([...moved.map(el => el.groupId)], ['group-1', 'group-1']);
-  assert.equal(moved[0].textColor, '#ffffff');
+  assert.deepEqual([...moved].map(el => ({ name: el.groupName, shape: el.color, text: el.textColor, font: el.fontSize })), [
+    { name: 'Finishing area', shape: '#334155', text: '#ffffff', font: 14 },
+    { name: 'Finishing area', shape: '#334155', text: '#ffffff', font: 14 },
+  ]);
   store.getState().deleteLayoutElements([a.id, b.id]);
   assert.equal(store.getState().activeFile().layoutDiagram.elements.length, 0);
   assert.equal(store.getState().activeFile().layoutDiagram.connections.length, 0);

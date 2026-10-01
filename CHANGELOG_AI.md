@@ -2,6 +2,13 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-01 (Codex: named Layout groups and batch styling Production release)
+
+- Added optional `LayoutElement.groupName` in the existing chart JSON. Group/Ctrl+G assigns a unique default name; selecting an existing complete group opens a name field and shared Shape colour, Text colour, Font size and Bold/Regular controls. Alt-click continues to edit one member, and Ungroup clears both group fields. No D1 migration or API change.
+- Local Pages Dev against an isolated fresh D1: grouped Rack and Inspection, named them `QA Inspection Station`, set both Shape and Text colours, saved to Cloud, verified both serialized members, reloaded, and verified the name persisted and Alt-click opened individual properties. Final `npm test` passed **221/221**, `npm run build` passed, targeted ESLint passed, and `git diff --check` passed.
+- Before release, a verified read-only Production backup was captured at `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-10-01_group-layout_103310`: 11 folders, 19 active charts, zero revisions/photos. The one chart missing from the preceding 20-active snapshot was found in recoverable Trash before deployment. No Trash item was changed.
+- Cloudflare Pages Production deployment succeeded at `https://1903274d.man-machine-chart.pages.dev`. The canonical editor showed the new Group name, Shape, Text and Font panel on BYDSidestep's existing two-member group with zero browser console errors. Post-deploy read-only API comparison matched all 11 folder IDs/parents and full content of all 19 active charts to the backup. No Production chart was saved in verification. Previous Pages deployment `a9e8f3e0` remains the rollback target.
+
 ## 2026-09-30 (Codex: Layout Man Map Production release)
 
 - The Owner approved the Production release of independent dark shape/text colours, multi-selection and grouping, human worker symbols, and Injection/Blow Molding machine symbols. Fast-forwarded local `main` to `7b84d62`, then merged the tested feature commit `848eda6`.

@@ -6,6 +6,7 @@ import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting
 import { v4 as uuidv4 } from 'uuid';
 import {
   ELEMENT_PALETTE, COLOR_PRESETS, shapeOf, defaultTextColor, expandGroupedSelection,
+  selectedLayoutGroup, nextLayoutGroupName,
   elCenter, edgePoint, connectionPath, pointsToPath,
   arrowHeadPoints, polylineMidpoint, DASH_ARRAY, type Pt,
 } from '@/lib/layout-utils';
@@ -332,6 +333,8 @@ export default function LayoutDiagram() {
   const [connectMode, setConnectMode]       = useState(false);
   const [connectFrom, setConnectFrom]       = useState<string | null>(null);
   const [hoveredId, setHoveredId]           = useState<string | null>(null);
+  const layoutElementsRef = useRef(activeFile?.layoutDiagram.elements ?? []);
+  useEffect(() => { layoutElementsRef.current = activeFile?.layoutDiagram.elements ?? []; }, [activeFile?.layoutDiagram.elements]);
   // Excel-style drag-to-connect: live rubber-band from a source element to the cursor.
   const [linking, setLinking]               = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null);
 
@@ -358,10 +361,14 @@ export default function LayoutDiagram() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault();
         if (e.shiftKey) {
-          updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined }])));
+          updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined, groupName: undefined }])));
         } else if (selectedIds.length > 1) {
-          const groupId = uuidv4();
-          updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId }])));
+          const elements = layoutElementsRef.current;
+          if (!selectedLayoutGroup(elements, selectedIds)) {
+            const groupId = uuidv4();
+            const groupName = nextLayoutGroupName(elements);
+            updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId, groupName }])));
+          }
         }
         return;
       }
@@ -383,8 +390,9 @@ export default function LayoutDiagram() {
   const isLocked = Boolean(activeFile.lockedAt);
   const { elements, connections } = activeFile.layoutDiagram;
   const getEl = (id: string) => elements.find(e => e.id === id);
-  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
-  const selectedEl = selectedId ? getEl(selectedId) : null;
+  const selectedElements = elements.filter(el => selectedIds.includes(el.id));
+  const selectedGroup = selectedLayoutGroup(elements, selectedIds);
+  const selectedEl = selectedElements.length === 1 && !selectedGroup ? selectedElements[0] : null;
   const selectedConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
   const selectedConnPts = selectedConn ? (connectionPath(selectedConn, getEl)?.pts ?? null) : null;
   const processHint = /injection|ฉีด/i.test(activeFile.header.processName) ? 'injection'
@@ -583,13 +591,14 @@ export default function LayoutDiagram() {
   };
 
   const groupSelected = () => {
-    if (isLocked || selectedIds.length < 2) return;
+    if (isLocked || selectedIds.length < 2 || selectedGroup) return;
     const groupId = uuidv4();
-    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId }])));
+    const groupName = nextLayoutGroupName(elements);
+    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId, groupName }])));
   };
   const ungroupSelected = () => {
     if (isLocked || !selectedIds.length) return;
-    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined }])));
+    updateMany(Object.fromEntries(selectedIds.map(id => [id, { groupId: undefined, groupName: undefined }])));
   };
 
   const addFromPalette = (type: string) => {
@@ -607,7 +616,7 @@ export default function LayoutDiagram() {
       <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
         <h3 className="text-slate-700 font-bold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
         <div className="flex items-center gap-2">
-          <button onClick={groupSelected} disabled={isLocked || selectedIds.length < 2}
+          <button onClick={groupSelected} disabled={isLocked || selectedIds.length < 2 || Boolean(selectedGroup)}
             className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             title="Group selected shapes and move them together">Group ({selectedIds.length})</button>
           <button onClick={ungroupSelected} disabled={isLocked || !selectedIds.some(id => getEl(id)?.groupId)}
@@ -765,15 +774,15 @@ export default function LayoutDiagram() {
         </svg>
 
         {/* ── Element property panel ─────────────────────────────────────────── */}
-        {selectedIds.length > 1 && (
-          <div className={PANEL}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-800">{selectedIds.length} elements selected</span>
-              <button onClick={() => { deleteMany(selectedIds); setSelectedIds([]); }} disabled={isLocked}
-                className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 text-white disabled:opacity-50">✕ Delete selected</button>
-            </div>
-            <p className="text-xs text-slate-600">Drag any selected element to move all. Group with Ctrl+G and ungroup with Ctrl+Shift+G. Alt-click a group member to edit its properties.</p>
-          </div>
+        {(selectedElements.length > 1 || selectedGroup) && (
+          <SelectionPanel
+            elements={selectedElements}
+            groupName={selectedGroup?.name}
+            onGroupNameChange={selectedGroup ? name => updateMany(Object.fromEntries(selectedElements.map(el => [el.id, { groupName: name }]))) : undefined}
+            onChange={patch => updateMany(Object.fromEntries(selectedElements.map(el => [el.id, patch])))}
+            onDelete={() => { deleteMany(selectedElements.map(el => el.id)); setSelectedIds([]); }}
+            disabled={isLocked}
+          />
         )}
         {selectedEl && (
           <ElementPanel
@@ -839,6 +848,81 @@ function Swatches({ value, onPick, disabled }: { value?: string; onPick: (c: str
         className="w-6 h-6 bg-transparent border border-slate-300 rounded cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Custom colour"
       />
+    </div>
+  );
+}
+
+function SelectionPanel({
+  elements, groupName, onGroupNameChange, onChange, onDelete, disabled,
+}: {
+  elements: LayoutElement[];
+  groupName?: string;
+  onGroupNameChange?: (name: string) => void;
+  onChange: (patch: Partial<LayoutElement>) => void;
+  onDelete: () => void;
+  disabled: boolean;
+}) {
+  const first = elements[0];
+  const shapeColor = elements.every(el => el.color === first.color) ? first.color : undefined;
+  const effectiveTextColor = (el: LayoutElement) => el.textColor ??
+    (el.type === 'worker' ? '#0f172a' : defaultTextColor(el.color ?? '#64748b'));
+  const textColor = elements.every(el => effectiveTextColor(el) === effectiveTextColor(first))
+    ? effectiveTextColor(first) : undefined;
+  const fontSize = elements.every(el => (el.fontSize ?? 11) === (first.fontSize ?? 11))
+    ? String(first.fontSize ?? 11) : '';
+  const allBold = elements.every(el => el.fontBold !== false);
+  const allRegular = elements.every(el => el.fontBold === false);
+
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold text-slate-800">
+          {onGroupNameChange ? `Group · ${elements.length} elements` : `${elements.length} elements selected`}
+        </span>
+        <button onClick={onDelete} disabled={disabled}
+          className="px-2 py-0.5 text-xs font-semibold rounded bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed">✕ Delete selected</button>
+      </div>
+
+      {onGroupNameChange && (
+        <div className={ROW}>
+          <label htmlFor="layout-group-name" className="text-[10px] font-bold text-slate-600 uppercase tracking-wider w-20 shrink-0">Group name</label>
+          <input id="layout-group-name" type="text" maxLength={60} value={groupName ?? ''}
+            onChange={e => onGroupNameChange(e.target.value)} disabled={disabled}
+            className={`${INPUT} flex-1 min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
+            placeholder="Name this group" />
+        </div>
+      )}
+
+      <div className={ROW}>
+        <span className={LBL}>Shape</span>
+        <Swatches value={shapeColor} onPick={color => onChange({ color })} disabled={disabled} />
+        {!shapeColor && <span className="text-xs text-slate-500">Mixed</span>}
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Text</span>
+        <Swatches value={textColor} onPick={color => onChange({ textColor: color })} disabled={disabled} />
+        <button onClick={() => onChange({ textColor: undefined })} disabled={disabled}
+          className="px-2 py-1 text-xs rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">Auto</button>
+        {!textColor && <span className="text-xs text-slate-500">Mixed</span>}
+      </div>
+
+      <div className={ROW}>
+        <span className={LBL}>Font</span>
+        <select value={fontSize} onChange={e => onChange({ fontSize: Number(e.target.value) })} disabled={disabled}
+          className={`${INPUT} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}>
+          {fontSize === '' && <option value="" disabled>Mixed</option>}
+          {[9, 10, 11, 12, 14, 16, 18, 22].map(size => <option key={size} value={size}>{size}px</option>)}
+        </select>
+        <button onClick={() => onChange({ fontBold: true })} disabled={disabled}
+          className={`px-2 py-1 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed ${allBold ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-slate-700'}`}>Bold</button>
+        <button onClick={() => onChange({ fontBold: false })} disabled={disabled}
+          className={`px-2 py-1 text-xs rounded border disabled:opacity-50 disabled:cursor-not-allowed ${allRegular ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-slate-700'}`}>Regular</button>
+      </div>
+
+      <p className="text-xs text-slate-600">
+        Changes here apply to every selected element. Drag any member to move the selection; Alt-click one group member to edit it alone.
+      </p>
     </div>
   );
 }

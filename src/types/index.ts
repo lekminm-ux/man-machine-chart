@@ -71,6 +71,7 @@ export interface LayoutElement {
   color?: string;
   textColor?: string;   // label colour, independent of the shape/icon colour
   groupId?: string;     // elements with the same id move together
+  groupName?: string;   // shared display name for members of a named group
   shape?: LayoutShape;   // overrides the default shape for the type
   fontSize?: number;     // label size in px (default 11)
   fontBold?: boolean;    // bold label (default true)

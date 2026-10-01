@@ -46,6 +46,23 @@ test('dark fills get readable text and explicit groups expand as one selection',
   assert.deepEqual([...L.expandGroupedSelection(elements, ['c'])], ['c']);
 });
 
+test('named group is identified only by a complete group selection', () => {
+  const elements = [
+    box(0, 0, 20, 20, { id: 'a', groupId: 'g', groupName: 'Inspection area' }),
+    box(30, 0, 20, 20, { id: 'b', groupId: 'g', groupName: 'Inspection area' }),
+    box(60, 0, 20, 20, { id: 'c' }),
+  ];
+  const selected = L.selectedLayoutGroup(elements, ['b', 'a']);
+  assert.equal(selected.id, 'g');
+  assert.equal(selected.name, 'Inspection area');
+  assert.equal(L.selectedLayoutGroup(elements, ['a']), null, 'Alt-selected member remains individually editable');
+  assert.equal(L.selectedLayoutGroup(elements, ['a', 'b', 'c']), null);
+  assert.equal(L.selectedLayoutGroup(elements, ['a', 'b', 'missing']), null);
+  assert.equal(L.nextLayoutGroupName(elements), 'Group 1');
+  elements[2].groupName = 'Group 1';
+  assert.equal(L.nextLayoutGroupName(elements), 'Group 2');
+});
+
 test('edgePoint lands on the box border toward the target', () => {
   const b = box(0, 0, 100, 100); // centre (50,50)
   // target far to the right → exits the right edge at x=100, y=50

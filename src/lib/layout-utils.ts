@@ -68,6 +68,26 @@ export function expandGroupedSelection(elements: LayoutElement[], ids: string[])
   return elements.filter(el => selected.has(el.id)).map(el => el.id);
 }
 
+/** Return the group only when the current selection contains all and only its members. */
+export function selectedLayoutGroup(elements: LayoutElement[], ids: string[]): { id: string; name: string } | null {
+  if (!ids.length) return null;
+  const selected = new Set(ids);
+  const members = elements.filter(el => selected.has(el.id));
+  const id = members[0]?.groupId;
+  if (!id || members.length !== selected.size || members.some(el => el.groupId !== id)) return null;
+  const fullGroup = elements.filter(el => el.groupId === id);
+  if (fullGroup.length !== members.length) return null;
+  return { id, name: fullGroup.find(el => el.groupName?.trim())?.groupName ?? '' };
+}
+
+/** Give new groups a readable name without colliding with existing named groups. */
+export function nextLayoutGroupName(elements: LayoutElement[]): string {
+  const names = new Set(elements.map(el => el.groupName?.trim()).filter(Boolean));
+  let number = 1;
+  while (names.has(`Group ${number}`)) number++;
+  return `Group ${number}`;
+}
+
 // ── Geometry ────────────────────────────────────────────────────────────────
 export interface Pt { x: number; y: number; }
 

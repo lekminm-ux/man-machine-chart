@@ -1,6 +1,6 @@
 ﻿# PROJECT_CONTEXT
 
-Last updated: 2026-09-30
+Last updated: 2026-10-01
 
 ## Project Name
 
@@ -11,6 +11,8 @@ Repository root: `D:\00_LocalFile_WebApp\ManMachineChart_StandardOperation`
 Primary app folder: the repository root itself (`src/`, `functions/`, `tests/`, `package.json` are all at root).
 
 ## Active APP02MMO task (2026-09-28)
+
+- **2026-10-01 named Layout groups released:** Complete group selection now exposes a shared name and batch Shape colour, Text colour, Font size, and Bold/Regular controls; existing unnamed groups can be named, while Alt-click still selects one member. `LayoutElement.groupName` is optional in the existing chart JSON; no D1 schema/API migration. Isolated local D1/browser Save and reload passed, along with 221/221 tests, targeted lint and build. Production Pages deployment `https://1903274d.man-machine-chart.pages.dev` succeeded. Read-only live UI inspection showed the new panel on BYDSidestep's existing two-element group and zero console errors. Post-deploy read-only comparison matched all 11 folder IDs/parents and all 19 active chart contents to the verified pre-deploy backup at `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-10-01_group-layout_103310`. One chart absent from the prior 20-active snapshot was confirmed in recoverable Trash before deployment; no Production chart was saved during this release check. Previous Pages deployment `a9e8f3e0` is the rollback target.
 
 - **2026-09-30 Trash Production release complete:** Cloudflare Worker `man-machine-trash-purge` version `d770d323-ae8d-4246-89db-53d56ec290ba` is deployed against D1 `mm-chart-db` and R2 `mm-chart-photos`, with public/preview URLs disabled. Cron is `0 1 * * *` (08:00 Bangkok); Dashboard lists the first run as 2026-10-01 01:00 UTC. The Sidebar Restore button successfully recovered the QA folder, nested child and chart; the QA subtree was then moved back to Trash by its scoped API after browser automation failed on the UI delete click. Current QA Trash entry is `6e8beac2-0967-4cf1-a395-6d8fe82ee7b8`, expiring `2026-12-29T07:30:58.290Z`, unacknowledged. Final read-only comparison matches all original 11 folders, 20 chart metadata rows and full content of all 20 original charts to the verified pre-migration backup. Local Trash tests passed 7/7. No scheduled Worker invocation has occurred yet; the first live execution remains to be observed. The shared nine-app login system remains a separate future project. See `docs/Trash_90_Day_Release_Plan.md`.
 
