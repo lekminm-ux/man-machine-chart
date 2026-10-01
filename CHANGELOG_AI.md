@@ -2,6 +2,13 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-01 (Codex: Layout Job 02 Undo/Redo — implementation)
+
+- Owner tried Copy and authorized Job 02. Added Layout Undo/Redo buttons and Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z. Changes cover shapes, group names/styles, drag/resize/rotation, grouped delete with attached connectors, copy/paste/duplicate and connector edits. History is separate per chart, capped at 100 edits, excluded from local/Cloud persistence, and restores only Layout while preserving other chart modules/clipboard.
+- Consolidated Layout actions into one history/persistence boundary; all reject locked/unloaded charts and skip no-ops. Pointer/focus transactions coalesce one gesture/field edit. Local browser caught an unrelated mouseleave ending a property transaction; fixed it with separate pointer/property transaction kinds and added a regression test. Revision close/open and fresh Cloud reopen clear history, while Save and cached chart/module changes preserve it. New mutations clear Redo; read-only Copy does not.
+- Verification: 238/238 tests, build and targeted ESLint PASS. Actual local Pages Dev used DB(local-DB)/PHOTOS(local) at 127.0.0.1:8788 with existing isolated `.tmp/layout-group-smoke-20261001` state. Tested Duplicate→Ctrl+Z→Ctrl+Shift+Z, Ctrl+Y, grouped drag Undo in one click, delete/restore, name typing in one transaction, chart switching, Save and reload. API readback of synthetic chart `a07963ad-a66d-404c-9598-07d644092ad2` matched two moved shapes with group name `QA Undo Roundtrip`; UI showed Saved to Cloud, reload retained data and cleared history. Console errors empty. No Production test write.
+- Fresh hash-verified read-only backup: `D:\00_LocalFile_WebApp\ManMachineChart_Data_Backups\2026-10-01_undo-layout_153126`, captured 2026-10-01T08:31:33.506Z, 11 folders (6 roots/max depth 3), 19 full charts, 0 revisions/photo keys, 23 verified payload files. No API/schema/dependency/config changes. Release pending; rollback `2520fa0b` / `44ce754`. Await Job 02 trial after release; no Job 03 implementation.
+
 ## 2026-10-01 (Codex: Layout Job 01 Production release)
 
 - Committed tested Job 01 as `44ce754`; Cloudflare Pages Production deploy succeeded at `https://2520fa0b.man-machine-chart.pages.dev`. Canonical editor displayed Copy/Paste/Duplicate. Selected BYDSidestep's existing two-member group, pressed Copy only, and confirmed Paste enabled plus the Copied hint; console errors were empty. No Production Paste/Duplicate/Save occurred.

@@ -15,6 +15,9 @@ function keyboardFixture(lockedAt = null) {
   } };
   const state = new Proxy({
     activeFile: () => file,
+    layoutHistory: {},
+    undoLayout: () => { calls.push(['undo']); return true; },
+    redoLayout: () => { calls.push(['redo']); return true; },
     layoutClipboard: { elements: file.layoutDiagram.elements },
     copyLayoutSelection: ids => { calls.push(['copy', [...ids]]); return true; },
     pasteLayoutClipboard: () => { calls.push(['paste']); return ['pasted']; },
@@ -42,15 +45,16 @@ function keyboardFixture(lockedAt = null) {
         if (id === 'react') return react;
         if (id === '@/store/useChartStore') return { useChartStore: selector => selector(state) };
         if (id === '@/lib/layout-utils') return load('src/lib/layout-utils.ts');
+        if (id === '@/lib/layout-history') return load('src/lib/layout-history.ts');
         return require(id);
       },
     }, { filename });
     return mod.exports;
   }
   load('src/components/layout-diagram/LayoutDiagram.tsx').default();
-  return { calls, key: (key, target = { tagName: 'BUTTON' }) => {
+  return { calls, key: (key, target = { tagName: 'BUTTON' }, modifiers = {}) => {
     let prevented = false;
-    listeners.get('keydown')({ key, target, ctrlKey: true, preventDefault: () => { prevented = true; } });
+    listeners.get('keydown')({ key, target, ctrlKey: true, ...modifiers, preventDefault: () => { prevented = true; } });
     return prevented;
   } };
 }
@@ -75,4 +79,16 @@ test('actual Layout keydown effect allows readonly Copy but blocks Paste/Duplica
   assert.equal(key('v'), false);
   assert.equal(key('d'), false);
   assert.deepEqual(calls, [['copy', ['a']]]);
+});
+
+test('actual Layout shortcuts dispatch undo/redo and preserve native field undo', () => {
+  const { key, calls } = keyboardFixture();
+  assert.equal(key('z'), true);
+  assert.equal(key('y'), true);
+  assert.equal(key('Z', { tagName: 'BUTTON' }, { shiftKey: true }), true);
+  assert.equal(key('z', { tagName: 'INPUT' }), false);
+  assert.equal(key('y', { tagName: 'DIV', isContentEditable: true }), false);
+  assert.deepEqual(calls, [['undo'], ['redo'], ['redo']]);
+  const locked = keyboardFixture('closed');
+  assert.equal(locked.key('z'), false); assert.equal(locked.calls.length, 0);
 });

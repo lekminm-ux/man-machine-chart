@@ -30,6 +30,7 @@ function loadTypeScriptModule(relativePath, mocks = {}) {
       if (id === '@/lib/time-study') return loadTypeScriptModule('src/lib/time-study.ts');
       if (id === '@/lib/machine-capacity') return loadTypeScriptModule('src/lib/machine-capacity.ts');
       if (id === '@/lib/layout-copy') return loadTypeScriptModule('src/lib/layout-copy.ts');
+      if (id === '@/lib/layout-history') return loadTypeScriptModule('src/lib/layout-history.ts');
       if (id === './chart-utils') return loadTypeScriptModule('src/lib/chart-utils.ts');
       if (id === './time-study') return loadTypeScriptModule('src/lib/time-study.ts');
       return require(id);
@@ -1623,4 +1624,163 @@ test('openNewRevision on an already-unlocked file is blocked before the API call
 
   assert.equal(openCalls, 0);
   assert.equal(store.getState().syncStatus, 'error');
+});
+
+// Job 02: exercise real store mutations/history and persistence boundaries.
+function layoutHistoryFixture(overrides = {}) {
+  const saves = [];
+  const store = freshStore({ saveLocalDatabase: db => saves.push(db), ...overrides });
+  const file = id => ({ id, name: id, folderId: 'folder', _loaded: true,
+    createdAt: '2026-10-01', updatedAt: '2026-10-01', header: { ...blankHeader },
+    steps: [{ id: 'step', description: 'keep times', manualTime: 12 }], kaizen: { problem: 'keep kaizen' },
+    layoutDiagram: { elements: ['a', 'b'].map((suffix, i) => ({ id: id + suffix, type: 'rack', label: suffix, x: 20 + i * 100, y: 40, width: 80, height: 40, color: '#334155' })),
+      connections: [{ id: id + 'conn', fromId: id + 'a', toId: id + 'b' }] },
+  });
+  store.setState({ files: [file('one'), file('two')], folders: [{ id: 'folder', name: 'F' }], activeFileId: 'one', cloudReady: true });
+  return { store, saves, state: () => store.getState(), layout: () => JSON.parse(JSON.stringify(store.getState().files.find(f => f.id === store.getState().activeFileId).layoutDiagram)) };
+}
+
+test('Layout undo restores deleted shapes and attached connectors together; redo deletes them again', () => {
+  const { state, layout } = layoutHistoryFixture();
+  const before = layout();
+  state().deleteLayoutElements(['onea']);
+  assert.equal(layout().connections.length, 0);
+  assert.equal(state().undoLayout(), true);
+  assert.deepEqual(layout(), before);
+  assert.equal(state().redoLayout(), true);
+  assert.deepEqual(layout().elements.map(e => e.id), ['oneb']);
+  assert.equal(layout().connections.length, 0);
+});
+
+test('Layout drag/property transactions coalesce, no-op keeps redo, changed branch clears redo', () => {
+  const { state, layout } = layoutHistoryFixture();
+  state().beginLayoutEdit();
+  for (let x = 21; x <= 50; x++) state().updateLayoutElements({ onea: { x }, oneb: { x: x + 100 } });
+  state().endLayoutEdit();
+  assert.equal(state().layoutHistory.one.past.length, 1);
+  state().undoLayout();
+  assert.equal(layout().elements[0].x, 20);
+  state().beginLayoutEdit(); state().updateLayoutElement('onea', { x: 20 }); state().endLayoutEdit();
+  assert.equal(state().layoutHistory.one.future.length, 1);
+  state().redoLayout(); assert.equal(layout().elements[0].x, 50);
+  state().undoLayout();
+  state().beginLayoutEdit();
+  state().updateLayoutElement('onea', { label: 'new' });
+  state().updateLayoutElement('onea', { label: 'new name' });
+  state().endLayoutEdit();
+  assert.equal(state().layoutHistory.one.past.length, 1);
+  assert.equal(state().redoLayout(), false);
+  state().undoLayout(); assert.equal(layout().elements[0].label, 'a');
+});
+
+test('Layout grouping/batch style/rotation and free-arrow edits all round trip through undo', () => {
+  const { state, layout } = layoutHistoryFixture();
+  const before = layout();
+  state().updateLayoutElements({ onea: { groupId: 'g', groupName: 'Station', textColor: '#fff' }, oneb: { groupId: 'g', groupName: 'Station', textColor: '#fff' } });
+  state().updateLayoutElement('onea', { rotation: 45, width: 160 });
+  state().addLayoutConnection({ id: 'free', fromPt: { x: 10, y: 10 }, toPt: { x: 40, y: 40 } });
+  state().beginLayoutEdit();
+  state().updateLayoutConnection('free', { toPt: { x: 60, y: 60 } });
+  state().updateLayoutConnection('free', { toPt: { x: 70, y: 70 } });
+  state().endLayoutEdit();
+  const final = layout();
+  for (let i = 0; i < 4; i++) assert.equal(state().undoLayout(), true);
+  assert.deepEqual(layout(), before);
+  for (let i = 0; i < 4; i++) assert.equal(state().redoLayout(), true);
+  assert.deepEqual(layout(), final);
+});
+
+test('Layout paste/duplicate undo and redo preserve new IDs/groups and leave clipboard intact', () => {
+  const { state, layout } = layoutHistoryFixture();
+  state().copyLayoutSelection(['onea', 'oneb']);
+  const clipboard = JSON.stringify(state().layoutClipboard);
+  state().pasteLayoutClipboard({ width: 800, height: 1000 });
+  const pasted = layout();
+  state().undoLayout(); assert.equal(layout().elements.length, 2);
+  state().redoLayout(); assert.deepEqual(layout(), pasted);
+  const ids = state().duplicateLayoutSelection(pasted.elements.slice(2).map(e => e.id), { width: 800, height: 1000 });
+  state().undoLayout(); assert.deepEqual(layout(), pasted);
+  state().redoLayout(); assert.deepEqual(layout().elements.slice(-2).map(e => e.id), Array.from(ids));
+  assert.equal(JSON.stringify(state().layoutClipboard), clipboard);
+});
+
+test('Layout history stays per chart/module and undo never rewinds header, steps or Kaizen', async () => {
+  const { store, state, saves, layout } = layoutHistoryFixture();
+  state().updateLayoutElement('onea', { color: '#fff' });
+  state().updateHeader({ processName: 'changed later' });
+  state().updateStep('step', { manualTime: 99 });
+  state().patchKaizen({ problem: 'changed later' });
+  await state().openFile('two');
+  assert.equal(state().undoLayout(), false);
+  state().updateLayoutElement('twoa', { color: '#000' });
+  state().setActiveModule(1); state().setActiveModule(4);
+  await state().openFile('one');
+  assert.equal(state().undoLayout(), true);
+  assert.equal(layout().elements[0].color, '#334155');
+  const file = state().files.find(f => f.id === 'one');
+  assert.equal(file.header.processName, 'changed later');
+  assert.equal(file.steps[0].manualTime, 99);
+  assert.equal(file.kaizen.problem, 'changed later');
+  assert.equal(state().files.find(f => f.id === 'two').layoutDiagram.elements[0].color, '#000');
+  assert.ok(saves.length);
+  assert.equal('layoutHistory' in saves.at(-1), false);
+  assert.equal('layoutHistory' in saves.at(-1).files[0], false);
+  assert.equal(state().syncStatus, 'idle');
+});
+
+test('Layout history refuses locked/unloaded edits and stale external/revision snapshots', () => {
+  const { store, state, layout } = layoutHistoryFixture();
+  state().updateLayoutElement('onea', { color: '#fff' });
+  const modified = layout();
+  for (const flags of [{ lockedAt: 'closed' }, { lockedAt: null, _loaded: false }]) {
+    store.setState(s => ({ files: s.files.map(f => f.id === 'one' ? { ...f, ...flags } : f) }));
+    state().addLayoutElement({ type: 'box', label: 'blocked', x: 1, y: 1, width: 20, height: 20 });
+    assert.equal(state().undoLayout(), false); assert.equal(state().redoLayout(), false);
+    assert.deepEqual(layout(), modified);
+  }
+  store.setState(s => ({ files: s.files.map(f => f.id === 'one' ? { ...f, _loaded: true, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(e => ({ ...e, label: 'external' })) } } : f) }));
+  assert.equal(state().undoLayout(), false);
+  state().updateLayoutElement('onea', { color: '#000' });
+  state().updateHeader({ revNo: 'new revision' });
+  assert.equal(state().undoLayout(), false);
+});
+
+test('Layout history is bounded to 100 edits and pending edit can be undone directly', () => {
+  const { state, layout } = layoutHistoryFixture();
+  for (let x = 21; x <= 130; x++) state().updateLayoutElement('onea', { x });
+  assert.equal(state().layoutHistory.one.past.length, 100);
+  for (let i = 0; i < 100; i++) assert.equal(state().undoLayout(), true);
+  assert.equal(state().undoLayout(), false); assert.equal(layout().elements[0].x, 30);
+  state().beginLayoutEdit(); state().updateLayoutElement('onea', { x: 70 });
+  assert.equal(state().undoLayout(), true); assert.equal(layout().elements[0].x, 30);
+});
+
+test('Layout undo/redo remain usable after explicit Save readback; only current Layout is saved', async () => {
+  let cloud;
+  const { state, layout } = layoutHistoryFixture({
+    saveFileCloud: async (file, updatedAt) => { cloud = JSON.parse(JSON.stringify({ ...file, updatedAt })); return { ok: true, id: file.id, updatedAt }; },
+    loadFileFromCloud: async () => ({ ok: true, file: JSON.parse(JSON.stringify(cloud)) }),
+  });
+  state().updateLayoutElement('onea', { color: '#fff' });
+  await state().saveActiveFile();
+  assert.equal(state().syncStatus, 'saved');
+  assert.equal('layoutHistory' in cloud, false);
+  assert.equal(state().undoLayout(), true);
+  assert.equal(state().syncStatus, 'idle');
+  await state().saveActiveFile();
+  assert.equal(cloud.layoutDiagram.elements[0].color, '#334155');
+  assert.equal(state().redoLayout(), true); assert.equal(layout().elements[0].color, '#fff');
+});
+
+test('Layout pointer/property transactions ignore unrelated end events and stay separate', () => {
+  const { state, layout } = layoutHistoryFixture();
+  state().beginLayoutEdit('property'); state().updateLayoutElement('onea', { label: 'n' });
+  state().endLayoutEdit('one', 'pointer');
+  state().updateLayoutElement('onea', { label: 'new' });
+  state().beginLayoutEdit('pointer');
+  state().endLayoutEdit('one', 'property');
+  state().updateLayoutElement('onea', { x: 50 }); state().updateLayoutElement('onea', { x: 60 });
+  state().endLayoutEdit('one', 'pointer');
+  state().undoLayout(); assert.equal(layout().elements[0].x, 20); assert.equal(layout().elements[0].label, 'new');
+  state().undoLayout(); assert.equal(layout().elements[0].label, 'a');
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { historyFor, sameLayout } from '@/lib/layout-history';
 import { useChartStore } from '@/store/useChartStore';
 import type { LayoutElement, LayoutConnection, ConnStyle, ConnArrow, ConnRouting } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -331,6 +332,20 @@ export default function LayoutDiagram() {
   const pasteLayout  = useChartStore(s => s.pasteLayoutClipboard);
   const duplicateLayout = useChartStore(s => s.duplicateLayoutSelection);
   const clipboardCount = useChartStore(s => s.layoutClipboard?.elements.length ?? 0);
+  const beginEdit = useChartStore(s => s.beginLayoutEdit);
+  const endEdit = useChartStore(s => s.endLayoutEdit);
+  const undoLayout = useChartStore(s => s.undoLayout);
+  const redoLayout = useChartStore(s => s.redoLayout);
+  const storedHistory = useChartStore(s => s.layoutHistory[s.activeFileId ?? '']);
+  const history = activeFile && storedHistory ? historyFor(activeFile, storedHistory) : undefined;
+  const pendingChange = Boolean(history?.pending && !sameLayout(history.pending, history.current));
+  const canUndo = Boolean(history?.past.length || pendingChange);
+  const canRedo = Boolean(history?.future.length && !pendingChange);
+
+  useEffect(() => {
+    const id = activeFile?.id;
+    return () => { if (id) endEdit(id); };
+  }, [activeFile?.id, endEdit]);
 
   const [selectedIds, setSelectedIds]       = useState<string[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
@@ -378,6 +393,17 @@ export default function LayoutDiagram() {
     setCopyNotice(`Duplicated ${ids.length} element${ids.length === 1 ? '' : 's'}. Drag the copy into place, then Save.`);
   }, [duplicateLayout, selectedIds]);
 
+  const travelSelected = useCallback((direction: 'undo' | 'redo') => {
+    const changed = direction === 'undo' ? undoLayout() : redoLayout();
+    if (!changed) return;
+    dragRef.current = null; resizeRef.current = null; rotateRef.current = null; connDragRef.current = null;
+    marqueeRef.current = null;
+    setMarquee(null); setLinking(null);
+    setSelectedIds([]); setSelectedConnId(null);
+    setConnectMode(false); setConnectFrom(null);
+    setCopyNotice(direction === 'undo' ? 'Undone. Save to keep this Layout.' : 'Redone. Save to keep this Layout.');
+  }, [undoLayout, redoLayout]);
+
   // Keyboard delete for whichever item is selected
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -385,6 +411,14 @@ export default function LayoutDiagram() {
       const tag = target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
       if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !activeFile?.lockedAt) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' || (key === 'y' && !e.shiftKey)) {
+          e.preventDefault();
+          travelSelected(key === 'y' || e.shiftKey ? 'redo' : 'undo');
+          return;
+        }
+      }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         const key = e.key.toLowerCase();
         if (key === 'c' && selectedIds.length && !window.getSelection()?.toString()) {
@@ -421,7 +455,7 @@ export default function LayoutDiagram() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [deleteMany, deleteConn, updateMany, selectedIds, selectedConnId, activeFile?.lockedAt,
-    copySelected, pasteSelected, duplicateSelected, clipboardCount]);
+    copySelected, pasteSelected, duplicateSelected, clipboardCount, travelSelected]);
 
   const pointer = useCallback((clientX: number, clientY: number): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -472,6 +506,7 @@ export default function LayoutDiagram() {
     setSelectedConnId(null);
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
+    beginEdit();
     dragRef.current = {
       positions: elements.filter(item => movingIds.includes(item.id)).map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height })),
       startX: p.x, startY: p.y,
@@ -483,12 +518,14 @@ export default function LayoutDiagram() {
     e.stopPropagation();
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
+    beginEdit();
     resizeRef.current = { id: el.id, corner, ox: el.x, oy: el.y, ow: el.width, oh: el.height, startX: p.x, startY: p.y };
   };
 
   const onRotateStart = (e: React.MouseEvent | React.TouchEvent, el: LayoutElement) => {
     if (isLocked) return;
     e.stopPropagation();
+    beginEdit();
     rotateRef.current = { id: el.id, cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
   };
 
@@ -530,6 +567,7 @@ export default function LayoutDiagram() {
   const onConnEndpointDown = (e: React.MouseEvent | React.TouchEvent, id: string, end: 'from' | 'to') => {
     if (isLocked) return;
     e.stopPropagation();
+    beginEdit();
     connDragRef.current = { id, end };
   };
 
@@ -539,6 +577,7 @@ export default function LayoutDiagram() {
     if (conn.fromId || conn.toId || !conn.fromPt || !conn.toPt) return;
     const c = 'touches' in e ? e.touches[0] : e;
     const p = pointer(c.clientX, c.clientY);
+    beginEdit();
     connDragRef.current = { id: conn.id, end: 'body', ofrom: conn.fromPt, oto: conn.toPt, startX: p.x, startY: p.y };
   };
 
@@ -608,6 +647,7 @@ export default function LayoutDiagram() {
   const onMouseMove = (e: React.MouseEvent) => handleMove(e.clientX, e.clientY);
   const onTouchMove = (e: React.TouchEvent) => { if (e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); };
   const endPointer  = () => {
+    const wasEditing = Boolean(dragRef.current || resizeRef.current || rotateRef.current || connDragRef.current);
     if (linking) {
       if (linking.targetId && linking.targetId !== linking.sourceId) {
         addConn({ fromId: linking.sourceId, toId: linking.targetId, routing: 'straight', arrow: 'end', style: 'solid' });
@@ -621,6 +661,7 @@ export default function LayoutDiagram() {
     marqueeRef.current = null;
     setMarquee(null);
     dragRef.current = null; resizeRef.current = null; rotateRef.current = null; connDragRef.current = null;
+    if (wasEditing) endEdit(activeFile.id, 'pointer');
   };
 
   const onCanvasDown = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -653,11 +694,19 @@ export default function LayoutDiagram() {
   const shapes    = ELEMENT_PALETTE.filter(p => p.group === 'shape');
 
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+    <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white"
+      onFocusCapture={e => { if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) beginEdit('property'); }}
+      onBlurCapture={e => { if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) endEdit(activeFile.id, 'property'); }}>
       {/* Header */}
       <div className="bg-slate-50 px-4 py-2.5 flex flex-wrap gap-2 items-center justify-between border-b border-slate-200">
         <h3 className="text-slate-700 font-bold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => travelSelected('undo')} disabled={isLocked || !canUndo}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Undo the last Layout edit (Ctrl+Z)">Undo</button>
+          <button onClick={() => travelSelected('redo')} disabled={isLocked || !canRedo}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Redo the Layout edit (Ctrl+Y / Ctrl+Shift+Z)">Redo</button>
           <button onClick={copySelected} disabled={!selectedElements.length}
             className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             title="Copy selected shapes or group (Ctrl+C)">Copy</button>

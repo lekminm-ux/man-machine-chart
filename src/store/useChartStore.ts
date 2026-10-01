@@ -23,6 +23,7 @@ import {
 } from '@/lib/time-study';
 import { emptyMachineCapacity, machineCapacityFromTimeStudy } from '@/lib/machine-capacity';
 import { captureLayoutSelection, cloneLayoutSelection, type LayoutCopyBounds } from '@/lib/layout-copy';
+import { historyFor, recordLayout, finishLayoutEdit, sameLayout, snapshotLayout, type LayoutHistory } from '@/lib/layout-history';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
 // 'unconfirmed' is distinct from 'error': the write call itself reported
@@ -48,6 +49,7 @@ interface ChartState extends AppDatabase {
   activeModule: 1 | 2 | 3 | 4 | 5 | 6;
   layoutClipboard: LayoutDiagram | null; // session only; excluded from local/cloud persistence
   layoutPasteCount: number;
+  layoutHistory: Record<string, LayoutHistory>; // session only; never other modules
 
   setActiveModule: (m: 1 | 2 | 3 | 4 | 5 | 6) => void;
 
@@ -107,6 +109,10 @@ interface ChartState extends AppDatabase {
   updateOperatorPosition: (operator: string, position: string) => void;
 
   // Layout actions
+  beginLayoutEdit: (kind?: 'pointer' | 'property') => void;
+  endLayoutEdit: (fileId?: string, kind?: 'pointer' | 'property') => void;
+  undoLayout: () => boolean;
+  redoLayout: () => boolean;
   copyLayoutSelection: (ids: string[]) => boolean;
   pasteLayoutClipboard: (bounds: LayoutCopyBounds) => string[];
   duplicateLayoutSelection: (ids: string[], bounds: LayoutCopyBounds) => string[];
@@ -308,26 +314,55 @@ function insertLayoutCopy(
   if (!file || blockUnloadedFile(set, 'Paste Layout', file) || blockLockedFile(set, 'Paste Layout', file)) return [];
   const copy = cloneLayoutSelection(source, file.layoutDiagram.elements, uuidv4, offset, bounds);
   if (!copy.elements.length) return [];
+  changeLayout(set, state, () => ({
+    ...file.layoutDiagram,
+    elements: [...file.layoutDiagram.elements, ...copy.elements],
+    connections: [...file.layoutDiagram.connections, ...copy.connections],
+  }));
+  return copy.elements.map(el => el.id);
+}
+
+/** All Layout edits share one history/persistence boundary; no Cloud write. */
+function changeLayout(set: Setter, state: ChartState, edit: (layout: LayoutDiagram) => LayoutDiagram): boolean {
+  const file = state.files.find(f => f.id === state.activeFileId);
+  if (!file || blockUnloadedFile(set, 'Edit Layout', file) || blockLockedFile(set, 'Edit Layout', file)) return false;
+  const layout = edit(file.layoutDiagram);
+  if (sameLayout(layout, file.layoutDiagram)) return false;
   const next = {
-    ...state,
-    files: state.files.map(f => f.id === file.id ? {
-      ...f,
-      layoutDiagram: {
-        ...f.layoutDiagram,
-        elements: [...f.layoutDiagram.elements, ...copy.elements],
-        connections: [...f.layoutDiagram.connections, ...copy.connections],
-      },
-      updatedAt: new Date().toISOString(),
-    } : f),
+    ...state, syncStatus: 'idle' as const,
+    files: state.files.map(f => f.id === file.id ? { ...f, layoutDiagram: layout, updatedAt: new Date().toISOString() } : f),
+    layoutHistory: { ...state.layoutHistory, [file.id]: recordLayout(historyFor(file, state.layoutHistory[file.id]), layout) },
   };
   set(next);
   persistLocal(next);
-  return copy.elements.map(el => el.id);
+  return true;
+}
+
+function travelLayout(set: Setter, state: ChartState, direction: 'past' | 'future'): boolean {
+  const file = state.files.find(f => f.id === state.activeFileId);
+  if (!file || blockUnloadedFile(set, 'Undo/Redo Layout', file) || blockLockedFile(set, 'Undo/Redo Layout', file)) return false;
+  const history = finishLayoutEdit(historyFor(file, state.layoutHistory[file.id]));
+  const target = history[direction].at(-1);
+  if (!target) return false;
+  const opposite = direction === 'past' ? 'future' : 'past';
+  const next = {
+    ...state, syncStatus: 'idle' as const,
+    files: state.files.map(f => f.id === file.id ? { ...f, layoutDiagram: snapshotLayout(target), updatedAt: new Date().toISOString() } : f),
+    layoutHistory: { ...state.layoutHistory, [file.id]: {
+      ...history, current: snapshotLayout(target),
+      [direction]: history[direction].slice(0, -1),
+      [opposite]: [...history[opposite], history.current],
+    } },
+  };
+  set(next);
+  persistLocal(next);
+  return true;
 }
 
 export const useChartStore = create<ChartState>((set, get) => ({
   layoutClipboard: null,
   layoutPasteCount: 0,
+  layoutHistory: {},
   folders: [],
   files: [],
   activeFileId: null,
@@ -428,6 +463,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       set(s => ({
         files: s.files.map(f => f.id === id ? { ...result.file, _loaded: true } as ChartFile : f),
         activeFileId: id,
+        layoutHistory: Object.fromEntries(Object.entries(s.layoutHistory).filter(([fileId]) => fileId !== id)),
         syncStatus: 'idle',
       }));
       persistLocal(get());
@@ -773,6 +809,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const next = {
         ...s,
         files: s.files.map(f => f.id === savedFile.id ? { ...f, lockedAt: result.snapshot.closedAt } : f),
+        layoutHistory: Object.fromEntries(Object.entries(s.layoutHistory).filter(([id]) => id !== savedFile.id)),
       };
       persistLocal(next);
       return { ...next, syncStatus: 'idle' };
@@ -801,6 +838,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const next = {
         ...s,
         files: s.files.map(f => f.id === file.id ? { ...f, lockedAt: null } : f),
+        layoutHistory: Object.fromEntries(Object.entries(s.layoutHistory).filter(([id]) => id !== file.id)),
       };
       persistLocal(next);
       return { ...next, syncStatus: 'idle' };
@@ -1164,144 +1202,50 @@ export const useChartStore = create<ChartState>((set, get) => ({
     return source ? insertLayoutCopy(set, state, source, 24, bounds) : [];
   },
 
+  beginLayoutEdit(kind = 'pointer') {
+    const state = get();
+    const file = state.files.find(f => f.id === state.activeFileId);
+    if (!file || file.lockedAt || (file as ChartFile & { _loaded?: boolean })._loaded === false) return;
+    let history = historyFor(file, state.layoutHistory[file.id]);
+    if (history.pending && history.pendingKind === kind) return;
+    history = finishLayoutEdit(history);
+    set({ layoutHistory: { ...state.layoutHistory, [file.id]: { ...history, pending: snapshotLayout(file.layoutDiagram), pendingKind: kind } } });
+  },
+  endLayoutEdit(fileId, kind) {
+    const state = get();
+    const id = fileId ?? state.activeFileId;
+    const file = state.files.find(f => f.id === id);
+    if (!file || !state.layoutHistory[file.id]) return;
+    if (kind && state.layoutHistory[file.id].pendingKind !== kind) return;
+    set({ layoutHistory: { ...state.layoutHistory, [file.id]: finishLayoutEdit(historyFor(file, state.layoutHistory[file.id])) } });
+  },
+  undoLayout: () => travelLayout(set, get(), 'past'),
+  redoLayout: () => travelLayout(set, get(), 'future'),
+
   addLayoutElement(el) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const newEl: LayoutElement = { ...el, id: uuidv4() };
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: [...f.layoutDiagram.elements, newEl] }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    changeLayout(set, get(), layout => ({ ...layout, elements: [...layout.elements, { ...el, id: uuidv4() }] }));
   },
-
   updateLayoutElement(id, partial) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(el => el.id === id ? { ...el, ...partial } : el) }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    get().updateLayoutElements({ [id]: partial });
   },
-
   updateLayoutElements(patches) {
-    set(s => {
-      if (!s.activeFileId || !Object.keys(patches).length) return s;
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, elements: f.layoutDiagram.elements.map(el => patches[el.id] ? { ...el, ...patches[el.id] } : el) }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    changeLayout(set, get(), layout => ({ ...layout, elements: layout.elements.map(el => patches[el.id] ? { ...el, ...patches[el.id] } : el) }));
   },
-
   deleteLayoutElements(ids) {
-    set(s => {
-      if (!s.activeFileId || !ids.length) return s;
-      const removed = new Set(ids);
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: {
-                elements: f.layoutDiagram.elements.filter(el => !removed.has(el.id)),
-                connections: f.layoutDiagram.connections.filter(c => !removed.has(c.fromId ?? '') && !removed.has(c.toId ?? '')),
-              }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    const removed = new Set(ids);
+    changeLayout(set, get(), layout => ({ ...layout,
+      elements: layout.elements.filter(el => !removed.has(el.id)),
+      connections: layout.connections.filter(c => !removed.has(c.fromId ?? '') && !removed.has(c.toId ?? '')),
+    }));
   },
-
-  deleteLayoutElement(id) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? {
-                ...f,
-                layoutDiagram: {
-                  elements: f.layoutDiagram.elements.filter(el => el.id !== id),
-                  connections: f.layoutDiagram.connections.filter(c => c.fromId !== id && c.toId !== id),
-                },
-                updatedAt: new Date().toISOString(),
-              }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
-  },
-
+  deleteLayoutElement(id) { get().deleteLayoutElements([id]); },
   addLayoutConnection(conn) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const newConn: LayoutConnection = { ...conn, id: conn.id ?? uuidv4() };
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: [...f.layoutDiagram.connections, newConn] }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    changeLayout(set, get(), layout => ({ ...layout, connections: [...layout.connections, { ...conn, id: conn.id ?? uuidv4() }] }));
   },
-
   updateLayoutConnection(id, partial) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: f.layoutDiagram.connections.map(c => c.id === id ? { ...c, ...partial } : c) }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    changeLayout(set, get(), layout => ({ ...layout, connections: layout.connections.map(c => c.id === id ? { ...c, ...partial } : c) }));
   },
-
   deleteLayoutConnection(id) {
-    set(s => {
-      if (!s.activeFileId) return s;
-      const next = {
-        ...s,
-        files: s.files.map(f =>
-          f.id === s.activeFileId
-            ? { ...f, layoutDiagram: { ...f.layoutDiagram, connections: f.layoutDiagram.connections.filter(c => c.id !== id) }, updatedAt: new Date().toISOString() }
-            : f
-        ),
-      };
-      persistLocal(next);
-      return next;
-    });
+    changeLayout(set, get(), layout => ({ ...layout, connections: layout.connections.filter(c => c.id !== id) }));
   },
 }));
