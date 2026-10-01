@@ -2,6 +2,12 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-01 (Codex: Layout Job 02 Production release)
+
+- Released source `550c566` via manual Cloudflare Pages deployment `https://016a8bac.man-machine-chart.pages.dev`. Canonical `https://man-machine-chart.pages.dev/editor` loaded BYDSidestep's existing Layout and Undo/Redo buttons (disabled correctly with no session history), with zero console errors. Saved screenshot evidence to ignored `.tmp/layout-undo-production.png`.
+- Post-release read-only GET comparison matched all 11 folder IDs/parent mappings and full content of all 19 active charts against fresh backup `2026-10-01_undo-layout_153126`. No Production mutation, schema/API/config change or live chart Save. Local UI and store tests provide the Undo/Redo behavior evidence; Production was checked read-only.
+- Final QA: 238/238 tests, build and targeted lint PASS. Master Plan v1.30 and Layout plan mark Job 02 released/awaiting Owner trial; Job 03 remains proposed. Rollback target is Pages `2520fa0b` / source `44ce754`.
+
 ## 2026-10-01 (Codex: Layout Job 02 Undo/Redo — implementation)
 
 - Owner tried Copy and authorized Job 02. Added Layout Undo/Redo buttons and Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z. Changes cover shapes, group names/styles, drag/resize/rotation, grouped delete with attached connectors, copy/paste/duplicate and connector edits. History is separate per chart, capped at 100 edits, excluded from local/Cloud persistence, and restores only Layout while preserving other chart modules/clipboard.
