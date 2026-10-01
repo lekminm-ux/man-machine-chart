@@ -29,6 +29,7 @@ function loadTypeScriptModule(relativePath, mocks = {}) {
       if (id === '@/lib/chart-utils') return loadTypeScriptModule('src/lib/chart-utils.ts');
       if (id === '@/lib/time-study') return loadTypeScriptModule('src/lib/time-study.ts');
       if (id === '@/lib/machine-capacity') return loadTypeScriptModule('src/lib/machine-capacity.ts');
+      if (id === '@/lib/layout-copy') return loadTypeScriptModule('src/lib/layout-copy.ts');
       if (id === './chart-utils') return loadTypeScriptModule('src/lib/chart-utils.ts');
       if (id === './time-study') return loadTypeScriptModule('src/lib/time-study.ts');
       return require(id);
@@ -218,6 +219,55 @@ test('layout group moves together in one batch and deletion removes attached con
 });
 
 // ── Phase 0B: runtime data-safety guards ─────────────────────────────────────
+
+test('Layout clipboard pastes across charts, preserves originals, and stays out of saved data', async () => {
+  const persisted = [];
+  const store = await freshReadyStore({ saveLocalDatabase: state => persisted.push(state) });
+  await store.getState().createFolder('Copy Test', 'custom');
+  await store.getState().createFile(store.getState().folders[0].id, 'Source');
+  store.getState().addLayoutElement({ type: 'rack', label: 'Rack', x: 10, y: 10, width: 80, height: 40, color: '#334155' });
+  const original = store.getState().activeFile();
+  const originalEl = original.layoutDiagram.elements[0];
+  assert.equal(store.getState().copyLayoutSelection([originalEl.id]), true);
+  store.getState().updateLayoutElement(originalEl.id, { label: 'Source changed' });
+  await store.getState().createFile(original.folderId, 'Destination');
+  const bounds = { width: 1000, height: 1000 };
+  const pasted = store.getState().pasteLayoutClipboard(bounds);
+  const second = store.getState().pasteLayoutClipboard(bounds);
+  const destination = store.getState().activeFile();
+  assert.equal(destination.layoutDiagram.elements.length, 2);
+  assert.equal(destination.layoutDiagram.elements[0].label, 'Rack', 'clipboard is a snapshot');
+  assert.notEqual(pasted[0], originalEl.id);
+  assert.notEqual(second[0], pasted[0]);
+  assert.equal(destination.layoutDiagram.elements[1].x, originalEl.x + 48);
+  assert.equal(store.getState().files.find(f => f.id === original.id).layoutDiagram.elements.length, 1);
+  assert.ok(persisted.every(state => !('layoutClipboard' in state) && !('layoutPasteCount' in state)));
+  const clipboard = store.getState().layoutClipboard;
+  const duplicate = store.getState().duplicateLayoutSelection(pasted, bounds);
+  assert.equal(duplicate.length, 1);
+  assert.equal(store.getState().layoutClipboard, clipboard, 'Duplicate leaves the copied buffer intact');
+});
+
+test('Layout paste and duplicate cannot edit locked or unloaded charts', async () => {
+  const store = await freshReadyStore();
+  await store.getState().createFolder('Locked Copy', 'custom');
+  await store.getState().createFile(store.getState().folders[0].id, 'Source');
+  store.getState().addLayoutElement({ type: 'rack', label: 'Rack', x: 10, y: 10, width: 80, height: 40 });
+  const file = store.getState().activeFile();
+  const ids = file.layoutDiagram.elements.map(el => el.id);
+  const bounds = { width: 1000, height: 1000 };
+  store.setState({ files: [{ ...file, lockedAt: '2026-10-01T00:00:00Z' }] });
+  assert.equal(store.getState().copyLayoutSelection(ids), true, 'copy is read-only');
+  assert.equal(store.getState().pasteLayoutClipboard(bounds).length, 0);
+  assert.equal(store.getState().duplicateLayoutSelection(ids, bounds).length, 0);
+  assert.equal(store.getState().activeFile().layoutDiagram.elements.length, 1);
+  store.setState({ files: [{ ...file, _loaded: false }] });
+  assert.equal(store.getState().pasteLayoutClipboard(bounds).length, 0);
+  assert.equal(store.getState().copyLayoutSelection(ids), false);
+  assert.equal(store.getState().duplicateLayoutSelection(ids, bounds).length, 0);
+  assert.equal(store.getState().activeFile().layoutDiagram.elements.length, 1);
+  assert.equal(store.getState().layoutPasteCount, 0);
+});
 
 test('duplicateFile starts a copied locked chart as an open revision', async () => {
   const store = await freshReadyStore();

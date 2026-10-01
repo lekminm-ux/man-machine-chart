@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   AppDatabase, ChartFile, ChartFolder, ChartStep,
-  ChartHeader, ProcessType, LayoutElement, LayoutConnection,
+  ChartHeader, ProcessType, LayoutElement, LayoutConnection, LayoutDiagram,
   TimeStudy, TimeStudyRow, MachineCapacity, KaizenSheet, TrashEntry,
 } from '@/types';
 import {
@@ -22,6 +22,7 @@ import {
   type PushBasis,
 } from '@/lib/time-study';
 import { emptyMachineCapacity, machineCapacityFromTimeStudy } from '@/lib/machine-capacity';
+import { captureLayoutSelection, cloneLayoutSelection, type LayoutCopyBounds } from '@/lib/layout-copy';
 
 // ── Sync status ─────────────────────────────────────────────────────────────
 // 'unconfirmed' is distinct from 'error': the write call itself reported
@@ -45,6 +46,8 @@ interface ChartState extends AppDatabase {
   trashEntries: TrashEntry[];
   trashMessage: string | null;
   activeModule: 1 | 2 | 3 | 4 | 5 | 6;
+  layoutClipboard: LayoutDiagram | null; // session only; excluded from local/cloud persistence
+  layoutPasteCount: number;
 
   setActiveModule: (m: 1 | 2 | 3 | 4 | 5 | 6) => void;
 
@@ -104,6 +107,9 @@ interface ChartState extends AppDatabase {
   updateOperatorPosition: (operator: string, position: string) => void;
 
   // Layout actions
+  copyLayoutSelection: (ids: string[]) => boolean;
+  pasteLayoutClipboard: (bounds: LayoutCopyBounds) => string[];
+  duplicateLayoutSelection: (ids: string[], bounds: LayoutCopyBounds) => string[];
   addLayoutElement: (el: Omit<LayoutElement, 'id'>) => void;
   updateLayoutElement: (id: string, partial: Partial<LayoutElement>) => void;
   updateLayoutElements: (patches: Record<string, Partial<LayoutElement>>) => void;
@@ -294,7 +300,34 @@ function recalcCycleTime(steps: ChartStep[]): number {
   return total > 0 ? total : 60;
 }
 
+/** Append the copied layout in one local update; Cloud Save remains explicit. */
+function insertLayoutCopy(
+  set: Setter, state: ChartState, source: LayoutDiagram, offset: number, bounds: LayoutCopyBounds,
+): string[] {
+  const file = state.files.find(f => f.id === state.activeFileId);
+  if (!file || blockUnloadedFile(set, 'Paste Layout', file) || blockLockedFile(set, 'Paste Layout', file)) return [];
+  const copy = cloneLayoutSelection(source, file.layoutDiagram.elements, uuidv4, offset, bounds);
+  if (!copy.elements.length) return [];
+  const next = {
+    ...state,
+    files: state.files.map(f => f.id === file.id ? {
+      ...f,
+      layoutDiagram: {
+        ...f.layoutDiagram,
+        elements: [...f.layoutDiagram.elements, ...copy.elements],
+        connections: [...f.layoutDiagram.connections, ...copy.connections],
+      },
+      updatedAt: new Date().toISOString(),
+    } : f),
+  };
+  set(next);
+  persistLocal(next);
+  return copy.elements.map(el => el.id);
+}
+
 export const useChartStore = create<ChartState>((set, get) => ({
+  layoutClipboard: null,
+  layoutPasteCount: 0,
   folders: [],
   files: [],
   activeFileId: null,
@@ -1106,6 +1139,31 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   // ── Layout (local only — auto-saved on saveActiveFile) ────────────────────────
+  copyLayoutSelection(ids) {
+    const file = get().activeFile();
+    if (!file || (file as ChartFile & { _loaded?: boolean })._loaded === false) return false;
+    const layoutClipboard = captureLayoutSelection(file.layoutDiagram, ids);
+    if (!layoutClipboard) return false;
+    set({ layoutClipboard, layoutPasteCount: 0 });
+    return true;
+  },
+
+  pasteLayoutClipboard(bounds) {
+    const state = get();
+    if (!state.layoutClipboard) return [];
+    const ids = insertLayoutCopy(set, state, state.layoutClipboard, 24 * (state.layoutPasteCount + 1), bounds);
+    if (ids.length) set({ layoutPasteCount: state.layoutPasteCount + 1 });
+    return ids;
+  },
+
+  duplicateLayoutSelection(ids, bounds) {
+    const state = get();
+    const file = state.activeFile();
+    if (!file || (file as ChartFile & { _loaded?: boolean })._loaded === false) return [];
+    const source = captureLayoutSelection(file.layoutDiagram, ids);
+    return source ? insertLayoutCopy(set, state, source, 24, bounds) : [];
+  },
+
   addLayoutElement(el) {
     set(s => {
       if (!s.activeFileId) return s;

@@ -99,7 +99,7 @@ export default function EditorPage() {
 
                   {/* ── Layout Diagram (Full Width) ──── */}
                   <div className="w-full">
-                    <LayoutDiagram />
+                    <LayoutDiagram key={activeFile.id} />
                   </div>
 
                   {/* ── Line Total Summary ──── */}

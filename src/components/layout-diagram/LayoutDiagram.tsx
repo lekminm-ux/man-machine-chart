@@ -327,12 +327,17 @@ export default function LayoutDiagram() {
   const addConn      = useChartStore(s => s.addLayoutConnection);
   const updateConn   = useChartStore(s => s.updateLayoutConnection);
   const deleteConn   = useChartStore(s => s.deleteLayoutConnection);
+  const copyLayout   = useChartStore(s => s.copyLayoutSelection);
+  const pasteLayout  = useChartStore(s => s.pasteLayoutClipboard);
+  const duplicateLayout = useChartStore(s => s.duplicateLayoutSelection);
+  const clipboardCount = useChartStore(s => s.layoutClipboard?.elements.length ?? 0);
 
   const [selectedIds, setSelectedIds]       = useState<string[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [connectMode, setConnectMode]       = useState(false);
   const [connectFrom, setConnectFrom]       = useState<string | null>(null);
   const [hoveredId, setHoveredId]           = useState<string | null>(null);
+  const [copyNotice, setCopyNotice]         = useState('');
   const layoutElementsRef = useRef(activeFile?.layoutDiagram.elements ?? []);
   useEffect(() => { layoutElementsRef.current = activeFile?.layoutDiagram.elements ?? []; }, [activeFile?.layoutDiagram.elements]);
   // Excel-style drag-to-connect: live rubber-band from a source element to the cursor.
@@ -351,11 +356,47 @@ export default function LayoutDiagram() {
   >(null);
   const svgRef    = useRef<SVGSVGElement>(null);
 
+  const copySelected = useCallback(() => {
+    if (copyLayout(selectedIds)) setCopyNotice('Copied. Choose Paste here or in another chart in this tab.');
+  }, [copyLayout, selectedIds]);
+  const pasteSelected = useCallback(() => {
+    const ids = pasteLayout({ width: Math.min(CANVAS_W, svgRef.current?.clientWidth ?? CANVAS_W), height: CANVAS_H });
+    if (!ids.length) return;
+    setSelectedIds(ids);
+    setSelectedConnId(null);
+    setConnectMode(false);
+    setConnectFrom(null);
+    setCopyNotice(`Pasted ${ids.length} element${ids.length === 1 ? '' : 's'}. Drag the copy into place, then Save.`);
+  }, [pasteLayout]);
+  const duplicateSelected = useCallback(() => {
+    const ids = duplicateLayout(selectedIds, { width: Math.min(CANVAS_W, svgRef.current?.clientWidth ?? CANVAS_W), height: CANVAS_H });
+    if (!ids.length) return;
+    setSelectedIds(ids);
+    setSelectedConnId(null);
+    setConnectMode(false);
+    setConnectFrom(null);
+    setCopyNotice(`Duplicated ${ids.length} element${ids.length === 1 ? '' : 's'}. Drag the copy into place, then Save.`);
+  }, [duplicateLayout, selectedIds]);
+
   // Keyboard delete for whichever item is selected
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'c' && selectedIds.length && !window.getSelection()?.toString()) {
+          e.preventDefault(); copySelected(); return;
+        }
+        if (!activeFile?.lockedAt && key === 'v' && clipboardCount) {
+          e.preventDefault(); pasteSelected(); return;
+        }
+        if (!activeFile?.lockedAt && key === 'd' && selectedIds.length) {
+          e.preventDefault(); duplicateSelected(); return;
+        }
+      }
       const isLocked = Boolean(activeFile?.lockedAt);
       if (isLocked) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
@@ -379,7 +420,8 @@ export default function LayoutDiagram() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [deleteMany, deleteConn, updateMany, selectedIds, selectedConnId, activeFile?.lockedAt]);
+  }, [deleteMany, deleteConn, updateMany, selectedIds, selectedConnId, activeFile?.lockedAt,
+    copySelected, pasteSelected, duplicateSelected, clipboardCount]);
 
   const pointer = useCallback((clientX: number, clientY: number): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -613,9 +655,18 @@ export default function LayoutDiagram() {
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
       {/* Header */}
-      <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+      <div className="bg-slate-50 px-4 py-2.5 flex flex-wrap gap-2 items-center justify-between border-b border-slate-200">
         <h3 className="text-slate-700 font-bold text-sm tracking-wide">WORKSTATION LAYOUT DIAGRAM</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={copySelected} disabled={!selectedElements.length}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Copy selected shapes or group (Ctrl+C)">Copy</button>
+          <button onClick={pasteSelected} disabled={isLocked || !clipboardCount}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Paste the Layout copy into this chart (Ctrl+V)">Paste</button>
+          <button onClick={duplicateSelected} disabled={isLocked || !selectedElements.length}
+            className="px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Duplicate selected shapes or group (Ctrl+D)">Duplicate</button>
           <button onClick={groupSelected} disabled={isLocked || selectedIds.length < 2 || Boolean(selectedGroup)}
             className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             title="Group selected shapes and move them together">Group ({selectedIds.length})</button>
@@ -641,6 +692,10 @@ export default function LayoutDiagram() {
             {connectMode ? (connectFrom ? '→ Click target' : '→ Click source') : '↔ Connect boxes'}
           </button>
         </div>
+      </div>
+
+      <div className="px-4 py-1.5 text-xs text-slate-600 border-b border-slate-200 bg-white" role="status">
+        {copyNotice || 'Select a shape or group, then Copy / Paste or Duplicate. Ctrl+C / Ctrl+V / Ctrl+D.'}
       </div>
 
       {/* Palette */}
