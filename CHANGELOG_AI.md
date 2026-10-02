@@ -2,6 +2,14 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-02 (Codex: Sidebar Production release complete)
+
+- Owner explicitly approved Codex Final QA instead of native Sol QA for this one Job and authorized Production. Native Sol QA was NOT EXECUTED; central policy/config/routing/Memory and other Apps are unchanged. Same-artifact Pro review remains PASS_WITH_LIMITATIONS.
+- Application source commit `15e3d35` pushed to main. Manual Pages deployment `06e4ef5a-555e-4000-9201-adf3b2e8d1d4` succeeded; automatic Git deployment `18f1f890-0e8f-49b2-90b8-ec31e2caea78` also built the same source. Canonical Production serves the automatic build. Verified all eight canonical JavaScript assets against that deployment by SHA256; all seven manual assets match local webpack `out`. An initial comparison against local webpack encountered a different automatic-build asset name; deployment/source verification resolved the mismatch without changing configuration.
+- Fresh root tests238/238, webpack build/TypeScript and scoped lint exit0/two low warnings. Live `/editor`: longer names at 320px Sidebar, one always-visible three-dot trigger, all five menu actions, existing chart opening, Copy dialog and Cancel returning focus passed; console errors/warnings empty. Prior isolated Duplicate/cross-folder Copy persistence and independent IDs passed. Move remains denied pending server auth; Move/Trash native-dialog runtime checks remain NOT TESTED.
+- GET-only pre/post comparison: all 11 folder metadata/hierarchy and 19 active chart metadata/full contents match. No Production chart Save/Copy/Move/Delete, migration or Worker change. Verified backup SHA256 `99306802870c8fac32b8f10052ec95314090bd72cd11dc8252ece2ed8991ab0b`. Rollback `506067fe-1df5-4bcc-a985-dffc2de2c7cd`, source `1af5aa2`.
+- Evidence: ignored `.tmp/sidebar-menu-release-20261002` contains backup/comparison, test/build/lint/deploy logs, deployment lists, bundle SHA proof and `production-menu.png`. Master Plan v1.31 status/roadmap/changelog updated after live verification. This closeout commit changes documentation only; any automatic build from it carries the same application files as `15e3d35`. Await Owner trial; Layout Job03 remains proposed. No verified Manager/native QA closeout is claimed while Hermes auth is unavailable.
+
 ## 2026-10-02 (Codex: Owner-authorized Sidebar Production release preflight)
 
 - Owner requested completion of Production deployment and explicitly approved using Codex Final QA instead of native Sol QA for this one Job. This exception does not change the central runbook or other App Tasks; native Sol QA was not executed. No further DEV or release approval is needed for the same scoped menu release.

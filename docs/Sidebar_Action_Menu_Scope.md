@@ -1,8 +1,16 @@
 # APP02 — Sidebar file action menu
 
 Date: 2026-10-02 (Asia/Bangkok)
-Status: Owner authorized Production release and explicitly approved Codex Final QA instead of native Sol QA for this Job. Exact reviewed artifacts applied locally; fresh root build/tests pass; GET-only Production backup verified. Commit/push/manual deploy/live verification pending at this checkpoint. Native Sol QA was not executed; the one-Job exception does not change central policy. Move/Trash native-dialog runtime checks remain NOT TESTED.
+Status: RELEASED / LIVE VERIFIED. Source `15e3d35` on main; manual Pages `06e4ef5a`, automatic Git Pages `18f1f890` (same source), canonical verified against automatic build. Owner approved Codex Final QA instead of native Sol QA for this Job; native Sol QA NOT EXECUTED. Tests238/238, build/TypeScript and scoped lint pass (two low warnings). Live menu/longer names/Copy Cancel focus pass, zero console errors/warnings. GET-only comparison matches all 11 folders and 19 active chart contents; no Production data mutation. Move remains denied; Move/Trash native-dialog runtime checks NOT TESTED. Await Owner trial before another Job. Earlier blocked/pending entries are historical.
 Baseline: clean `main`, `1af5aa2`; `git pull --ff-only` reported already up to date.
+
+## Final release evidence (2026-10-02)
+
+- Production: `https://man-machine-chart.pages.dev/editor`. At unchanged 320px Sidebar, isolated measurement increased name width from 88.61px to185.37px; live UI shows the longer name and single menu trigger.
+- Manual deployment `06e4ef5a-555e-4000-9201-adf3b2e8d1d4`; automatic deployment `18f1f890-0e8f-49b2-90b8-ec31e2caea78`; both source `15e3d35`. Seven manual JavaScript assets match local webpack output; eight canonical assets match automatic Turbopack deployment by SHA256.
+- Live chart opening, five menu actions, Copy destination dialog and Cancel focus verified without saving or copying live data. Backup/comparison and screenshot: `.tmp/sidebar-menu-release-20261002`. Folder hierarchy/metadata, chart metadata and all full contents match (11 folders/19 charts).
+- Rollback: Pages `506067fe-1df5-4bcc-a985-dffc2de2c7cd`, source `1af5aa2`. No schema/API/store/Worker release. Documentation closeout can trigger another Git build of unchanged application code.
+- One-Job Owner QA exception is explicit; it does not establish native QA PASS or authorize central policy/config/Memory changes. No verified Hermes Manager closeout is claimed.
 
 ## Owner request
 

@@ -12,6 +12,8 @@ Primary app folder: the repository root itself (`src/`, `functions/`, `tests/`, 
 
 ## Active APP02MMO task (2026-09-28)
 
+- **2026-10-02 Sidebar released and verified:** Application commit `15e3d35` pushed to main. Manual Production Pages deployment `06e4ef5a-555e-4000-9201-adf3b2e8d1d4` succeeded; Git integration also built Production `18f1f890-0e8f-49b2-90b8-ec31e2caea78` from the same source. Canonical `/editor` serves the automatic build; all eight JavaScript assets match that deployment by SHA256, and all seven manual-build assets match local `out`. Live longer filenames, one menu trigger, five actions, existing chart opening and Copy dialog Cancel/focus passed with zero console errors/warnings. Sidebar remains 320px. GET-only comparison matches all metadata, hierarchy and full chart contents: 11 folders/19 active charts unchanged. No Production chart mutation. Tests238/238, build/TypeScript and scoped lint passed (two low warnings). Owner explicitly approved Codex Final QA replacing native Sol QA for this Job; native QA NOT EXECUTED. Move remains denied pending server auth; Move/Trash native-dialog runtime checks remain unverified. Rollback `506067fe-1df5-4bcc-a985-dffc2de2c7cd` / `1af5aa2`. Release proof is under ignored `.tmp/sidebar-menu-release-20261002`; the preflight/held-release bullets below are historical. Await Owner trial before another Job; Layout Job03 remains proposed. Central routing/config/Memory and other Apps were not changed.
+
 - **2026-10-02 Sidebar release authorized/preflight passed:** Owner approved completing Production release and explicitly chose Codex Final QA instead of native Sol QA for this one Job. Applied only the exact two reviewed menu/Sidebar artifacts; root tests238/238, scoped lint exit0/two low warnings and webpack build/TypeScript pass. Fresh GET-only backup verifies 11 folders/19 active charts, SHA `99306802870c8fac32b8f10052ec95314090bd72cd11dc8252ece2ed8991ab0b`; rollback Pages `506067fe-1df5-4bcc-a985-dffc2de2c7cd` / source `1af5aa2`. Cloudflare OAuth works with system CA trust. Commit/push/deploy/live verification still pending at this checkpoint. Native QA remains NOT EXECUTED under an explicit one-Job Owner exception; do not change central routing/config or mark native QA passed. Earlier held-release bullets are historical and superseded only for this approved Job.
 
 - **2026-10-02 Sidebar DEV verified locally; native QA route blocked:** Latest authenticated Files readback matches Sidebar SHA `b504170d4dcb80d3f164f177a587fa8f2498e5906ad107220eeecb8c4e46cfe2` and new menu SHA `8e7cfbe3d09bd4cf1b08f5c25d202f9c9e044ef6d5ac4a872afbbe9a2b6fe94a`. Gemini fixed syntax, ancestor/cycle cleanup, portal overflow and Copy dialog focus. Isolated Codex scoped lint exit0 (two low warnings), tests238/238 and webpack build/TypeScript pass. Synthetic UI verifies longer filename185.37px vs88.61px baseline at320px, one trigger, menu bounds, keyboard/Escape, Rename focus/cancel, Copy cancel focus, Duplicate and cross-folder Copy with source preserved and new chart/shape IDs. Pro same-SHA review: PASS_WITH_LIMITATIONS, external tests not executed by reviewer. Move/Trash native dialogs remain runtime NOT TESTED due browser bridge failure. Manager's read-only capability check cannot prove/launch the required native restricted Sol QA session with effective tool restrictions/6turns/120seconds/DB binding; Dashboard QA is prohibited. Keep Task `t_d4d6e13f` and exact approved DEV workspace. Local Source-of-Truth source remains unchanged; DEV copies/evidence are ignored under `.tmp`. No apply/commit/push/deploy/Production/Memory approval is implied; readiness is not a release PASS. Older bullets below are historical; current continuation is in `docs/Sidebar_Action_Menu_Scope.md`.
@@ -434,13 +436,14 @@ to the user.
 
 Why steps 3 and 4 are in this order and are not optional:
 
-- **Deployment is manual (verified 2026-08-01).** Pushing to GitHub does NOT publish
-  the site. A push sat for 13 hours with zero Cloudflare Pages builds, so the Git
-  integration is either disabled or its builds fail. The user sees only the deployed
-  site, so work that is committed but not deployed looks like nothing happened.
-  wrangler is already authenticated on this machine. The root cause still needs
-  fixing in the Cloudflare dashboard (Workers & Pages -> man-machine-chart ->
-  Settings -> Builds & deployments); until then, deploy by hand every time.
+- **Verify the actual Production build after each release.** On 2026-08-01 a push
+  produced no Pages build, so manual deployment was required. On 2026-10-02 this
+  release produced both manual `06e4ef5a` and automatic Git `18f1f890`, source
+  `15e3d35`; canonical served the automatic build. This observed release does not
+  prove all future pushes will deploy. Check deployment source/status, live UI and
+  canonical assets; a successful push or CLI exit alone is insufficient. Manual
+  webpack and automatic Turbopack assets can differ for the same source. No Pages
+  integration configuration was changed during this release.
 - **Master Plan update rule (user requirement, 2026-07-31).** Update
   `docs/Master_Plan.html` only AFTER verification passes. Never move a status badge
   to "done" on the strength of code that merely looks right.
