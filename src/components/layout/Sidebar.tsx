@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useChartStore } from '@/store/useChartStore';
 import type { ChartFile, ChartFolder, ProcessType } from '@/types';
+import { SidebarActionMenu, SidebarCopyDialog } from './SidebarActionMenu';
 
 const LEVEL_ICONS = ['🏭', '⚙️', '📦', '🗃️'];
 const LEVEL_COLORS = ['text-yellow-500', 'text-green-400', 'text-blue-300', 'text-slate-400'];
@@ -78,6 +79,7 @@ export default function Sidebar() {
   const [newFileName, setNewFileName]           = useState('');
 
   const [movingTarget, setMovingTarget]         = useState<ContextTarget>(null);
+  const [openMenuFileId, setOpenMenuFileId]     = useState<string | null>(null);
   const [copyingFileId, setCopyingFileId]       = useState<string | null>(null);
   const [trashOpen, setTrashOpen]                 = useState(false);
   const [clockNow, setClockNow]                   = useState(() => Date.now());
@@ -86,6 +88,66 @@ export default function Sidebar() {
     const timer = window.setInterval(() => setClockNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Close menu and copying dialog when active chart changes or cloud becomes unavailable
+  // Avoid synchronous setState in effects by handling transitions during render
+  const [prevActiveFileId, setPrevActiveFileId] = useState(activeFileId);
+  if (prevActiveFileId !== activeFileId) {
+    setPrevActiveFileId(activeFileId);
+    if (openMenuFileId !== null) setOpenMenuFileId(null);
+    if (copyingFileId !== null) setCopyingFileId(null);
+  }
+
+  const [prevCloudReady, setPrevCloudReady] = useState(cloudReady);
+  if (prevCloudReady !== cloudReady) {
+    setPrevCloudReady(cloudReady);
+    if (!cloudReady) {
+      if (openMenuFileId !== null) setOpenMenuFileId(null);
+      if (copyingFileId !== null) setCopyingFileId(null);
+    }
+  }
+
+  // Derive confirmed folders for copy target selection
+  const confirmedFolders = folders.filter(f => {
+    const status = f as ChartFolder & { _unconfirmed?: boolean; _unsynced?: boolean };
+    return !status._unconfirmed && !status._unsynced;
+  });
+
+  const isFolderAndAncestorsExpanded = (folderId: string | null | undefined): boolean => {
+    let currentId: string | null | undefined = folderId;
+    const visited = new Set<string>();
+    while (currentId) {
+      if (visited.has(currentId)) return false;
+      visited.add(currentId);
+      const folder = folders.find(f => f.id === currentId);
+      if (!folder || !folder.expanded) return false;
+      currentId = folder.parentId;
+    }
+    return Boolean(folderId);
+  };
+
+  // Derive valid open menu file: must exist in files and parent folder must be expanded
+  const openMenuFile = openMenuFileId ? files.find(f => f.id === openMenuFileId) : null;
+  const isMenuFolderExpanded = openMenuFile
+    ? isFolderAndAncestorsExpanded(openMenuFile.folderId)
+    : false;
+  const effectiveOpenMenuFileId = (openMenuFile && isMenuFolderExpanded) ? openMenuFileId : null;
+
+  // Derive valid copying file: must exist, cloud must be ready, and parent folder must be expanded
+  const copyingFile = (copyingFileId && cloudReady)
+    ? files.find(f => f.id === copyingFileId)
+    : null;
+  const isCopyingFolderExpanded = copyingFile
+    ? isFolderAndAncestorsExpanded(copyingFile.folderId)
+    : false;
+  const effectiveCopyingFile = (copyingFile && isCopyingFolderExpanded) ? copyingFile : null;
+
+  if (openMenuFileId && !effectiveOpenMenuFileId) {
+    setOpenMenuFileId(null);
+  }
+  if (copyingFileId && !effectiveCopyingFile) {
+    setCopyingFileId(null);
+  }
 
   const warningStart = clockNow + 7 * 24 * 60 * 60 * 1000;
   const expiringEntries = trashEntries.filter(entry => !entry.purgeStartedAt && Date.parse(entry.expiresAt) <= warningStart);
@@ -269,7 +331,11 @@ export default function Sidebar() {
                     : 'hover:bg-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
                 style={{ marginLeft: `${indent + 24}px` }}
-                onClick={() => openFile(file.id)}
+                onClick={() => {
+                  setOpenMenuFileId(null);
+                  setCopyingFileId(null);
+                  openFile(file.id);
+                }}
               >
                 <span className="text-base flex-shrink-0 drop-shadow-sm mr-1">📋</span>
 
@@ -286,7 +352,7 @@ export default function Sidebar() {
                   />
                 ) : (
                   <span
-                    className={`flex-1 text-xs font-medium truncate ${movingTarget?.id === file.id ? 'opacity-30' : ''}`}
+                    className={`min-w-0 flex-1 text-xs font-medium truncate ${movingTarget?.id === file.id ? 'opacity-30' : ''}`}
                     onMouseEnter={e => showNameTip(e, file.name)}
                     onMouseLeave={hideNameTip}
                   >
@@ -295,72 +361,25 @@ export default function Sidebar() {
                 )}
                 {unsyncedBadge(file as ChartFile & { _unsynced?: boolean; _unconfirmed?: boolean })}
 
-                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                  <button
-                    onClick={e => { e.stopPropagation(); duplicateFile(file.id); }}
-                    className="text-slate-400 hover:text-slate-700 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Duplicate Chart"
-                  >📋</button>
-                  <button
-                    disabled={!cloudReady}
-                    onClick={e => {
-                      e.stopPropagation();
-                      setCopyingFileId(copyingFileId === file.id ? null : file.id);
-                    }}
-                    className={`text-[10px] p-1 rounded transition-colors ${
-                      !cloudReady
-                        ? 'opacity-30 cursor-not-allowed text-slate-400'
-                        : 'text-slate-400 hover:text-blue-600 hover:bg-slate-300'
-                    }`}
-                    title={cloudReady ? "Copy to Folder" : "Cloud unavailable"}
-                  >📑</button>
-                  {copyingFileId === file.id && (
-                    <span className="flex items-center gap-1 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs shadow-sm" onClick={e => e.stopPropagation()}>
-                      <select
-                        defaultValue=""
-                        onChange={e => {
-                          if (e.target.value) {
-                            duplicateFile(file.id, e.target.value);
-                            setCopyingFileId(null);
-                          }
-                        }}
-                        className="bg-transparent text-slate-800 text-[10px] focus:outline-none"
-                      >
-                        <option value="" disabled>Select target folder…</option>
-                        {folders.filter(f => {
-                          const status = f as ChartFolder & { _unconfirmed?: boolean; _unsynced?: boolean };
-                          return !status._unconfirmed && !status._unsynced;
-                        }).map(f => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => setCopyingFileId(null)}
-                        className="text-[10px] text-slate-500 hover:text-slate-800 font-semibold px-1"
-                        title="Cancel"
-                      >✕</button>
-                    </span>
-                  )}
-                  <button
-                    onClick={e => { e.stopPropagation(); setMovingTarget({ type: 'file', id: file.id }); }}
-                    className="text-slate-400 hover:text-blue-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Move"
-                  >🔄</button>
-                  <button
-                    onClick={e => { e.stopPropagation(); setRenaming({ type: 'file', id: file.id }); setRenameValue(file.name); }}
-                    className="text-slate-400 hover:text-slate-700 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Rename"
-                  >✏️</button>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      confirmDeleteFile(file);
-                    }}
-                    disabled={!cloudReady}
-                    className="text-slate-400 hover:text-red-600 text-[10px] p-1 hover:bg-slate-300 rounded transition-colors"
-                    title="Move chart to Trash"
-                  >🗑️</button>
-                </div>
+                <SidebarActionMenu
+                  fileId={file.id}
+                  fileName={file.name}
+                  open={effectiveOpenMenuFileId === file.id}
+                  onOpenChange={(nextOpen) => {
+                    setOpenMenuFileId(nextOpen ? file.id : null);
+                  }}
+                  cloudReady={cloudReady}
+                  onDuplicate={() => duplicateFile(file.id)}
+                  onCopy={() => setCopyingFileId(file.id)}
+                  onMove={() => {
+                    setMovingTarget({ type: 'file', id: file.id });
+                  }}
+                  onRename={() => {
+                    setRenaming({ type: 'file', id: file.id });
+                    setRenameValue(file.name);
+                  }}
+                  onTrash={() => confirmDeleteFile(file)}
+                />
               </div>
             ))}
 
@@ -469,13 +488,33 @@ export default function Sidebar() {
         </div>
       )}
 
+      {/* Copy destination dialog */}
+      {effectiveCopyingFile && (
+        <SidebarCopyDialog
+          fileName={effectiveCopyingFile.name}
+          folders={confirmedFolders}
+          cloudReady={cloudReady}
+          onCopy={(targetFolderId) => {
+            if (
+              cloudReady &&
+              files.some(f => f.id === effectiveCopyingFile.id) &&
+              confirmedFolders.some(f => f.id === targetFolderId)
+            ) {
+              duplicateFile(effectiveCopyingFile.id, targetFolderId);
+            }
+            setCopyingFileId(null);
+          }}
+          onClose={() => setCopyingFileId(null)}
+        />
+      )}
+
       {/* New folder panel */}
       <div className="border-t border-slate-200 p-3 bg-white">
         {showNewFolder ? (
           <div className="space-y-2">
             <div className="text-xs text-blue-600 mb-1 font-semibold">
               {newFolderParent
-                ? `Creating sub-folder in "${folders.find(f => f.id === newFolderParent)?.name}"`
+                ? `Creating sub-folder in \"${folders.find(f => f.id === newFolderParent)?.name}\"`
                 : 'Creating root folder (e.g. PD level)'}
             </div>
             <input
