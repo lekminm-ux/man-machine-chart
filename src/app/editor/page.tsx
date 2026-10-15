@@ -112,7 +112,7 @@ export default function EditorPage() {
               {activeModule === 1 && <Module1_TimeMeasurement />}
               {activeModule === 2 && <Module2_MachineCapacity />}
               {activeModule === 3 && <Module3_CombinationTable />}
-              {activeModule === 5 && <Module5_YamazumiChart />}
+              {activeModule === 5 && <Module5_YamazumiChart key={activeFile.id} />}
               {activeModule === 6 && <Module6_Kaizen />}
 
               {/* ── Approval section ───────────────────────────────── */}
