@@ -1,5 +1,15 @@
 # APP02MMO — M5 Takt Time per-file isolation
 
+## Production release complete — 2026-10-15
+
+Owner explicitly approved commit/push/deploy while acknowledging native drag/locked drag UAT pending. Source commit `0d139b4` is pushed to main. Manual Pages deployment `c4611312-3b57-461b-9c13-200376b1e2e0` succeeded; Git integration also built `d89dbfdc-7cbc-45cd-a1d2-f1d0c47c2f96` from the same source. Canonical editor serves the Git deployment, verified by all8 JavaScript asset SHAs; all7 manual deployment JavaScript assets match the fresh local webpack build.
+
+Fresh release tests245/245, scoped lint and webpack build/TypeScript/static5 passed. Live Production M5 smoke: chart02 saved120 → draft177 → chart03 displays its own saved120; chart03 draft233 → chart02 displays its own saved120. Takt lines reset with the input. No Update Benchmark or Save click, no chart data write. Browser console errors/warnings empty. Original stored values are preserved even when two charts legitimately share120. Synthetic DEV save/readback tests and Owner Takt-isolation acceptance remain separate evidence.
+
+GET-only pre/post verification, including after browser smoke, matches all11folder metadata/hierarchy and20activechart metadata/fullcontent. Backup `.tmp/m5-release-20261015/before.json`, SHA256f2767b44eff67f7a311b4351863bc37ce3d5f346c4c27b1347d0b281d206c4a2. Screenshot `production-m5.png`, browser trace `production-smoke.json`, bundle proof `live-bundles.json`, and test/build/lint/deploy/comparison logs are in the same ignored directory. Rollback Pages08568476-0170-4f5e-84e0-e2cf581d4e64/sourceeef3253.
+
+**Native unlocked drag and locked native drag UAT remain PENDING; complete Owner UAT is not claimed.** Release authorization is approved independently. No code change beyond the exact reviewed artifact; no schema/API/formula/Worker/real-data/Identity/Hermes-config change. The following preflight/no-release checkpoints are historical. Documentation-only closeout may create a further Git build with unchanged application files; verify canonical after that push. Preserve unrelated untracked workflow setup prompt outside this release.
+
 ## Owner release gate / preflight — 2026-10-15
 
 Owner explicitly authorized commit/push/deploy of this reviewed M5 fix to Production and acknowledged that native drag/locked-drag UAT remains pending; do not mark full UAT passed. This supersedes the earlier no-release status only for this exact artifact. No additional implementation/revision loop, formula/API/schema/shared Identity/Hermes config or live chart data correction is authorized.

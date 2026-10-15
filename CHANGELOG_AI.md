@@ -2,6 +2,14 @@
 
 This file is the shared AI work log for Codex, Claude Code, Antigravity, and any other AI tool working on this project.
 
+## 2026-10-15 (Codex: M5 Takt isolation Production release complete)
+
+- Explicit Owner release approval includes commit/push/deploy and acknowledgement of native drag/locked drag UAT pending; complete UAT is NOT marked passed. Source0d139b4 pushed to main; staged page/test bytes independently matched reviewed artifact8a2385e8c7b5a66b9c309b22090183ffec1a7fe72e9cb0a0cefc8bcf661afb60. Gemini remained sole writer; no third revision or replacement QA. Untracked HERMES_WORKFLOW_START_PROMPT.md intentionally excluded/preserved.
+- Manual Pagesc4611312-3b57-461b-9c13-200376b1e2e0 succeeded; automatic Gitd89dbfdc-7cbc-45cd-a1d2-f1d0c47c2f96 also source0d139b4. Canonical HTTP200/8JS asset SHA match automatic deployment; all7 manual JS assets match fresh root webpack build. Existing wrangler.toml missing pages_build_output_dir warning was informational, project deployment succeeded; no config change. Dirty warning refers to preserved unrelated untracked prompt.
+- Fresh npm test245pass/0fail, scoped page ESLint0 and webpack build/TypeScript/static5 passed. Actual live canonical M5: chart02 saved120/draft177 → chart03 own120; chart03 draft233 → chart02 own120, input and Takt line reset correctly. No Update Benchmark/Save click or Production chart mutation; console errors/warnings empty. Distinct persisted values/save/readback were already verified in synthetic DEV, not written live. Screenshot and browser proof retained.
+- GET-only export before and after deployment/browser checks matches all11folder metadata/hierarchy,20activechart metadata and fullcontent. Verified backup SHA256f2767b44eff67f7a311b4351863bc37ce3d5f346c4c27b1347d0b281d206c4a2. Rollback08568476-0170-4f5e-84e0-e2cf581d4e64/sourceeef3253. No schema/API/formula/store/Worker/Identity/Hermes config change or live-value repair.
+- Updated MasterPlanv1.32 status/roadmap/changelog after live verification; current Context/scope supersede historical held/no-release notes. Evidence `.tmp/m5-release-20261015`: before/after/comparison, tests/build/lint/deploy/deployment metadata, live-bundles.json, production-smoke.json, production-m5.png. Documentation closeout push may trigger another same-app-source Git build; verify canonical after that push, without an endless docs/deploy loop. Native unlocked/locked drag and full Owner UAT remain pending after release.
+
 ## 2026-10-15 (Codex: Owner-authorized M5 Production release preflight)
 
 - Owner explicitly approves commit/push/deploy of M5 fix, acknowledges native drag/locked drag pending and instructs not to claim full UAT. Exact already-reviewed Gemini artifact retained; no new writer/Task/revision, no code rewrite. Native Argon103 PASS_WITH_LIMITATIONS, separate SolQA105 DEV_PASS and Manager106 closeout remain the actual same-artifact DEV evidence.
