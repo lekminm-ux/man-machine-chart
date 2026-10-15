@@ -20,7 +20,7 @@ export default function Module5_YamazumiChart() {
   const updateTimeMeasurement = useChartStore(s => s.updateTimeMeasurement);
   const updateTimeStudy = useChartStore(s => s.updateTimeStudy);
 
-  const [localTaktTime, setLocalTaktTime] = useState<number>(
+  const [localTaktTime, setLocalTaktTime] = useState<number | string>(
     activeFile?.timeMeasurement?.taktTime || 60
   );
   const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
@@ -32,7 +32,10 @@ export default function Module5_YamazumiChart() {
   const isLocked = Boolean(activeFile.lockedAt);
 
   const handleSaveTaktTime = () => {
-    updateTimeMeasurement({ taktTime: localTaktTime });
+    const val = Number(localTaktTime);
+    if (localTaktTime !== '' && Number.isFinite(val) && val > 0) {
+      updateTimeMeasurement({ taktTime: val });
+    }
   };
 
   // Group steps by operator.
@@ -130,7 +133,7 @@ export default function Module5_YamazumiChart() {
 
   // Find max total time for scaling the chart height
   const maxTotalTime = Math.max(
-    localTaktTime,
+    Number.isFinite(Number(localTaktTime)) && Number(localTaktTime) > 0 ? Number(localTaktTime) : 0,
     ...operatorTotals.map(t => hasTimeStudy
       ? t.totalMax + t.periodicalMin + t.changeoverMin
       : t.totalMax),
@@ -157,12 +160,28 @@ export default function Module5_YamazumiChart() {
               <span className="text-sm font-bold text-slate-600 mr-2">Takt Time (s):</span>
               <input
                 type="number"
+                step="any"
                 value={localTaktTime}
-                onChange={e => setLocalTaktTime(Number(e.target.value))}
+                onChange={e => {
+                  const raw = e.target.value;
+                  const val = Number(raw);
+                  if (raw !== '' && Number.isFinite(val) && val > 0) {
+                    setLocalTaktTime(val);
+                    updateTimeMeasurement({ taktTime: val });
+                  } else {
+                    setLocalTaktTime(raw);
+                  }
+                }}
                 disabled={isLocked}
-                className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                aria-invalid={localTaktTime === '' || !Number.isFinite(Number(localTaktTime)) || Number(localTaktTime) <= 0}
+                className={`w-16 bg-white border ${localTaktTime === '' || !Number.isFinite(Number(localTaktTime)) || Number(localTaktTime) <= 0 ? 'border-red-500 text-red-600 focus:border-red-500' : 'border-slate-300 focus:border-blue-500'} rounded px-2 py-1 text-sm font-mono text-slate-800 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100`}
               />
             </div>
+            {(localTaktTime === '' || !Number.isFinite(Number(localTaktTime)) || Number(localTaktTime) <= 0) && (
+              <span className="text-xs text-red-500 font-medium">
+                {localTaktTime === '' ? 'Takt time is required' : 'Must be greater than 0'}
+              </span>
+            )}
             <button
               onClick={handleSaveTaktTime}
               disabled={isLocked}
@@ -233,7 +252,7 @@ export default function Module5_YamazumiChart() {
             {/* Takt Time Benchmark Line */}
             <div 
               className="absolute left-10 right-0 z-10 flex items-center pointer-events-none" 
-              style={{ bottom: localTaktTime * pxPerSec + 40 }}
+              style={{ bottom: (Number.isFinite(Number(localTaktTime)) && Number(localTaktTime) > 0 ? Number(localTaktTime) : 0) * pxPerSec + 40 }}
             >
               <div className="flex-1 h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
               <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shadow-sm uppercase tracking-wide">

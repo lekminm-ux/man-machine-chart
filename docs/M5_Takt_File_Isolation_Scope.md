@@ -1,5 +1,24 @@
 # APP02MMO — M5 Takt Time per-file isolation
 
+## 2026-10-15 direct-Save release approved / preflight verified
+
+Owner explicitly approved: "อนุมัติขึ้น Production โดยคง drag UAT เป็น pending". This covers commit/push/deploy of exact Gemini121 M5 SHA79a148007ed465f6de3bf3176d632f029f3c3268a0513ae9baed4af0eab5ed68 after Medium126, separate SolQA128 DEV_PASS, Manager governance closeout188 and Codex actual final QA. Saved High exception and unproven per-run reasoning remain documented. Both per-file isolation and type125 -> one global Save -> closed/new-tab persistence passed actual synthetic DEV; native unlocked/locked drag and full Owner UAT remain PENDING.
+
+Release preflight reverified exact24757B source, all six root read-only members and66 frozen output files. GET-only Production backup11folders/20fullcharts read back SHA256e33c70e82c93e3b83ad81393fc7d86ac2a83ffb1af3d4a6c49dead18243dc8cb; remote main matches62857a2. Rollback Pages55e259d6-76ba-4af1-acc6-7ffd5abc73f6/source62857a2. Evidence .tmp/m5-direct-save-release-20261015. Preserve unrelated untracked workflow prompt; no source revision, new Hermes task, schema/API/formula/real-data/Identity/config change. Publication and live verification are next; older no-release paragraphs below are historical.
+
+
+## 2026-10-15 FINAL DEV closeout — ready for Owner trial, no release
+
+Both Takt DEV requirements are now supported: independent file values and type125 -> one global Save without Benchmark -> fresh GET -> actual tab close/new tab reopen125, with B365 and full unrelated-file invariants. Exact Gemini121 M5 source24757B/SHA79a148007ed465f6de3bf3176d632f029f3c3268a0513ae9baed4af0eab5ed68; independent Medium126 SOURCEPASS; separate native Sol QA SAME t_695e3163/run128 DEV_PASS; Manager native governance closeout comment188 on completed QA card read back. This Manager closeout is evidence-only, not a separate Task/Run or new QA verdict. Run127 BLOCKED/history remains intact.
+
+Human approved saved-High exception for this same Task only: saved_reasoning_effort=high, effective_reasoning_per_run_proven=false. Native QA/Manager did not execute tests; they reconciled actual Codex tests/browser evidence. Codex final local QA confirms source matches exact reviewed bytes, only M5 App diff, seven read-only members unchanged, rejected new test absent from root, unchanged HEAD62857a2, full test245/245 and real-module regression10/10 evidence intact, lint/build pass. Final GET-only DEV8797 full records match accepted A125/B365/default/locked state. No optional repeated tests or additional source revision. Failed Gemini new tests122-125 remain preserved evidence-only under explicit Owner regression-substitute approval.
+
+DEV URL http://127.0.0.1:8797/editor; synthetic local Functions/D1/R2 only. Owner trial instructions: docs/M5_Takt_Direct_Save_UAT.md. Final aggregate: ignored .tmp/m5-direct-save-20261015/M5_DIRECT_SAVE_DEV_ACCEPTANCE.json with source/QA/closeout/evidence hashes. Previous blocked/OPEN checkpoints below are preserved history and superseded only for bounded DEV acceptance. Owner trial, native unlocked/locked drag and full Owner UAT remain PENDING. No commit/push/deploy, Production data/formula/API/schema/Identity/shared Hermes config change or new release approval. Production has not received this direct-Save fix.
+
+## Subsequent direct-Save failure — 2026-10-15
+
+Owner's125 -> global Save -> reopen120 failure is confirmed in actual synthetic local browser/Functions/D1. Prior persistence acceptance used Update Benchmark then Save. The released chart-identity key fixes switch isolation but does not flush the M5 local draft into global Save. New follow-up: [M5_Takt_Direct_Save_Scope.md](M5_Takt_Direct_Save_Scope.md). Status FAIL reproduced / read-only Hermes planning; no new source edit or release. Preserve old native evidence as bounded history; do not claim direct Save or full UAT passed, extend old LOOP2/MAX2, or reuse exact old release authority.
+
 ## Production release complete — 2026-10-15
 
 Owner explicitly approved commit/push/deploy while acknowledging native drag/locked drag UAT pending. Source commit `0d139b4` is pushed to main. Manual Pages deployment `c4611312-3b57-461b-9c13-200376b1e2e0` succeeded; Git integration also built `d89dbfdc-7cbc-45cd-a1d2-f1d0c47c2f96` from the same source. Canonical editor serves the Git deployment, verified by all8 JavaScript asset SHAs; all7 manual deployment JavaScript assets match the fresh local webpack build.
