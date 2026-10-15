@@ -1,5 +1,14 @@
 # CHANGELOG_AI
 
+## 2026-10-15 direct-Save Production released / live verified
+
+Owner-authorized source commit654efc6e71c8cd883f3e8969277dd9589d681f0b is pushed to main. Exact Gemini121 M5 SHA79a148007ed465f6de3bf3176d632f029f3c3268a0513ae9baed4af0eab5ed68 is unchanged from Medium126 / native SolQA128 DEV_PASS / Manager governance closeout188 / Codex final QA. Manual Pages68ab1a7d-5f2a-43ce-91a1-9aaec232e8e0 succeeded; automatic Git6b64eee5-b12e-4a59-a4bf-02f322527977 built the same source. All8 canonical JavaScript assets match the Git deployment; all7 manual assets match the66-member frozen tested local output. Wrangler warned that existing TOML lacks pages_build_output_dir and used existing project settings; no config/binding changes, and deployed GET endpoints remain functional.
+
+Live https://man-machine-chart.pages.dev/editor freshly loaded the new step=any/aria-invalid input. File02 draft177 and file03 draft233 independently survive switches; reload discards unsaved drafts and displays original stored120. No global Save/Benchmark or Production data write was performed. Actual type125 -> ONE global Save -> freshGET125 -> actual tab close/newtab125 was tested in synthetic DEV, not against real Production charts. Console errors/warnings0. GET-only post-deploy and post-browser comparisons match all11folders/20active fullchart records, backup SHAe33c70e82c93e3b83ad81393fc7d86ac2a83ffb1af3d4a6c49dead18243dc8cb.
+
+Native unlocked drag, locked native drag and full Owner UAT remain PENDING. Saved-High/per-run reasoning limitation and rejected newtests122-125 evidence-only disposition remain unchanged. Evidence/receipt/screenshots are under ignored .tmp/m5-direct-save-release-20261015; rollback Pages55e259d6-76ba-4af1-acc6-7ffd5abc73f6/source62857a2. This documentation-only closeout may trigger another Git build of unchanged application source; final canonical verification follows. Unrelated HERMES_WORKFLOW_START_PROMPT.md remains untracked and preserved. No schema/API/formula/real-data/Identity/shared Hermes config change. Older checkpoints below are historical.
+
+
 ## 2026-10-15 direct-Save release approved / preflight verified
 
 Owner explicitly approved: "อนุมัติขึ้น Production โดยคง drag UAT เป็น pending". This covers commit/push/deploy of exact Gemini121 M5 SHA79a148007ed465f6de3bf3176d632f029f3c3268a0513ae9baed4af0eab5ed68 after Medium126, separate SolQA128 DEV_PASS, Manager governance closeout188 and Codex actual final QA. Saved High exception and unproven per-run reasoning remain documented. Both per-file isolation and type125 -> one global Save -> closed/new-tab persistence passed actual synthetic DEV; native unlocked/locked drag and full Owner UAT remain PENDING.

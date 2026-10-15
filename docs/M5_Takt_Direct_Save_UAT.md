@@ -1,6 +1,6 @@
 # M5 Takt — ทดลอง DEV หลังแก้ direct Save
 
-สถานะ: DEV ผ่าน Gemini → Argon Medium → Sol QA128 → Manager closeout → Codex final QA แล้ว; รอ Owner ทดลอง
+สถานะ: เผยแพร่ Production แล้ว commit654efc6 ผ่าน Gemini → Argon Medium → Sol QA128 → Manager closeout → Codex final QA; native drag/locked drag และ full Owner UAT ยัง pending
 
 เปิด http://127.0.0.1:8797/editor แล้วเลือก 5: Yamazumi ใช้ข้อมูลจำลองในโฟลเดอร์ SYNTHETIC M5 UAT - LOCAL ONLY
 
@@ -14,4 +14,6 @@
 
 ข้อจำกัด QA: Owner อนุมัติใช้ config High ที่ยืนยันแล้วเฉพาะ Task t_695e3163; ไม่มีหลักฐาน effective reasoning แยกราย Run; QA เป็นการตรวจหลักฐานอิสระ ส่วนการรันทดสอบ/เบราว์เซอร์ทำโดย Codex
 
-Owner อนุมัติ commit/push/deploy ชุดนี้แล้ว โดยคง native drag/locked drag และ full Owner UAT เป็น pending; อยู่ระหว่างเผยแพร่และตรวจ Production แบบอ่านอย่างเดียว ผล Save/ปิดเปิดใหม่ข้างต้นเป็นผลทดสอบ DEV
+Production: https://man-machine-chart.pages.dev/editor — กด Ctrl+F5 ก่อนทดลอง พิมพ์ Takt ของไฟล์ที่เลือกแล้วกด Save สีฟ้าด้านบนได้เลย ไม่ต้องกด Update Benchmark จากนั้นปิด–เปิดเว็บตรวจค่าและสลับไฟล์อื่น
+
+Codex ทดสอบ Save/ปิดเปิดใหม่ครบใน DEV ข้างต้น; Production ตรวจโค้ดใหม่/draft แยกไฟล์/console และเทียบข้อมูลก่อน–หลังแบบอ่านอย่างเดียว ไม่ได้กด Save ข้อมูลจริง ผล Owner Production trial ยังรอยืนยัน และไม่ได้ลงว่า UAT ผ่านทั้งหมด
